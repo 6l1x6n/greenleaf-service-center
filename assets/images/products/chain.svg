@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Шина и цепь</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="200" cy="160" rx="95" ry="40" transform="rotate(-14 200 160)"/>
+    <ellipse cx="200" cy="160" rx="70" ry="22" transform="rotate(-14 200 160)"/>
+    <path d="M258 128 l30 30"/>
+    <circle cx="150" cy="70" r="14"/>
+    <path d="M136 84 l14 18"/>
+  </g>
+  <path d="M118 176 a95 95 0 0 0 30 22" stroke="#a8e063" stroke-width="10"/>
+</svg>

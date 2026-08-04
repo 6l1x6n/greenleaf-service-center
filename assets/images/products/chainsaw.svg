@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Бензопила</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 200 L260 150"/>
+    <rect x="118" y="178" width="70" height="46" rx="8"/>
+    <path d="M188 200 l40 -15"/>
+    <circle cx="200" cy="110" r="26"/>
+    <path d="M220 128 l30 14"/>
+  </g>
+  <path d="M255 152 L300 132" stroke="#a8e063" stroke-width="12" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Триммер</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M190 60 v150"/>
+    <path d="M190 210 h-45 v30 h60 v-30 z"/>
+    <circle cx="175" cy="70" r="16"/>
+    <path d="M160 220 q-15 10 0 30"/>
+    <path d="M190 240 h-30"/>
+  </g>
+  <path d="M148 228 L176 246" stroke="#a8e063" stroke-width="12" stroke-linecap="round"/>
+  <path d="M152 252 L178 240" stroke="#a8e063" stroke-width="12" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="160" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#5b7a66">Фото товара</text>
+  <rect x="165" y="125" width="70" height="70" rx="14" fill="none" stroke="#a8e063" stroke-width="8"/>
+  <circle cx="262" cy="145" r="6" fill="#a8e063"/>
+  <circle cx="210" cy="190" r="6" fill="#a8e063"/>
+  <circle cx="172" cy="112" r="6" fill="#a8e063"/>
+</svg>

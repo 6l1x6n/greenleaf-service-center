@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Мотокоса</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M180 60 v150"/>
+    <path d="M180 210 h-45 v30 h60 v-30 z"/>
+    <circle cx="165" cy="70" r="16"/>
+    <path d="M150 222 q-20 10 -10 34"/>
+    <path d="M182 240 h-25"/>
+  </g>
+  <path d="M140 224 L168 250" stroke="#a8e063" stroke-width="12" stroke-linecap="round"/>
+  <path d="M144 252 L174 232" stroke="#a8e063" stroke-width="12" stroke-linecap="round"/>
+</svg>

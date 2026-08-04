@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Мотокультиватор</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 120 h100 l25 60 h-20 l-15 -35 h-40 v35 h-20 v-90 z"/>
+    <path d="M150 120 v-35 h30"/>
+    <circle cx="180" cy="78" r="14"/>
+    <circle cx="140" cy="205" r="22"/>
+    <circle cx="250" cy="205" r="22"/>
+  </g>
+  <circle cx="140" cy="205" r="22" stroke="#a8e063" stroke-width="10"/>
+</svg>

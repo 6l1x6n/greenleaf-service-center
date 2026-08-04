@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Масло 2T</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="160" y="90" width="80" height="130" rx="12"/>
+    <path d="M180 90 v-25 h40 v25"/>
+    <path d="M175 200 h50"/>
+    <circle cx="200" cy="150" r="16"/>
+  </g>
+  <path d="M200 138 a16 16 0 0 1 0 24" stroke="#a8e063" stroke-width="8" fill="none" stroke-linecap="round"/>
+</svg>

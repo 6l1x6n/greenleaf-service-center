@@ -1,0 +1,159 @@
+{
+  "updated": "2026-08-04T12:00:00+03:00",
+  "products": [
+    {
+      "id": "gl-1001",
+      "sku": "GL-1001",
+      "name": "Газонокосилка Greenleaf GL 3.8 (бензиновая)",
+      "category": "Газонокосилки",
+      "price": 28990,
+      "image": "assets/images/products/lawnmower.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": "2026-08-06"
+    },
+    {
+      "id": "gl-1002",
+      "sku": "GL-1002",
+      "name": "Газонокосилка Greenleaf GL 5.0 Self (самоходная)",
+      "category": "Газонокосилки",
+      "price": 45990,
+      "image": "assets/images/products/lawnmower.svg",
+      "status": "low",
+      "eta": "2026-08-14",
+      "incoming": "2026-08-14"
+    },
+    {
+      "id": "gl-1003",
+      "sku": "GL-1003",
+      "name": "Газонокосилка Greenleaf GL 2.2 (электрическая)",
+      "category": "Газонокосилки",
+      "price": 16990,
+      "image": "assets/images/products/lawnmower.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null
+    },
+    {
+      "id": "gl-2001",
+      "sku": "GL-2001",
+      "name": "Триммер Greenleaf GT 28",
+      "category": "Триммеры",
+      "price": 7490,
+      "image": "assets/images/products/trimmer.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null
+    },
+    {
+      "id": "gl-2002",
+      "sku": "GL-2002",
+      "name": "Триммер Greenleaf GT 32 Pro",
+      "category": "Триммеры",
+      "price": 12990,
+      "image": "assets/images/products/trimmer.svg",
+      "status": "expected",
+      "eta": "2026-08-20",
+      "incoming": null
+    },
+    {
+      "id": "gl-3001",
+      "sku": "GL-3001",
+      "name": "Мотокоса Greenleaf GB 52",
+      "category": "Мотокосы",
+      "price": 18990,
+      "image": "assets/images/products/brushcutter.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null
+    },
+    {
+      "id": "gl-3002",
+      "sku": "GL-3002",
+      "name": "Мотокоса Greenleaf GB 66",
+      "category": "Мотокосы",
+      "price": 25990,
+      "image": "assets/images/products/brushcutter.svg",
+      "status": "out",
+      "eta": "2026-09-05",
+      "incoming": null
+    },
+    {
+      "id": "gl-4001",
+      "sku": "GL-4001",
+      "name": "Бензопила Greenleaf GC 25",
+      "category": "Бензопилы",
+      "price": 11990,
+      "image": "assets/images/products/chainsaw.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null
+    },
+    {
+      "id": "gl-4002",
+      "sku": "GL-4002",
+      "name": "Бензопила Greenleaf GC 38",
+      "category": "Бензопилы",
+      "price": 15990,
+      "image": "assets/images/products/chainsaw.svg",
+      "status": "low",
+      "eta": "2026-08-14",
+      "incoming": null
+    },
+    {
+      "id": "gl-5001",
+      "sku": "GL-5001",
+      "name": "Кусторез Greenleaf GH 22",
+      "category": "Кусторезы",
+      "price": 8990,
+      "image": "assets/images/products/hedgetrimmer.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null
+    },
+    {
+      "id": "gl-6001",
+      "sku": "GL-6001",
+      "name": "Снегоуборщик Greenleaf GS 62",
+      "category": "Снегоуборщики",
+      "price": 54990,
+      "image": "assets/images/products/snowblower.svg",
+      "status": "expected",
+      "eta": "2026-09-20",
+      "incoming": null
+    },
+    {
+      "id": "gl-7001",
+      "sku": "GL-7001",
+      "name": "Мотокультиватор Greenleaf GM 35",
+      "category": "Мотокультиваторы",
+      "price": 34990,
+      "image": "assets/images/products/tiller.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null
+    },
+    {
+      "id": "gl-8001",
+      "sku": "GL-8001",
+      "name": "Масло двухтактное Greenleaf 2T, 1 л",
+      "category": "Расходники",
+      "price": 590,
+      "image": "assets/images/products/oil.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null
+    },
+    {
+      "id": "gl-8002",
+      "sku": "GL-8002",
+      "name": "Шина и цепь для Greenleaf GC 25",
+      "category": "Расходники",
+      "price": 1990,
+      "image": "assets/images/products/chain.svg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null
+    }
+  ]
+}

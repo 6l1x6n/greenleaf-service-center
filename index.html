@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Сервис-центр Greenleaf — наличие техники в реальном времени</title>
+  <meta name="description" content="Каталог техники Greenleaf с актуальным наличием, онлайн-бронирование, даты поставок, презентации и обучение. Адрес, часы работы, WhatsApp.">
+  <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="container header-inner">
+      <a class="logo" href="#top">
+        <img src="assets/images/logo.svg" alt="Greenleaf">
+        <span class="logo-text">Greenleaf<small>Сервис-центр</small></span>
+      </a>
+      <nav class="nav" id="nav">
+        <a href="#catalog">Каталог</a>
+        <a href="#deliveries">Поставки</a>
+        <a href="#events">Презентации</a>
+        <a href="#partners">Партнёрам</a>
+        <a href="#contacts">Контакты</a>
+      </nav>
+      <div class="header-actions">
+        <a class="btn btn-whatsapp btn-sm" id="waHeader" href="#" target="_blank" rel="noopener">Написать в WhatsApp</a>
+        <button class="burger" id="burger" aria-label="Открыть меню"><span></span><span></span><span></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <section class="hero">
+      <div class="container">
+        <span class="hero-badge">Проверка наличия в реальном времени</span>
+        <h1>Техника Greenleaf в наличии — проверьте и забронируйте к приезду</h1>
+        <p class="hero-sub">Каталог с актуальным наличием нашего сервис-центра, даты следующих поставок и запись на презентации — без звонков и ожидания ответа.</p>
+        <div class="hero-cta">
+          <a href="#catalog" class="btn btn-accent">Перейти к каталогу</a>
+          <a href="#" class="btn btn-whatsapp" id="waHero" target="_blank" rel="noopener">Написать в WhatsApp</a>
+        </div>
+        <div class="hero-meta">
+          <span>📍 <span id="heroAddress">…</span></span>
+          <span>🕒 <span id="heroHours">…</span></span>
+          <span>📦 <span id="heroStock">…</span></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="container features-grid">
+        <div class="feature">
+          <div class="feature-ico">📦</div>
+          <h3>Актуальное наличие</h3>
+          <p>Каталог обновляется автоматически — видно, что есть прямо сейчас.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-ico">🛒</div>
+          <h3>Бронирование к приезду</h3>
+          <p>Резервируете товар онлайн — мы готовим заказ к вашему визиту.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-ico">🚚</div>
+          <h3>Даты поставок</h3>
+          <p>Если товара нет — сразу видно, когда будет следующая поставка.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-ico">📅</div>
+          <h3>Презентации и обучение</h3>
+          <p>Расписание мероприятий и запись через сайт в один клик.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="catalog" class="section alt">
+      <div class="container">
+        <h2>Каталог и наличие</h2>
+        <p class="section-sub" id="catalogUpdated">Загружаем данные…</p>
+        <div class="toolbar">
+          <input class="search" id="search" type="search" placeholder="Поиск: косилка, триммер, артикул…" autocomplete="off">
+          <div class="chips" id="chips"></div>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="empty hidden" id="empty">
+          Ничего не найдено.<br>
+          Оставьте заявку — сообщим, когда товар появится.
+        </div>
+        <p class="catalog-note">Не нашли нужную позицию? Напишите в WhatsApp — подскажем дату поставки и предложим альтернативу.</p>
+      </div>
+    </section>
+
+    <section id="deliveries" class="section">
+      <div class="container">
+        <h2>Ближайшие поставки</h2>
+        <p class="section-sub">Плановые завозы товара в наш сервис-центр. По конкретной позиции — смотрите бейдж «Ожидается» в карточке товара.</p>
+        <div class="deliveries-list" id="deliveriesList"></div>
+      </div>
+    </section>
+
+    <section id="events" class="section alt">
+      <div class="container">
+        <h2>Презентации и обучения</h2>
+        <p class="section-sub">Приходите посмотреть технику в работе и научиться её обслуживать. Запись через сайт.</p>
+        <div class="events-grid" id="eventsList"></div>
+      </div>
+    </section>
+
+    <section id="partners" class="section">
+      <div class="container split">
+        <div>
+          <h2>Подключение к бизнесу</h2>
+          <p class="section-sub">Свой магазин или сервис? Станьте нашим партнёром и продавайте Greenleaf.</p>
+          <ul class="partner-list">
+            <li>Выгодные условия и план поставок под ваш город</li>
+            <li>Обучение ваших сотрудников у нас или у вас</li>
+            <li>Маркетинговая поддержка и демо-образцы</li>
+          </ul>
+        </div>
+        <form class="card form" id="partnerForm" data-type="partner">
+          <input name="name" placeholder="Имя" required>
+          <input name="phone" placeholder="Телефон" required>
+          <input name="city" placeholder="Город">
+          <select name="experience">
+            <option value="">Тип бизнеса…</option>
+            <option>Магазин техники</option>
+            <option>Сервисный центр</option>
+            <option>Интернет-магазин</option>
+            <option>Другое</option>
+          </select>
+          <textarea name="message" placeholder="Пара слов о вас и вашем бизнесе"></textarea>
+          <input class="hp" name="company" tabindex="-1" autocomplete="off">
+          <button class="btn btn-primary" type="submit">Отправить заявку</button>
+          <p class="form-success">Заявка отправлена! Мы свяжемся с вами в течение рабочего дня.</p>
+          <p class="form-error">Что-то пошло не так. Попробуйте ещё раз или напишите нам в WhatsApp.</p>
+          <p class="form-note">Мы ответим в течение дня. Это ни к чему не обязывает.</p>
+        </form>
+      </div>
+    </section>
+
+    <section id="contacts" class="section alt">
+      <div class="container split">
+        <div>
+          <h2>Контакты</h2>
+          <address class="contacts-info" id="contactsInfo"></address>
+          <div class="contacts-actions">
+            <a class="btn btn-whatsapp btn-lg" id="waContacts" href="#" target="_blank" rel="noopener">Написать в WhatsApp</a>
+            <a class="btn btn-outline btn-lg" id="phoneLink" href="tel:">Позвонить</a>
+          </div>
+        </div>
+        <div class="map-wrap">
+          <iframe id="map" title="Карта: адрес сервис-центра" loading="lazy"></iframe>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <span>© <span id="year"></span> Сервис-центр Greenleaf</span>
+      <span>Есть вопросы? <a href="#" id="waFooter">Напишите в WhatsApp</a></span>
+    </div>
+  </footer>
+
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="Закрыть">✕</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="js/ui.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/forms.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Газонокосилка</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M120 190 h160 l30 -60 h-70 l-15 30 h-30 l15 -30 h-60 z"/>
+    <path d="M120 190 v-20 h-25"/>
+    <circle cx="112" cy="196" r="14"/>
+    <circle cx="288" cy="196" r="14"/>
+    <circle cx="200" cy="70" r="34"/>
+    <path d="M200 104 v20"/>
+  </g>
+  <rect x="252" y="112" width="46" height="22" rx="6" fill="#a8e063"/>
+</svg>

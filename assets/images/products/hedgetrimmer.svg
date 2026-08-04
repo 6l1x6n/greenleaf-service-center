@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Кусторез</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M140 80 v110 h-30"/>
+    <rect x="118" y="190" width="54" height="40" rx="8"/>
+    <circle cx="145" cy="70" r="16"/>
+    <path d="M200 96 h120"/>
+    <path d="M210 96 l0 26 h40 l0 -26"/>
+    <path d="M262 96 l0 26 h40 l0 -26"/>
+  </g>
+  <path d="M300 90 L320 70" stroke="#a8e063" stroke-width="12" stroke-linecap="round"/>
+</svg>

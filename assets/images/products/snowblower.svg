@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="20" fill="#eef5ee"/>
+  <text x="200" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#5b7a66">Greenleaf · Снегоуборщик</text>
+  <g stroke="#1b6b3f" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 170 h110"/>
+    <path d="M260 150 a55 55 0 0 1 0 40"/>
+    <rect x="140" y="140" width="80" height="50" rx="10"/>
+    <path d="M180 190 v30"/>
+    <circle cx="165" cy="228" r="16"/>
+    <circle cx="245" cy="228" r="16"/>
+    <path d="M160 130 l-20 -30 h25"/>
+    <path d="M200 130 l10 -30 h22"/>
+  </g>
+  <path d="M150 158 l-20 -8" stroke="#a8e063" stroke-width="12" stroke-linecap="round"/>
+</svg>

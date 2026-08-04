@@ -1,0 +1,99 @@
+backend:
+  name: github
+  repo: ИМЯ_ПОЛЬЗОВАТЕЛЯ/имя-репозитория
+  branch: main
+  base_url: https://api.netlify.com
+  auth_endpoint: auth
+
+media_folder: "assets/images/products"
+public_folder: "/assets/images/products"
+
+collections:
+  - name: store
+    label: "Сервис-центр"
+    label_singular: "Сервис-центр"
+    description: "Адрес, часы работы и контакты, которые видны на сайте"
+    file: data/store.json
+    format: json
+    fields:
+      - { label: "Название", name: name, widget: string }
+      - { label: "Адрес", name: address, widget: string }
+      - label: "Часы работы"
+        name: hours
+        widget: list
+        collapsed: false
+        fields:
+          - { label: "Дни", name: days, widget: string, default: "Пн–Пт" }
+          - { label: "Время", name: time, widget: string, default: "09:00 – 19:00" }
+      - { label: "Телефон (как показывать)", name: phone, widget: string, default: "+7 (900) 000-00-00" }
+      - { label: "Телефон для ссылки (только цифры, с +7)", name: phoneRaw, widget: string, default: "+79000000000" }
+      - { label: "WhatsApp (только цифры, с 7)", name: whatsapp, widget: string, default: "79000000000" }
+
+  - name: products
+    label: "Товары"
+    label_singular: "Товар"
+    description: "Каталог. Файл перезаписывается автоматическим парсером — не вносите сюда изменения вручную, если парсер уже настроен"
+    file: data/products.json
+    format: json
+    fields:
+      - { label: "Дата обновления (автоматически)", name: updated, widget: datetime, required: false }
+      - label: "Товары"
+        name: products
+        widget: list
+        collapsed: false
+        summary: "{{fields.name}} — {{fields.status}}"
+        fields:
+          - { label: "ID (не менять)", name: id, widget: string }
+          - { label: "Артикул", name: sku, widget: string }
+          - { label: "Название", name: name, widget: string }
+          - { label: "Категория", name: category, widget: string }
+          - { label: "Цена (₽)", name: price, widget: number, min: 0 }
+          - { label: "Фото", name: image, widget: image, required: false }
+          - label: "Статус наличия"
+            name: status
+            widget: select
+            options:
+              - { label: "В наличии", value: in_stock }
+              - { label: "Заканчивается", value: low }
+              - { label: "Ожидается (заказано)", value: expected }
+              - { label: "Нет в наличии", value: out }
+          - { label: "Дата следующей поставки (если нет в наличии)", name: eta, widget: datetime, format: "YYYY-MM-DD", dateFormat: "YYYY-MM-DD", timeFormat: false, required: false }
+          - { label: "Дата завоза в пути", name: incoming, widget: datetime, format: "YYYY-MM-DD", dateFormat: "YYYY-MM-DD", timeFormat: false, required: false }
+
+  - name: deliveries
+    label: "Поставки"
+    label_singular: "Поставка"
+    description: "Ближайшие плановые поставки — блок «Ближайшие поставки»"
+    file: data/deliveries.json
+    format: json
+    fields:
+      - label: "Поставки"
+        name: deliveries
+        widget: list
+        collapsed: false
+        fields:
+          - { label: "Дата", name: date, widget: datetime, format: "YYYY-MM-DD", dateFormat: "YYYY-MM-DD", timeFormat: false }
+          - { label: "Что привезём", name: note, widget: text }
+
+  - name: events
+    label: "Презентации и обучения"
+    label_singular: "Мероприятие"
+    description: "Расписание мероприятий и запись через сайт"
+    file: data/events.json
+    format: json
+    fields:
+      - label: "Мероприятия"
+        name: events
+        widget: list
+        collapsed: false
+        summary: "{{fields.date}} — {{fields.title}}"
+        fields:
+          - { label: "Название", name: title, widget: string }
+          - { label: "Дата", name: date, widget: datetime, format: "YYYY-MM-DD", dateFormat: "YYYY-MM-DD", timeFormat: false }
+          - { label: "Время", name: time, widget: string, default: "14:00" }
+          - { label: "Место", name: place, widget: string }
+          - { label: "Описание", name: description, widget: text }
+          - { label: "Количество мест", name: slots, widget: number, min: 0, required: false }
+
+editor:
+  preview: false
