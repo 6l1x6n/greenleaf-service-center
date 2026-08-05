@@ -1,0 +1,14 @@
+{
+  // Cloudflare Worker: сайт Greenleaf (статик-ассеты из корня репозитория)
+  // + обработка форм → Telegram в worker.js
+  "name": "mygreenleaf",
+  "main": "worker.js",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": true
+  }
+}
