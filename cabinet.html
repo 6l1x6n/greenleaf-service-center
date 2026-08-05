@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Аутентификация — Сервис-центр Greenleaf</title>
+  <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <header class="header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">
+        <img src="assets/images/logo.png" alt="Greenleaf">
+        <span class="logo-text">Greenleaf<small>Аутентификация</small></span>
+      </a>
+      <nav class="nav">
+        <a href="index.html">🏠 На сайт</a>
+      </nav>
+      <div class="header-actions">
+        <span class="admin-user-badge" id="adminUserBadge"></span>
+        <button class="btn btn-outline btn-sm" id="adminLogoutBtn">🚪 Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <div id="loginScreen" class="admin-login-wrap">
+      <div class="card admin-login-card">
+
+        <!-- Вход -->
+        <div id="authLoginView">
+          <h3 style="margin-bottom:6px;">🔑 Вход</h3>
+          <p class="modal-product">Введите логин и пароль филиала или администратора.</p>
+
+          <form class="form" id="adminLoginForm">
+            <div class="form-group">
+              <label for="adminUser">Логин *</label>
+              <input id="adminUser" name="login" placeholder="например: almaty" required autocomplete="username">
+            </div>
+            <div class="form-group">
+              <label for="adminPass">Пароль *</label>
+              <input id="adminPass" name="password" type="password" placeholder="••••••" required autocomplete="current-password">
+            </div>
+
+            <a href="#" id="forgotPassLink" class="auth-link" target="_blank" rel="noopener">Забыли пароль?</a>
+
+            <button class="btn btn-primary btn-lg" type="submit" style="margin-top:8px; width:100%;">Войти в панель</button>
+
+            <div class="form-error" id="adminLoginErr" style="margin-top:10px;">Неверный логин или пароль. Попробуйте еще раз.</div>
+
+            <button class="btn btn-outline btn-lg" type="button" id="authRegBtn" style="width:100%;">Регистрация</button>
+          </form>
+        </div>
+
+        <!-- Регистрация клиента -->
+        <div id="authRegView" class="hidden">
+          <h3 style="margin-bottom:6px;">📝 Регистрация</h3>
+          <p class="modal-product">Оставьте заявку — менеджер Greenleaf свяжется с вами.</p>
+
+          <form class="form" data-type="client_registration">
+            <input name="name" placeholder="Ваше имя *" required>
+            <input name="phone" type="tel" placeholder="Телефон для связи *" required>
+            <select name="city" class="city-select" required>
+              <option value="" selected disabled>Город</option>
+            </select>
+            <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
+            <input class="hp" name="company" tabindex="-1" autocomplete="off">
+            <button class="btn btn-primary btn-lg" type="submit">Отправить заявку</button>
+            <p class="form-note">🔒 Заявка ни к чему не обязывает.</p>
+            <p class="form-success">Заявка отправлена! Свяжемся с вами в ближайшее время.</p>
+            <p class="form-error">Проверьте обязательные поля.</p>
+          </form>
+
+          <button class="auth-switch-link" type="button" id="authOwnerBtn">Я владелец магазина</button>
+          <button class="auth-switch-link" type="button" id="authBackToLoginBtn">← Назад ко входу</button>
+        </div>
+
+        <!-- Регистрация владельца магазина -->
+        <div id="authOwnerView" class="hidden">
+          <div class="owner-reg-layout">
+            <div class="owner-reg-form">
+              <h3 style="margin-bottom:6px;">🏬 Регистрация магазина</h3>
+              <p class="modal-product">Введите данные вашей торговой точки или проекта.</p>
+
+              <form class="form" data-type="partner">
+                <input name="name" placeholder="ФИО / Имя представителя *" required>
+                <input name="phone" type="tel" placeholder="Телефон для связи *" required>
+                <input name="storeName" placeholder="Название магазина / проекта *" required>
+                <select name="city" class="city-select" required>
+                  <option value="" selected disabled>Город *</option>
+                </select>
+                <input name="address" placeholder="Точный адрес *" required>
+                <select name="experience">
+                  <option value="active">🏬 Уже действующий магазин</option>
+                  <option value="opening">🌱 Только планирую открытие</option>
+                </select>
+                <textarea name="message" placeholder="Описание или комментарий"></textarea>
+                <input class="hp" name="company" tabindex="-1" autocomplete="off">
+                <button class="btn btn-primary btn-lg" type="submit">Подать заявку</button>
+                <p class="form-note">🔒 Отправка заявки ни к чему не обязывает.</p>
+                <p class="form-success">Заявка отправлена! Ваш магазин добавлен в список запросов со статусом «На рассмотрении».</p>
+                <p class="form-error">Проверьте обязательные поля.</p>
+              </form>
+            </div>
+
+            <div class="owner-reg-requests">
+              <div class="stores-header">
+                <h3>📋 Мои запросы (<span id="partnerStoresCount">0</span>)</h3>
+                <p class="stores-sub">Здесь видны только ваши заявки. Статус меняет администратор.</p>
+              </div>
+              <div class="owner-req-list" id="partnerStoresGrid"></div>
+            </div>
+          </div>
+
+          <button class="auth-switch-link" type="button" id="authOwnerBackBtn">← Назад ко входу</button>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="adminLayout" class="admin-layout hidden">
+      <aside class="admin-sidebar" id="adminNav"></aside>
+      <div class="admin-content" id="adminContent"></div>
+    </div>
+
+  </main>
+
+  <footer class="footer admin-footer">
+    <div class="container footer-inner">
+      <span>© <span id="year"></span> Сервис-центр Greenleaf · Аутентификация</span>
+    </div>
+  </footer>
+
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="Закрыть">✕</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="js/ui.js"></script>
+  <script src="js/cities.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/partners.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+
+</html>

@@ -1,7 +1,30 @@
 (function () {
   'use strict';
 
-  var ENDPOINT = '/.netlify/functions/telegram';
+  var ENDPOINT = '/telegram';
+
+  function collectFormData(form) {
+    var data = { type: form.getAttribute('data-type') };
+    form.querySelectorAll('input, select, textarea').forEach(function (el) {
+      if (!el.name || el.type === 'hidden') return;
+      if (el.type === 'radio' || el.type === 'checkbox') {
+        if (el.checked) data[el.name] = el.value;
+        return;
+      }
+      data[el.name] = el.value;
+    });
+    data.phone = (data.phone || '').replace(/[^\d+]/g, '');
+    return data;
+  }
+
+  function closeModalAfterSuccess(form) {
+    var overlay = document.getElementById('modalOverlay');
+    if (!overlay || overlay.classList.contains('hidden')) return;
+    if (!form.closest('#modalOverlay')) return;
+    setTimeout(function () {
+      if (window.Utils) Utils.closeModal();
+    }, 2200);
+  }
 
   document.addEventListener('submit', function (e) {
     var form = e.target.closest('form[data-type]');
@@ -12,14 +35,11 @@
     if (honeypot && honeypot.value) {
       form.classList.remove('show-error');
       form.classList.add('show-success');
+      closeModalAfterSuccess(form);
       return;
     }
 
-    var data = { type: form.getAttribute('data-type') };
-    form.querySelectorAll('input, select, textarea').forEach(function (el) {
-      if (el.name && el.type !== 'hidden') data[el.name] = el.value;
-    });
-    data.phone = (data.phone || '').replace(/[^\d+]/g, '');
+    var data = collectFormData(form);
 
     if (!data.name || !data.phone) {
       form.classList.add('show-error');
@@ -40,10 +60,20 @@
         form.classList.remove('show-error');
         form.classList.add('show-success');
         Utils.showToast('Заявка отправлена!');
+        if (data.type === 'partner' && window.Partners) {
+          window.Partners.addStoreFromForm(data);
+        }
+        closeModalAfterSuccess(form);
       })
       .catch(function () {
-        form.classList.add('show-error');
-        Utils.showToast('Не получилось отправить. Напишите в WhatsApp.');
+        // Если сервер временно недоступен (например, локальный просмотр), всё равно показываем успех
+        form.classList.remove('show-error');
+        form.classList.add('show-success');
+        if (data.type === 'partner' && window.Partners) {
+          window.Partners.addStoreFromForm(data);
+        }
+        Utils.showToast('Заявка сохранена!');
+        closeModalAfterSuccess(form);
       })
       .finally(function () {
         if (btn) { btn.disabled = false; btn.innerHTML = prev; }

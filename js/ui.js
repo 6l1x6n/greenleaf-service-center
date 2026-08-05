@@ -9,8 +9,16 @@
 
   var store = null;
 
-  function openModal(html) {
+  function openModal(html, wide) {
     modalBody.innerHTML = html;
+    var modalEl = overlay.querySelector('.modal');
+    if (modalEl) {
+      if (wide) {
+        modalEl.classList.add('modal-wide');
+      } else {
+        modalEl.classList.remove('modal-wide');
+      }
+    }
     overlay.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     var first = modalBody.querySelector('input');
@@ -39,7 +47,7 @@
   }
 
   function fmtPrice(n) {
-    return new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
+    return new Intl.NumberFormat('ru-RU').format(n) + ' ₸';
   }
 
   function fmtDate(iso, opts) {
@@ -81,30 +89,24 @@
       var res = await fetch('data/store.json?t=' + Date.now());
       store = await res.json();
       bindStore(store);
-    } catch (err) {
-      document.getElementById('heroAddress').textContent = 'Данные скоро появятся';
-    }
+    } catch (err) { }
   }
 
   function bindStore(s) {
-    document.title = 'Сервис-центр Greenleaf — ' + s.address;
-    document.getElementById('heroAddress').textContent = s.address;
-    document.getElementById('heroHours').textContent =
-      (s.hours[0] ? s.hours[0].days + ' ' + s.hours[0].time : '');
-    document.getElementById('contactsInfo').innerHTML =
-      '<div class="row"><span class="lbl">Адрес</span><span>' + esc(s.address) + '</span></div>' +
-      '<div class="row"><span class="lbl">Часы</span><span>' + esc(s.hours.map(function (h) { return h.days + ' ' + h.time; }).join('<br>')) + '</span></div>' +
-      '<div class="row"><span class="lbl">Телефон</span><span>' + esc(s.phone) + '</span></div>';
-    document.getElementById('phoneLink').href = 'tel:' + s.phoneRaw;
-    document.getElementById('phoneLink').textContent = 'Позвонить: ' + s.phone;
+    document.title = 'Сервис-центры Greenleaf — каталог продукции и эко-товаров';
 
     var waButtons = document.querySelectorAll('#waHeader, #waHero, #waContacts, #waFooter');
     waButtons.forEach(function (b) {
-      b.href = waLink('Здравствуйте! Интересует наличие техники Greenleaf.');
+      b.href = waLink('Здравствуйте! Интересует наличие эко-продукции Greenleaf.');
     });
 
-    var map = document.getElementById('map');
-    map.src = 'https://yandex.ru/map-widget/v1/?text=' + encodeURIComponent(s.address);
+    var forgot = document.getElementById('forgotPassLink');
+    if (forgot) {
+      forgot.href = waLink('Здравствуйте! Не могу вспомнить пароль от кабинета Greenleaf.');
+    }
+
+    // Контакты/карта зависят от выбранного СЦ — их рендерит catalog.js
+    if (window.CatalogRefreshContacts) window.CatalogRefreshContacts();
   }
 
   window.Utils = {

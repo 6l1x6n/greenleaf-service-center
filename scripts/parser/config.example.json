@@ -1,8 +1,51 @@
 {
-  "portal_url": "https://",
-  "login": "",
-  "password": "",
-  "headers": {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-  }
+  "portal_url": "https://greenleaf-global.com",
+  "sc_login": "",
+  "sc_password": "",
+  "partner_login": "kz44326234",
+  "price_multiplier": 2,
+  "low_threshold": 6,
+  "max_pages": 200,
+  "categories": [
+    {
+      "name": "Газонокосилки",
+      "keywords": ["газонокосил"],
+      "image": "assets/images/products/lawnmower.svg"
+    },
+    {
+      "name": "Триммеры",
+      "keywords": ["триммер"],
+      "image": "assets/images/products/trimmer.svg"
+    },
+    {
+      "name": "Мотокосы",
+      "keywords": ["мотокос", "мотокоса"],
+      "image": "assets/images/products/brushcutter.svg"
+    },
+    {
+      "name": "Бензопилы",
+      "keywords": ["бензопил", "пил"],
+      "image": "assets/images/products/chainsaw.svg"
+    },
+    {
+      "name": "Кусторезы",
+      "keywords": ["кусторез"],
+      "image": "assets/images/products/hedgetrimmer.svg"
+    },
+    {
+      "name": "Снегоуборщики",
+      "keywords": ["снегоуборщик"],
+      "image": "assets/images/products/snowblower.svg"
+    },
+    {
+      "name": "Мотокультиваторы",
+      "keywords": ["культиватор", "мотоблок"],
+      "image": "assets/images/products/tiller.svg"
+    },
+    {
+      "name": "Масла и расходники",
+      "keywords": ["масло", "свеча", "фильтр", "цепь", "шина", "леска", "нож"],
+      "image": "assets/images/products/oil.svg"
+    }
+  ]
 }

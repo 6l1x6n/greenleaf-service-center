@@ -1,29 +1,33 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Сервис-центр Greenleaf — наличие техники в реальном времени</title>
-  <meta name="description" content="Каталог техники Greenleaf с актуальным наличием, онлайн-бронирование, даты поставок, презентации и обучение. Адрес, часы работы, WhatsApp.">
+  <meta name="description"
+    content="Каталог техники Greenleaf с актуальным наличием, онлайн-бронирование, даты поставок, презентации и обучение. Адрес, часы работы, WhatsApp.">
   <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
 
   <header class="header">
     <div class="container header-inner">
       <a class="logo" href="#top">
-        <img src="assets/images/logo.svg" alt="Greenleaf">
+        <img src="assets/images/logo.png" alt="Greenleaf">
         <span class="logo-text">Greenleaf<small>Сервис-центр</small></span>
       </a>
       <nav class="nav" id="nav">
         <a href="#catalog">Каталог</a>
+        <a href="#sc">Сервис-центры</a>
         <a href="#deliveries">Поставки</a>
         <a href="#events">Презентации</a>
-        <a href="#partners">Партнёрам</a>
         <a href="#contacts">Контакты</a>
       </nav>
       <div class="header-actions">
+        <button class="btn btn-outline btn-sm" id="scAuthBtn">Войти</button>
         <a class="btn btn-whatsapp btn-sm" id="waHeader" href="#" target="_blank" rel="noopener">Написать в WhatsApp</a>
         <button class="burger" id="burger" aria-label="Открыть меню"><span></span><span></span><span></span></button>
       </div>
@@ -34,17 +38,18 @@
 
     <section class="hero">
       <div class="container">
-        <span class="hero-badge">Проверка наличия в реальном времени</span>
-        <h1>Техника Greenleaf в наличии — проверьте и забронируйте к приезду</h1>
-        <p class="hero-sub">Каталог с актуальным наличием нашего сервис-центра, даты следующих поставок и запись на презентации — без звонков и ожидания ответа.</p>
+        <span class="hero-badge">Сервис-Центры и Магазины Greenleaf</span>
+        <h1 data-edit-key="hero_title">Продукция Greenleaf в наличии — выберите ближайший СЦ</h1>
+        <p class="hero-sub" data-edit-key="hero_sub">Актуальные каталоги бытовой химии iLife, уходовой косметики SEALUX, личной гигиены CARICH и
+          подбор Сервис-Центров по городам Казахстана.</p>
         <div class="hero-cta">
           <a href="#catalog" class="btn btn-accent">Перейти к каталогу</a>
           <a href="#" class="btn btn-whatsapp" id="waHero" target="_blank" rel="noopener">Написать в WhatsApp</a>
         </div>
         <div class="hero-meta">
-          <span>📍 <span id="heroAddress">…</span></span>
-          <span>🕒 <span id="heroHours">…</span></span>
-          <span>📦 <span id="heroStock">…</span></span>
+          <span class="hero-meta-pill" id="heroStoresMeta">🏬 Загружаем филиалы…</span>
+          <span class="hero-meta-pill">📦 <span id="heroStock">…</span></span>
+          <div class="hero-cities" id="heroCities"></div>
         </div>
       </div>
     </section>
@@ -74,78 +79,73 @@
       </div>
     </section>
 
+    <section id="sc" class="sc-row-section">
+      <div class="container">
+        <div class="sc-row-header">
+          <div>
+            <h2 data-edit-key="scrow_title">Сервис-Центры Greenleaf в Казахстане</h2>
+            <p data-edit-key="scrow_sub">Выберите СЦ для просмотра контактов, фото и остатков продукции в этом филиале</p>
+          </div>
+        </div>
+        <div class="sc-toolbar">
+          <div class="sc-city-chips" id="scCityChips"></div>
+          <input class="search sc-search" id="scSearch" type="search"
+            placeholder="Поиск филиала по названию или адресу…" autocomplete="off">
+        </div>
+        <div class="sc-grid" id="scGrid">
+          <!-- Карточки СЦ -->
+        </div>
+      </div>
+    </section>
+
     <section id="catalog" class="section alt">
       <div class="container">
-        <h2>Каталог и наличие</h2>
+        <div id="scActiveBannerContainer"></div>
+        <h2 data-edit-key="catalog_title">Каталог продукции и наличие</h2>
         <p class="section-sub" id="catalogUpdated">Загружаем данные…</p>
         <div class="toolbar">
-          <input class="search" id="search" type="search" placeholder="Поиск: косилка, триммер, артикул…" autocomplete="off">
-          <div class="chips" id="chips"></div>
+          <input class="search" id="search" type="search"
+            placeholder="Поиск: эко-порошок, крем SEALUX, шампунь, артикул…" autocomplete="off">
+          <div class="toolbar-row">
+            <label class="stock-only"><input type="checkbox" id="stockOnly"> Только в наличии</label>
+            <div class="chips" id="chips"></div>
+          </div>
         </div>
         <div class="grid" id="grid"></div>
         <div class="empty hidden" id="empty">
           Ничего не найдено.<br>
           Оставьте заявку — сообщим, когда товар появится.
         </div>
-        <p class="catalog-note">Не нашли нужную позицию? Напишите в WhatsApp — подскажем дату поставки и предложим альтернативу.</p>
+        <p class="catalog-note" data-edit-key="catalog_note">Не нашли нужную позицию? Напишите в WhatsApp — подскажем дату поставки и предложим
+          альтернативу.</p>
       </div>
     </section>
 
     <section id="deliveries" class="section">
       <div class="container">
-        <h2>Ближайшие поставки</h2>
-        <p class="section-sub">Плановые завозы товара в наш сервис-центр. По конкретной позиции — смотрите бейдж «Ожидается» в карточке товара.</p>
+        <h2 data-edit-key="deliveries_title">Ближайшие поставки</h2>
+        <p class="section-sub" data-edit-key="deliveries_sub">Плановые завозы товара в наш сервис-центр. По конкретной позиции — смотрите бейдж
+          «Ожидается» в карточке товара.</p>
         <div class="deliveries-list" id="deliveriesList"></div>
       </div>
     </section>
 
     <section id="events" class="section alt">
       <div class="container">
-        <h2>Презентации и обучения</h2>
-        <p class="section-sub">Приходите посмотреть технику в работе и научиться её обслуживать. Запись через сайт.</p>
+        <h2 data-edit-key="events_title">Презентации и обучения</h2>
+        <p class="section-sub" data-edit-key="events_sub">Приходите посмотреть технику в работе и научиться её обслуживать. Запись через сайт.</p>
         <div class="events-grid" id="eventsList"></div>
-      </div>
-    </section>
-
-    <section id="partners" class="section">
-      <div class="container split">
-        <div>
-          <h2>Подключение к бизнесу</h2>
-          <p class="section-sub">Свой магазин или сервис? Станьте нашим партнёром и продавайте Greenleaf.</p>
-          <ul class="partner-list">
-            <li>Выгодные условия и план поставок под ваш город</li>
-            <li>Обучение ваших сотрудников у нас или у вас</li>
-            <li>Маркетинговая поддержка и демо-образцы</li>
-          </ul>
-        </div>
-        <form class="card form" id="partnerForm" data-type="partner">
-          <input name="name" placeholder="Имя" required>
-          <input name="phone" placeholder="Телефон" required>
-          <input name="city" placeholder="Город">
-          <select name="experience">
-            <option value="">Тип бизнеса…</option>
-            <option>Магазин техники</option>
-            <option>Сервисный центр</option>
-            <option>Интернет-магазин</option>
-            <option>Другое</option>
-          </select>
-          <textarea name="message" placeholder="Пара слов о вас и вашем бизнесе"></textarea>
-          <input class="hp" name="company" tabindex="-1" autocomplete="off">
-          <button class="btn btn-primary" type="submit">Отправить заявку</button>
-          <p class="form-success">Заявка отправлена! Мы свяжемся с вами в течение рабочего дня.</p>
-          <p class="form-error">Что-то пошло не так. Попробуйте ещё раз или напишите нам в WhatsApp.</p>
-          <p class="form-note">Мы ответим в течение дня. Это ни к чему не обязывает.</p>
-        </form>
       </div>
     </section>
 
     <section id="contacts" class="section alt">
       <div class="container split">
         <div>
-          <h2>Контакты</h2>
+          <h2 data-edit-key="contacts_title">Контакты</h2>
           <address class="contacts-info" id="contactsInfo"></address>
           <div class="contacts-actions">
-            <a class="btn btn-whatsapp btn-lg" id="waContacts" href="#" target="_blank" rel="noopener">Написать в WhatsApp</a>
+            <a class="btn btn-whatsapp btn-lg" id="waContacts" href="#" target="_blank" rel="noopener">Написать в
+              WhatsApp</a>
             <a class="btn btn-outline btn-lg" id="phoneLink" href="tel:">Позвонить</a>
           </div>
         </div>
@@ -174,7 +174,10 @@
   <div class="toast hidden" id="toast"></div>
 
   <script src="js/ui.js"></script>
+  <script src="js/cities.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/catalog.js"></script>
   <script src="js/forms.js"></script>
 </body>
+
 </html>

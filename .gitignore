@@ -3,3 +3,4 @@ node_modules/
 __pycache__/
 *.pyc
 scripts/parser/config.json
+scripts/parser/diag/
