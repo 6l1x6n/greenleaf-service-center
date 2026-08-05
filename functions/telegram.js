@@ -1,5 +1,9 @@
-const BOT_TOKEN = process.env.TG_BOT_TOKEN;
-const CHAT_ID = process.env.TG_CHAT_ID;
+// Cloudflare Pages Function: формы сайта → Telegram.
+// Маршрут: /telegram (файл functions/telegram.js в корне репозитория).
+// Переменные окружения (Pages → Settings → Environment variables):
+//   TG_BOT_TOKEN, TG_CHAT_ID
+
+const TELEGRAM_API = 'https://api.telegram.org/bot';
 
 function buildText(data) {
   const name = (data.name || '').trim();
@@ -11,6 +15,7 @@ function buildText(data) {
     reservation: [
       '🛒 Бронирование товара',
       '📦 ' + (data.product || '—'),
+      data.store ? '🏬 Филиал: ' + data.store : null,
       '🔢 Кол-во: ' + (data.quantity || 1),
       data.comment ? '💬 ' + data.comment : null
     ],
@@ -18,11 +23,21 @@ function buildText(data) {
       '📅 Запись на мероприятие',
       '🎫 ' + (data.event || '—')
     ],
+    client_registration: [
+      '📝 Регистрация клиента',
+      data.city ? '🏙️ Город: ' + data.city : null,
+      data.comment ? '💬 ' + data.comment : null
+    ],
     partner: [
       '🤝 Заявка на партнёрство',
       data.city ? '🏙️ Город: ' + data.city : null,
+      data.address ? '📍 Адрес: ' + data.address : null,
       data.experience ? '💼 Тип бизнеса: ' + data.experience : null,
       data.message ? '💬 ' + data.message : null
+    ],
+    notice: [
+      '📢 Уведомление для Сервис-Центров',
+      data.notice ? '💬 ' + data.notice : null
     ]
   };
 
@@ -37,31 +52,31 @@ function buildText(data) {
   return lines.join('\n');
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
+export async function onRequestPost(context) {
+  const { env } = context;
+  const BOT_TOKEN = env.TG_BOT_TOKEN;
+  const CHAT_ID = env.TG_CHAT_ID;
 
   if (!BOT_TOKEN || !CHAT_ID) {
     console.error('TG_BOT_TOKEN или TG_CHAT_ID не заданы');
-    return { statusCode: 500, body: 'Telegram not configured' };
+    return new Response('Telegram not configured', { status: 500 });
   }
 
   let data;
   try {
-    data = JSON.parse(event.body || '{}');
+    data = await context.request.json();
   } catch (err) {
-    return { statusCode: 400, body: 'Invalid JSON' };
+    return new Response('Invalid JSON', { status: 400 });
   }
 
   const honey = data.company;
   if (honey) {
-    return { statusCode: 200, body: 'ok' };
+    return new Response('ok', { status: 200 });
   }
 
   const text = buildText(data);
 
-  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  const res = await fetch(`${TELEGRAM_API}${BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: CHAT_ID, text, disable_web_page_preview: true })
@@ -70,8 +85,8 @@ exports.handler = async (event) => {
   if (!res.ok) {
     const body = await res.text();
     console.error('Telegram API error:', res.status, body);
-    return { statusCode: 502, body: 'Telegram error' };
+    return new Response('Telegram error', { status: 502 });
   }
 
-  return { statusCode: 200, body: 'ok' };
-};
+  return new Response('ok', { status: 200 });
+}

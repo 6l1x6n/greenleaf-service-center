@@ -1,7 +1,10 @@
 backend:
   name: github
-  repo: ИМЯ_ПОЛЬЗОВАТЕЛЯ/имя-репозитория
+  repo: 6l1x6n/greenleaf-service-center
   branch: main
+  # Cloudflare Pages: Netlify OAuth-прокси больше не работает.
+  # После создания своего OAuth-воркера замените base_url на него:
+  # base_url: https://ВАШ-ВОРКЕР.workers.dev
   base_url: https://api.netlify.com
   auth_endpoint: auth
 
@@ -47,7 +50,7 @@ collections:
           - { label: "Артикул", name: sku, widget: string }
           - { label: "Название", name: name, widget: string }
           - { label: "Категория", name: category, widget: string }
-          - { label: "Цена (₽)", name: price, widget: number, min: 0 }
+          - { label: "Цена (₸)", name: price, widget: number, min: 0 }
           - { label: "Фото", name: image, widget: image, required: false }
           - label: "Статус наличия"
             name: status

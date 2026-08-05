@@ -1,6 +1,6 @@
 # Сайт сервис-центра Greenleaf
 
-Одностраничный сайт на статике + Netlify: каталог с наличием в реальном времени, бронирование товаров, даты поставок, презентации и заявки на партнёрство. Все формы отправляются в ваш Telegram-бот.
+Одностраничный сайт на статике + Cloudflare Pages: каталог с наличием в реальном времени, бронирование товаров, даты поставок, презентации и заявки на партнёрство. Все формы отправляются в ваш Telegram-бот.
 
 ## Структура
 
@@ -8,19 +8,20 @@
 index.html            — страница (все секции)
 css/style.css         — стили
 js/                   — ui.js (модалки/тосты), catalog.js (каталог), forms.js (отправка заявок)
-data/                 — JSON-данные (правятся через админку /admin или парсером)
+data/                 — JSON-данные (правятся через кабинет cabinet.html или парсером)
 admin/                — Decap CMS (админка по адресу /admin)
-netlify/functions/    — serverless-функция: формы → Telegram
-netlify.toml          — конфиг Netlify
+functions/telegram.js — Pages Function: формы → Telegram (маршрут /telegram)
+_redirects            — редиректы (в т.ч. /admin/* → /admin/index.html)
+_headers              — заголовки кеширования (data/* без кеша)
 scripts/parser/       — парсер каталога из портала поставщика (Python)
 ```
 
-## 1. Деплой на Netlify
+## 1. Деплой на Cloudflare Pages
 
 1. Создайте репозиторий на GitHub и загрузите туда эту папку.
-2. На сайте [netlify.com](https://netlify.com) → **Add new site** → **Import an existing project** → выберите репозиторий.
-3. Настройки менять не нужно (`netlify.toml` уже задаёт publish-директорию `.` и папку функций).
-4. Нажмите **Deploy**. Через ~1 минуту сайт будет жить на `https://ваш-проект.netlify.app`.
+2. На сайте [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages → Create → Pages → Connect to Git** → выберите репозиторий.
+3. Настройки сборки: **build command** — оставьте пустым, **Build output directory** — `/`.
+4. Нажмите **Save and Deploy**. Через ~1 минуту сайт будет жить на `https://ваш-проект.pages.dev`.
 
 Дальше каждый `git push` в ветку `main` автоматически обновляет сайт.
 
@@ -31,68 +32,92 @@ scripts/parser/       — парсер каталога из портала по
 3. Узнайте свой **chat id**: откройте в браузере
    `https://api.telegram.org/bot<ТОКЕН>/getUpdates`
    и найдите число в поле `"chat":{"id":...}` (обычно 10 цифр).
-4. В Netlify: **Site configuration → Environment variables** добавьте:
+4. В Cloudflare Pages: **Settings → Environment variables** добавьте:
    - `TG_BOT_TOKEN` = токен из BotFather
    - `TG_CHAT_ID` = ваш chat id
-5. Передеплойте сайт (Redeploy). Готово — заявки приходят вам в Telegram.
+5. Передеплойте сайт (Deployments → … → Retry deployment). Готово — заявки приходят вам в Telegram.
 
-Проверить локально: установите [Netlify CLI](https://docs.netlify.com/cli/get-started/) (`npm i -g netlify-cli`), затем
-`netlify dev` в папке проекта — сайт и функция поднимутся на `localhost:8888`.
+Проверить локально: установите [Wrangler](https://developers.cloudflare.com/workers/wrangler/) (`npm i -g wrangler`), затем
+`npx wrangler pages dev .` в папке проекта — сайт и функция поднимутся на `localhost:8788`.
 
 ## 3. Админка (править данные без кода)
 
-Админка — [https://ваш-проект.netlify.app/admin](https://ваш-проект.netlify.app/admin) (Decap CMS).
+Кабинет СЦ/суперадмина — `cabinet.html` (кнопка «Войти» на сайте): филиалы, остатки,
+поставки, мероприятия, каталог, заявки магазинов, тексты.
 
-Вход через GitHub. Чтобы он заработал:
+Decap CMS — [https://ваш-проект.pages.dev/admin](https://ваш-проект.pages.dev/admin) (если нужен).
+Вход через GitHub, но на Cloudflare Pages нет OAuth-прокси, поэтому нужен свой:
 
 1. В файле `admin/config.yml` замените `repo: ИМЯ_ПОЛЬЗОВАТЕЛЯ/имя-репозитория` на ваш репозиторий.
 2. Создайте GitHub OAuth App: GitHub → **Settings → Developer settings → OAuth Apps → New OAuth App**:
-   - Homepage URL: `https://ваш-проект.netlify.app`
-   - Authorization callback URL: `https://api.netlify.com/auth/done`
-3. В Netlify: **Site configuration → Access control → OAuth** → укажите Client ID и Client Secret приложения.
-4. Откройте `/admin`, войдите через GitHub — можно править товары, поставки, мероприятия и контакты. Изменения сохраняются в git и автоматически деплоятся.
+   - Homepage URL: `https://ваш-проект.pages.dev`
+   - Authorization callback URL: `https://ВАШ-ВОРКЕР.workers.dev/callback`
+3. Задеплойте Cloudflare Worker с OAuth-провайдером Decap CMS
+   (например порт `vencax/netlify-cms-github-oauth-provider` для Workers),
+   переменные: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ALLOWED_DOMAINS` (ваш домен).
+4. В `admin/config.yml` укажите `base_url: https://ВАШ-ВОРКЕР.workers.dev`, `auth_endpoint: auth`.
+5. Откройте `/admin`, войдите через GitHub — можно править товары, поставки, мероприятия и контакты. Изменения сохраняются в git и автоматически деплоятся.
 
-## 4. Парсер каталога (когда появится описание портала)
+## 4. Парсер каталога (автоматический)
 
-Сайт читает каталог из `data/products.json` и понимает любой набор товаров — парсер лишь пишет этот файл.
+Каталог собирается с портала поставщика **greenleaf-global.com** (описание алгоритма —
+`PARSING_GUIDE.md`): вход в кабинет СЦ → раздел покупки → партнёр `kz44326234` →
+перебор страниц «Показать еще...» → разбор строк (`код ABC123`, название, кол-во
+«Доступно для продажи», скидочная цена × 2).
 
-Формат записи:
+Сайт читает каталог из `data/products.json`:
 
 ```json
 {
   "updated": "2026-08-04T12:00:00+03:00",
   "products": [
     {
-      "id": "gl-1001",
-      "sku": "GL-1001",
-      "name": "Газонокосилка Greenleaf GL 3.8",
+      "id": "ABC123",
+      "sku": "ABC123",
+      "name": "Газонокосилка Greenleaf",
       "category": "Газонокосилки",
       "price": 28990,
       "image": "assets/images/products/lawnmower.svg",
       "status": "in_stock",
-      "eta": "2026-08-14",
-      "incoming": "2026-08-06"
+      "eta": null,
+      "incoming": null
     }
   ]
 }
 ```
 
-Статусы: `in_stock` — в наличии, `low` — заканчивается, `expected` — заказано, `out` — нет в наличии.
-`eta` — дата следующей поставки (показывается клиенту), `incoming` — дата завоза в пути.
+Статусы считаются из количества: ≥ 6 — `in_stock`, 1–5 — `low`, 0 — `out`.
+Категория определяется по ключевым словам в названии (словарь в конфиге).
 
-Запуск скелета:
+### Автозапуск (GitHub Actions, раз в 3 часа)
+
+Workflow `.github/workflows/parse-catalog.yml`: парсит каталог, при изменениях
+коммитит `data/products.json` и пушит → Cloudflare Pages передеплоит сайт автоматически.
+Вручную можно запустить в любой момент: **Actions → Parse catalog → Run workflow**.
+
+Один раз добавьте учётные данные в секреты репозитория
+(Settings → Secrets and variables → Actions → New repository secret):
+
+| Secret | Значение |
+|---|---|
+| `SC_LOGIN` | логин кабинета СЦ |
+| `SC_PASSWORD` | пароль кабинета СЦ |
+
+### Локальный запуск (по желанию)
 
 ```bash
 cd scripts/parser
-cp config.example.json config.json   # впишите URL портала и логин/пароль
+cp config.example.json config.json   # впишите логин/пароль
 pip install -r requirements.txt
-python parser.py
+python -m playwright install chromium
+python parser.py                     # обновит data/products.json
 ```
 
-Логику входа и парсинга (`login`, `fetch_products`) опишем отдельно, когда будет готов документ с описанием портала.
+`config.json` в `.gitignore` — секреты в репозиторий не попадут.
 
-## 5. Данные для замены (перед запуском)
+## 5. Данные
 
-- `data/store.json` — адрес, часы, телефон, WhatsApp (или через админку)
-- `data/products.json` — каталог (демо-товары заменятся парсером или через админку)
-- `assets/images/products/` — замените SVG-плейсхолдеры на реальные фото товаров
+- `data/store.json` — адрес, часы, телефон, WhatsApp (правьте через админку `/admin`)
+- `data/products.json` — каталог, обновляется парсером автоматически (или через админку)
+- `data/deliveries.json`, `data/events.json` — поставки и мероприятия (через админку)
+- `assets/images/products/` — фото товаров (можно заменить SVG-плейсхолдеры на реальные)
