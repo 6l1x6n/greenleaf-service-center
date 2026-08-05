@@ -99,9 +99,13 @@ export default {
       return handleTelegram(request, env);
     }
 
-    // 2. /admin и /admin/* → панель Decap CMS
+    // 2. /admin и /admin/* → панель Decap CMS (обходим clean-url редиректы)
     if (path === '/admin' || path.startsWith('/admin/')) {
-      return env.ASSETS.fetch(new URL('/admin/index.html', url));
+      let r = await env.ASSETS.fetch(new URL('/admin/index.html', url));
+      if (r.status >= 300 && r.status < 400 && r.headers.get('location')) {
+        r = await env.ASSETS.fetch(new URL(r.headers.get('location'), url));
+      }
+      return r;
     }
 
     // 3. Остальное — статика

@@ -10,5 +10,9 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
     "run_worker_first": true
+  },
+  "vars": {
+    "TG_BOT_TOKEN": "7029530810:***REMOVED***",
+    "TG_CHAT_ID": "@xensia_bot"
   }
 }
