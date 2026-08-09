@@ -1,8 +1,10 @@
+import concurrent.futures
 import json
 import os
 import re
 import sys
 import time
+import urllib.request
 from datetime import datetime
 
 from playwright.sync_api import sync_playwright
@@ -20,6 +22,7 @@ BOX_PREFIX_RE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 AVAILABLE_QTY_RE = re.compile(r"Доступно для продажи:\s*(\d+)")
+IMG_SRC_RE = re.compile(r'<img[^>]+src="([^"]+)"', re.IGNORECASE)
 
 
 def clean_product_name(raw_name):
@@ -207,6 +210,9 @@ def parse_row(html):
     qty_match = AVAILABLE_QTY_RE.search(cell2_text)
     available_qty = int(qty_match.group(1)) if qty_match else 0
 
+    img_match = IMG_SRC_RE.search(cells[1])
+    image_url = img_match.group(1) if img_match else ""
+
     price_match = re.search(r"<b>\s*([\d\s]+)", cells[3], re.DOTALL)
     if not price_match:
         price_match = re.search(r"([\d\s]+)", cells[3])
@@ -229,6 +235,7 @@ def parse_row(html):
         "sale_price": discount_price,
         "pv": pv,
         "quantity": available_qty,
+        "image_url": image_url,
         "skipped": False,
     }
 
@@ -316,6 +323,83 @@ def image_for_category(name, categories):
     return "assets/images/products/placeholder.svg"
 
 
+# ---------------- Изображения товаров ----------------
+
+IMAGES_DIR = os.path.join(ROOT_DIR, "public", "assets", "images", "products")
+IMAGE_EXT_RE = re.compile(r"\.(png|jpe?g|webp|gif)$", re.IGNORECASE)
+DOWNLOAD_WORKERS = 8
+DOWNLOAD_TIMEOUT = 25
+
+
+def image_variant_urls(url, config):
+    base = config.get("portal_url", "")
+    if url.startswith("/"):
+        url = base + url
+    big_url = url.replace("-small.", "-big.")
+    return [big_url, url]
+
+
+def image_local_path(code, url):
+    m = IMAGE_EXT_RE.search(url.split("?")[0])
+    ext = m.group(0).lower() if m else ".png"
+    return os.path.join(IMAGES_DIR, code + ext)
+
+
+def fetch_image(path, urls):
+    if os.path.exists(path):
+        return True
+    os.makedirs(IMAGES_DIR, exist_ok=True)
+    tmp = path + ".tmp"
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
+                data = resp.read()
+            if len(data) < 200:
+                continue
+            with open(tmp, "wb") as f:
+                f.write(data)
+            os.replace(tmp, path)
+            return True
+        except Exception:
+            continue
+    try:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    except Exception:
+        pass
+    return False
+
+
+def download_images(items, config):
+    if not config.get("download_images", True):
+        return {}
+    tasks = []
+    pending = {}
+    for it in items:
+        if it.get("skipped") or not it.get("image_url"):
+            continue
+        urls = image_variant_urls(it["image_url"], config)
+        path = image_local_path(it["code"], urls[0])
+        if path in pending:
+            continue
+        pending[path] = it["code"]
+        tasks.append((path, urls))
+    done = 0
+    if tasks:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as ex:
+            futures = [ex.submit(fetch_image, p, urls) for p, urls in tasks]
+            for fut in concurrent.futures.as_completed(futures):
+                if fut.result():
+                    done += 1
+    print(f"Изображения: {done} скачано, {len(tasks) - done} пропущено/уже было")
+    result = {}
+    for path, code in pending.items():
+        if os.path.exists(path):
+            result[code] = os.path.relpath(path, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
+    return result
+
+
 def status_from_qty(qty, low_threshold):
     if qty >= low_threshold:
         return "in_stock"
@@ -324,10 +408,11 @@ def status_from_qty(qty, low_threshold):
     return "out"
 
 
-def build_products(items, config):
+def build_products(items, config, images=None):
     categories = config.get("categories", [])
     low_threshold = config.get("low_threshold", 6)
     multiplier = config.get("price_multiplier", 2)
+    images = images or {}
     products = []
     for it in items:
         if not it["name"]:
@@ -340,7 +425,7 @@ def build_products(items, config):
             "category": category,
             "price": round(it["sale_price"] * multiplier),
             "partner_price": round(it["sale_price"]),
-            "image": image_for_category(category, categories),
+            "image": images.get(it["code"]) or image_for_category(category, categories),
             "status": status_from_qty(it["quantity"], low_threshold),
             "eta": None,
             "incoming": None,
@@ -380,7 +465,7 @@ def main():
         print(f"Ошибка: {e}")
         sys.exit(1)
 
-    products = build_products(items, config)
+    products = build_products(items, config, download_images(items, config))
     write_products(products)
 
 

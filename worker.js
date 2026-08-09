@@ -1,7 +1,8 @@
 // Cloudflare Worker: статика сайта Greenleaf + обработка форм → Telegram.
 // Разворачивается через Git-интеграцию Workers (проект mygreenleaf).
 // Переменные окружения (Worker → Settings → Variables):
-//   TG_BOT_TOKEN, TG_CHAT_ID
+//   TG_BOT_TOKEN, TG_CHAT_ID — заявки/консультации
+//   TG_ORDERS_CHAT_ID       — группа, куда бот шлёт ЗАКАЗЫ (корзина + бронь)
 
 const TELEGRAM_API = 'https://api.telegram.org/bot';
 
@@ -9,11 +10,22 @@ function buildText(data) {
   const name = (data.name || '').trim();
   const phone = (data.phone || '').trim();
   const type = data.type || 'other';
-  const head = '🔔 Новая заявка с сайта';
+  const isOrder = type === 'order' || type === 'reservation';
+  const head = isOrder ? '🛒 НОВЫЙ ЗАКАЗ' : '🔔 Новая заявка с сайта';
 
   const blocks = {
+    order: [
+      '💳 Оплата: ' + (data.payment || '—'),
+      data.partner_id ? '🎫 ID партнёра: ' + data.partner_id + (data.order_partner_mode === '1' ? ' (партнёрские цены)' : '') : null,
+      data.order_store ? '🏬 Филиал: ' + data.order_store : null,
+      '— Состав заказа —',
+      data.order_items ? data.order_items : '—',
+      '—',
+      '🧾 Пакет-упаковка: ' + (data.order_package || 0) + ' ₸',
+      '💰 ИТОГО: ' + (data.order_total || 0) + ' ₸' + (data.payment && data.payment.indexOf('Kaspi') !== -1 ? ' (оплачено)' : ''),
+      data.pickup_date ? '📅 Дата приезда: ' + data.pickup_date + (data.pickup_time ? ' в ' + data.pickup_time : '') : null
+    ],
     reservation: [
-      '🛒 Бронирование товара',
       '📦 ' + (data.product || '—'),
       data.store ? '🏬 Филиал: ' + data.store : null,
       '🔢 Кол-во: ' + (data.quantity || 1),
@@ -73,12 +85,6 @@ function buildText(data) {
 
 async function handleTelegram(request, env) {
   const BOT_TOKEN = env.TG_BOT_TOKEN;
-  const CHAT_ID = env.TG_CHAT_ID;
-
-  if (!BOT_TOKEN || !CHAT_ID) {
-    console.error('TG_BOT_TOKEN или TG_CHAT_ID не заданы');
-    return new Response('Telegram not configured', { status: 500 });
-  }
 
   let data;
   try {
@@ -89,6 +95,15 @@ async function handleTelegram(request, env) {
 
   if (data.company) {
     return new Response('ok', { status: 200 });
+  }
+
+  // Заказы (корзина, бронь) — в группу заказов, остальное — в основной чат
+  const isOrder = data.type === 'order' || data.type === 'reservation';
+  const CHAT_ID = (isOrder ? env.TG_ORDERS_CHAT_ID : null) || env.TG_CHAT_ID;
+
+  if (!BOT_TOKEN || !CHAT_ID) {
+    console.error('TG_BOT_TOKEN или TG_CHAT_ID не заданы');
+    return new Response('Telegram not configured', { status: 500 });
   }
 
   const text = buildText(data);

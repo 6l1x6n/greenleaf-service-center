@@ -28,6 +28,9 @@
         <a href="podpiska.html">Подписка</a>
       </nav>
       <div class="header-actions">
+        <a class="btn btn-outline btn-sm cart-link" href="cart.html" aria-label="Корзина">
+          🛒 <span class="cart-badge" id="cartCount"></span>
+        </a>
         <button class="btn btn-outline btn-sm" id="scAuthBtn">Войти</button>
         <a class="btn btn-whatsapp btn-sm" id="waHeader" href="#" target="_blank" rel="noopener">Написать в WhatsApp</a>
         <button class="burger" id="burger" aria-label="Открыть меню"><span></span><span></span><span></span></button>
@@ -112,7 +115,7 @@
             <div class="chips" id="chips"></div>
           </div>
         </div>
-        <div class="grid" id="grid"></div>
+        <div class="list" id="grid"></div>
         <div class="empty hidden" id="empty">
           Ничего не найдено.<br>
           Оставьте заявку — сообщим, когда товар появится.
@@ -177,6 +180,7 @@
   <script src="js/ui.js"></script>
   <script src="js/cities.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/cart.js"></script>
   <script src="js/catalog.js"></script>
   <script src="js/forms.js"></script>
 </body>
