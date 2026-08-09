@@ -473,6 +473,7 @@ def build_products(items, config, images=None):
             "category": category,
             "price": round(it["sale_price"] * multiplier),
             "partner_price": round(it["sale_price"]),
+            "quantity": it["quantity"],
             "image": images.get(it["code"]) or image_for_category(category, categories),
             "status": status_from_qty(it["quantity"], low_threshold),
             "eta": None,

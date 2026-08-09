@@ -15,6 +15,10 @@
   var categories = [];
   var state = { category: 'all', query: '', stockOnly: false, selectedStoreId: 'all', cityFilter: 'all', storeQuery: '', showAllCatalog: false };
 
+  var isCatalogPage = document.body && document.body.dataset.catalogPage === '1';
+  var MAIN_PAGE_LIMIT = 24;
+  var FILTERS_KEY = 'greenleaf_catalog_filters_v1';
+
   var grid = document.getElementById('grid');
   var chips = document.getElementById('chips');
   var search = document.getElementById('search');
@@ -52,6 +56,10 @@
   function rowHtml(p) {
     var st = statusInfo(p);
     var img = p.image || 'assets/images/products/placeholder.svg';
+    var qtyHtml = '';
+    if (typeof p.quantity === 'number' && p.quantity > 0) {
+      qtyHtml = '<div class="eta-line qty-line' + (p.status === 'low' ? ' qty-line-low' : '') + '">📦 Доступно: <b>' + p.quantity + ' шт.</b></div>';
+    }
     var stockInSelectedStore = '';
     if (state.selectedStoreId && state.selectedStoreId !== 'all' && p.stockByStore) {
       var storeStock = p.stockByStore[state.selectedStoreId] || 'Нет данных';
@@ -70,6 +78,7 @@
       '<span class="badge ' + st.meta.cls + '">' + st.meta.icon + ' ' + st.meta.label + '</span>' +
       '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
       '</div>' +
+      qtyHtml +
       stockInSelectedStore +
       st.extra +
       '</div>' +
@@ -262,6 +271,10 @@
   // ---------------- Товар: модалка, резерв ----------------
 
   function openProductDetailModal(p) {
+    var qtyLine = '';
+    if (typeof p.quantity === 'number' && p.quantity > 0) {
+      qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно на складе: <b>' + p.quantity + ' шт.</b></div>';
+    }
     var stockRows = '';
     if (p.stockByStore) {
       stockRows = Object.keys(p.stockByStore).map(function (sId) {
@@ -293,6 +306,7 @@
       '</div>' +
       '<a class="partner-link" href="podpiska.html">Партнёрская цена для подписчиков · Как стать партнёром →</a>' +
       '<div class="product-detail-desc">' + Utils.esc(p.description || 'Высококачественная экологичная продукция Greenleaf.') + '</div>' +
+      qtyLine +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
       '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">' +
@@ -322,8 +336,12 @@
     list.sort(function (a, b) {
       return (ORDER[a.status] - ORDER[b.status]) || (a.name.localeCompare(b.name, 'ru'));
     });
+    if (!isCatalogPage && list.length > MAIN_PAGE_LIMIT) {
+      list = list.slice(0, MAIN_PAGE_LIMIT);
+    }
     grid.innerHTML = list.map(rowHtml).join('');
-    document.getElementById('empty').classList.toggle('hidden', list.length > 0);
+    var emptyEl = document.getElementById('empty');
+    if (emptyEl) emptyEl.classList.toggle('hidden', list.length > 0);
   }
 
   function renderChips() {
@@ -533,17 +551,39 @@
     state.category = chip.getAttribute('data-cat');
     renderChips();
     render();
+    saveFilters();
   });
 
   search.addEventListener('input', function () {
     state.query = search.value;
     render();
+    saveFilters();
   });
 
   stockOnly.addEventListener('change', function () {
     state.stockOnly = stockOnly.checked;
     render();
+    saveFilters();
   });
+
+  function saveFilters() {
+    try {
+      localStorage.setItem(FILTERS_KEY, JSON.stringify({ q: state.query, cat: state.category, stock: state.stockOnly }));
+    } catch (e) { }
+  }
+
+  function restoreFilters() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(FILTERS_KEY) || 'null');
+      if (saved) {
+        state.query = saved.q || '';
+        state.category = saved.cat || 'all';
+        state.stockOnly = !!saved.stock;
+        if (search) search.value = state.query;
+        if (stockOnly) stockOnly.checked = state.stockOnly;
+      }
+    } catch (e) { }
+  }
 
   Cart.onChange(function () {
     Cart.updateBadge();
@@ -861,12 +901,23 @@
       });
       categories = Object.keys(byCat).map(function (k) { return { name: k, label: k, count: byCat[k] }; });
 
-      document.getElementById('catalogUpdated').textContent = 'Обновлено: ' +
-        Utils.fmtDate(data.updated, { day: 'numeric', month: 'long' }) + ' ' +
-        new Date(data.updated).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      var updatedEl = document.getElementById('catalogUpdated');
+      if (updatedEl) {
+        updatedEl.textContent = 'Обновлено: ' +
+          Utils.fmtDate(data.updated, { day: 'numeric', month: 'long' }) + ' ' +
+          new Date(data.updated).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      }
 
       var inStock = products.filter(function (p) { return p.status === 'in_stock' || p.status === 'low'; }).length;
-      document.getElementById('heroStock').textContent = 'В наличии: ' + inStock + ' ' + plural(inStock, ['позиция', 'позиции', 'позиций']);
+      var heroStockEl = document.getElementById('heroStock');
+      if (heroStockEl) {
+        heroStockEl.textContent = 'В наличии: ' + inStock + ' ' + plural(inStock, ['позиция', 'позиции', 'позиций']);
+      }
+
+      var countEl = document.getElementById('catalogCount');
+      if (countEl) {
+        countEl.textContent = products.length + ' ' + plural(products.length, ['позиция', 'позиции', 'позиций']);
+      }
     } catch (err) {
       grid.innerHTML = '<div class="empty">Каталог временно недоступен. Напишите нам в WhatsApp — подскажем наличие.</div>';
     }
@@ -874,10 +925,19 @@
     applyLocalOverrides();
     setupTapEdit();
     updateHeroMeta();
+    restoreFilters();
 
     try {
       var savedCity = localStorage.getItem('greenleaf_city_v1');
       if (savedCity) state.cityFilter = savedCity;
+    } catch (e) { }
+
+    try {
+      var savedSc = localStorage.getItem('greenleaf_sc_selected_v1');
+      if (savedSc) {
+        var scObj = JSON.parse(savedSc);
+        if (scObj && scObj.id) state.selectedStoreId = scObj.id;
+      }
     } catch (e) { }
 
     window.CatalogStores = stores;
@@ -887,7 +947,7 @@
     renderChips();
     render();
     renderContacts();
-    maybeAskCity();
+    if (!isCatalogPage) maybeAskCity();
 
     fetch('data/deliveries.json?t=' + Date.now())
       .then(function (r) { return r.json(); })

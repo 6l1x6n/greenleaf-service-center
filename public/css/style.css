@@ -96,7 +96,7 @@ a:hover { text-decoration: none; }
   border-bottom: 1px solid var(--line);
   box-shadow: 0 1px 0 rgba(22, 48, 31, 0.03);
 }
-.header-inner { display: flex; align-items: center; gap: 18px; height: 68px; }
+.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 18px; height: 68px; }
 .logo { display: flex; align-items: center; gap: 10px; margin-right: 4px; }
 .logo img { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; }
 .logo-text {
@@ -108,7 +108,7 @@ a:hover { text-decoration: none; }
 }
 .logo-text small { display: block; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
 
-.nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.nav { display: flex; align-items: center; gap: 4px; }
 .nav a {
   display: inline-flex;
   align-items: center;
@@ -144,12 +144,22 @@ a:hover { text-decoration: none; }
 .burger.open span:nth-child(2) { opacity: 0; }
 .burger.open span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
 
-@media (max-width: 1180px) and (min-width: 961px) {
+@media (max-width: 1500px) and (min-width: 961px) {
   .header-inner { gap: 12px; }
   .nav { gap: 2px; }
   .nav a { padding: 0 10px; font-size: 13px; }
   #waHeader { padding: 8px 12px; font-size: 12.5px; }
   #scAuthBtn { padding: 8px 12px; font-size: 12.5px; }
+}
+
+@media (min-width: 1201px) {
+  .header-inner { gap: 20px; }
+  .nav a { padding: 0 13px; }
+}
+
+@media (max-width: 960px) and (min-width: 641px) {
+  #waHeader { font-size: 0; padding: 0; width: 40px; }
+  #waHeader::after { content: "💬"; font-size: 17px; }
 }
 
 @media (max-width: 960px) {
@@ -437,6 +447,16 @@ a:hover { text-decoration: none; }
   font-family: var(--font);
 }
 .search:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(27, 107, 63, 0.1); }
+
+.catalog-all-link { display: flex; justify-content: flex-end; margin: -6px 0 18px; }
+.catalog-all-link .btn { gap: 4px; }
+.catalog-all-note { font-size: 13.5px; color: var(--muted); font-weight: 700; margin-bottom: 16px; }
+
+.breadcrumbs { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+.breadcrumbs a { color: var(--green-dark); font-weight: 700; text-decoration: none; }
+.breadcrumbs a:hover { text-decoration: underline; }
+
+.qty-line-low b { color: #b45309; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .city-pick-grid {
