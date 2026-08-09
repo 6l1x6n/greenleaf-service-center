@@ -432,7 +432,10 @@ def classify_category(name, categories):
     lower = name.lower()
     for cat in categories:
         for keyword in cat.get("keywords", []):
-            if keyword.lower() in lower:
+            kw = keyword.lower()
+            # слово должно начинаться с ключевого слова (не подстрока внутри слова,
+            # чтобы «пил» не попадал в «депиляции» и т.п.)
+            if re.search(r"(?<![a-zа-яё0-9])" + re.escape(kw), lower):
                 return cat["name"]
     return "Прочее"
 
