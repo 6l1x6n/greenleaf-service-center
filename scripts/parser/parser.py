@@ -339,6 +339,7 @@ def build_products(items, config):
             "name": it["name"],
             "category": category,
             "price": round(it["sale_price"] * multiplier),
+            "partner_price": round(it["sale_price"]),
             "image": image_for_category(category, categories),
             "status": status_from_qty(it["quantity"], low_threshold),
             "eta": None,

@@ -54,7 +54,12 @@
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 class="card-title" style="cursor:pointer;" data-open-detail="' + Utils.esc(p.id) + '">' + Utils.esc(p.name) + '</h3>' +
       '<span class="card-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      '<div class="card-price">' + Utils.fmtPrice(p.price) + '</div>' +
+      '<div class="card-prices">' +
+      '<span class="price-old">' + Utils.fmtPrice(p.price) + '</span>' +
+      '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
+      '<span class="badge-sale">-50%</span>' +
+      '</div>' +
+      '<a class="partner-link" href="podpiska.html">Партнёрская цена · Как стать партнёром →</a>' +
       '<div><span class="badge ' + st.meta.cls + '">' + st.meta.icon + ' ' + st.meta.label + '</span></div>' +
       stockInSelectedStore +
       st.extra +
@@ -64,6 +69,12 @@
       '</div>' +
       '</div>' +
       '</article>';
+  }
+
+  function partnerPrice(p) {
+    var v = p.partner_price;
+    if (typeof v !== 'number' || isNaN(v)) v = Math.round(p.price / 2);
+    return v;
   }
 
   function selectedStore() {
@@ -257,7 +268,12 @@
       '<img src="' + Utils.esc(p.image || 'assets/images/products/placeholder.svg') + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
       '</div>' +
       '<div class="product-detail-body">' +
-      '<div class="product-detail-price">' + Utils.fmtPrice(p.price) + '</div>' +
+      '<div class="card-prices" style="margin-top:6px;">' +
+      '<span class="price-old">' + Utils.fmtPrice(p.price) + '</span>' +
+      '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
+      '<span class="badge-sale">-50%</span>' +
+      '</div>' +
+      '<a class="partner-link" href="podpiska.html">Партнёрская цена для подписчиков · Как стать партнёром →</a>' +
       '<div class="product-detail-desc">' + Utils.esc(p.description || 'Высококачественная экологичная продукция Greenleaf.') + '</div>' +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
@@ -370,7 +386,8 @@
     Utils.openModal(
       '<h3>Бронирование продукции</h3>' +
       '<p class="modal-product"><b>' + Utils.esc(p.name) + '</b></p>' +
-      '<p class="modal-price">' + Utils.fmtPrice(p.price) + ' · ' + Utils.esc(p.sku) + '</p>' +
+      '<p class="modal-price">Розничная цена: <b>' + Utils.fmtPrice(p.price) + '</b> · ' + Utils.esc(p.sku) + '</p>' +
+      '<p class="modal-partner-note">Для партнёров по подписке: <b>' + Utils.fmtPrice(partnerPrice(p)) + '</b> <a href="podpiska.html">Как стать партнёром →</a></p>' +
       '<div style="margin-top:10px"><span class="badge ' + st.meta.cls + '">' + st.meta.icon + ' ' + st.meta.label + '</span></div>' +
       '<form class="form" data-type="reservation">' +
       '<input type="hidden" name="product" value="' + Utils.esc(p.name) + ' (' + Utils.esc(p.sku) + ')">' +
