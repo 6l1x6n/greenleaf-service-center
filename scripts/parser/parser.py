@@ -121,8 +121,17 @@ def login(page, config):
     url = config["portal_url"] + "/office/login?goto=%2Fdashboard"
     login_ = config["sc_login"]
     password = config["sc_password"]
-    if not login_ or not password:
-        raise RuntimeError("Учетные данные не настроены (config.json или SC_LOGIN/SC_PASSWORD)")
+    missing = []
+    if not login_:
+        missing.append("SC_LOGIN")
+    if not password:
+        missing.append("SC_PASSWORD")
+    if missing:
+        raise RuntimeError(
+            "Учетные данные не настроены: "
+            + ", ".join(missing)
+            + " (задайте их в GitHub Secrets → Actions или в scripts/parser/config.json)"
+        )
 
     max_retries = 6
     for retry in range(max_retries):

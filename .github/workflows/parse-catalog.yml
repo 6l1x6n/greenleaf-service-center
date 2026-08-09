@@ -28,6 +28,20 @@ jobs:
           pip install -r scripts/parser/requirements.txt
           python -m playwright install chromium --with-deps
 
+      - name: Check secrets
+        env:
+          SC_LOGIN: ${{ secrets.SC_LOGIN }}
+          SC_PASSWORD: ${{ secrets.SC_PASSWORD }}
+        run: |
+          if [ -z "$SC_LOGIN" ]; then
+            echo "::error::Секрет SC_LOGIN не задан (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          if [ -z "$SC_PASSWORD" ]; then
+            echo "::error::Секрет SC_PASSWORD не задан (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+
       - name: Random delay (защита от блокировок портала)
         run: sleep $((RANDOM % 900))
 
