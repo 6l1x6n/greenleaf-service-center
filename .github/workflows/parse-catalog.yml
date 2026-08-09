@@ -3,7 +3,12 @@ name: Parse catalog
 on:
   schedule:
     - cron: "17 */3 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      skip_delay:
+        description: "Пропустить случайную задержку (для отладки)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,6 +48,7 @@ jobs:
           fi
 
       - name: Random delay (защита от блокировок портала)
+        if: ${{ !inputs.skip_delay }}
         run: sleep $((RANDOM % 900))
 
       - name: Run parser
@@ -51,6 +57,14 @@ jobs:
           SC_PASSWORD: ${{ secrets.SC_PASSWORD }}
           PARTNER_LOGIN: ${{ secrets.PARTNER_LOGIN }}
         run: python scripts/parser/parser.py
+
+      - name: Upload diag (если парсер что-то сохранил)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parser-diag
+          path: scripts/parser/diag/
+          if-no-files-found: ignore
 
       - name: Commit catalog if changed
         run: |

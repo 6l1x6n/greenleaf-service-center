@@ -197,13 +197,25 @@ def enter_partner(page, config):
             }
         }""", partner)
         deadline = time.time() + 25
+        denied_seen = False
+        denied_since = None
         while time.time() < deadline:
             if page.locator('text="Нет доступа"').count() > 0:
-                return False
+                if not denied_since:
+                    denied_since = time.time()
+                # «Нет доступа» может мигать при загрузке — реагируем, только если держится 4 сек
+                if not denied_seen and time.time() - denied_since >= 4:
+                    denied_seen = True
+                    dump_diag(page, f"partner_denied_{int(time.time() % 100)}")
+            else:
+                denied_since = None
             if page.locator('input[type="submit"][value="Далее"]:not([disabled])').count() > 0:
                 break
             time.sleep(0.5)
         else:
+            if denied_seen:
+                print("Партнёр отклонён порталом (Нет доступа)")
+                return False
             return False
         page.click('input[type="submit"][value="Далее"]', timeout=15000)
         try:
@@ -279,6 +291,7 @@ def scrape_goods(page, config):
             page.reload(timeout=30000)
             time.sleep(2)
         if not enter_partner(page, config):
+            dump_diag(page, f"partner_failed_{attempt}")
             if attempt >= 3:
                 raise RuntimeError("Не удалось получить каталог поставщика")
             continue
