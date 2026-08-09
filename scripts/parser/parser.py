@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
 PRODUCTS_PATH = os.path.join(ROOT_DIR, "public", "data", "products.json")
+MOVES_PATH = os.path.join(ROOT_DIR, "public", "data", "moves.json")
 CATALOG_CACHE_PATH = os.path.join(ROOT_DIR, "scripts", "parser", ".catalog_cache.json")
 
 PRODUCT_CODE_STRICT_RE = re.compile(r"^[A-Z]{3}\d{3}$")
@@ -538,6 +539,156 @@ def status_from_qty(qty, low_threshold):
     return "out"
 
 
+# ---------------- Перемещения товаров (накладные, статусы поставок) ----------------
+
+# Статусы накладных портала: код по значению из select[name="state"]
+MOVE_STATUS_CODES = {
+    "Новый": 0,
+    "Оплачен": 1,
+    "Выгружен в 1С": 2,
+    "Проверен": 3,
+    "Отправлен": 4,
+    "Оспорен": 5,
+    "Принят": 6,
+    "Принят СЦ": 7,
+    "Отменен": 9,
+    "В обработке": 100,
+    "Ошибка обработки": 101,
+}
+# Статусы, по которым имеет смысл показывать «в пути» и парсить состав накладной
+ACTIVE_MOVE_CODES = (0, 1, 2, 3, 4, 6, 100)
+
+
+def wait_move_rows(page, timeout=30):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        rows = page.query_selector_all('table.table_round tr:has(a[href*="action=show&move="])')
+        if rows:
+            return rows
+        time.sleep(1.5)
+    return page.query_selector_all('table.table_round tr:has(a[href*="action=show&move="])')
+
+
+def _cell_text(cell):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", cell)).strip()
+
+
+def parse_move_row(html):
+    cells = re.findall(r"<td[^>]*>(.*?)</td>", html, re.DOTALL | re.IGNORECASE)
+    if len(cells) < 7:
+        return None
+    m = re.search(r'href="[^"]*move=(\d+)"', cells[0])
+    if not m:
+        return None
+    time_raw = _cell_text(cells[2])
+    sum_raw = _cell_text(cells[3]).replace(" ", "").replace("\u00a0", "")
+    status = _cell_text(cells[6])
+    date_iso = ""
+    time_iso = ""
+    tm = re.search(r"(\d{2})\.(\d{2})\.(\d{4})", time_raw)
+    if tm:
+        d, mo, y = tm.groups()
+        date_iso = f"{y}-{mo}-{d}"
+        time_iso = date_iso
+        if "," in time_raw:
+            time_iso += " " + time_raw.split(",", 1)[1].strip()
+    try:
+        total = float(sum_raw)
+    except ValueError:
+        total = 0.0
+    return {
+        "number": m.group(1),
+        "who": _cell_text(cells[1]),
+        "time": time_iso,
+        "date": date_iso,
+        "sum": total,
+        "source": _cell_text(cells[4]),
+        "recipient": _cell_text(cells[5]),
+        "status": status,
+        "statusCode": MOVE_STATUS_CODES.get(status, -1),
+        "items": [],
+        "itemsParsed": False,
+    }
+
+
+def fetch_move_items(page, config, mv):
+    url = config["portal_url"] + "/do.vshow#admin/shop/move?action=show&move=" + mv["number"]
+    try:
+        page.goto(url, timeout=30000)
+        time.sleep(2.5)
+    except Exception as e:
+        print(f"Не удалось открыть накладную {mv['number']}: {e}")
+        return []
+    try:
+        os.makedirs(DIAG_DIR, exist_ok=True)
+        with open(os.path.join(DIAG_DIR, f"move_{mv['number']}.html"), "w", encoding="utf-8") as f:
+            f.write(page.content())
+    except Exception:
+        pass
+    items = []
+    seen = set()
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", page.content(), re.DOTALL | re.IGNORECASE):
+        if "<td" not in row:
+            continue
+        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", row)).strip()
+        m = PRODUCT_CODE_STRICT_RE.search(text)
+        if not m:
+            continue
+        code = m.group(0)
+        if code in seen:
+            continue
+        seen.add(code)
+        qty_m = re.search(r"(?:кол[-\s]?во|шт)[\s:×x*]*(\d+)", text, re.IGNORECASE)
+        items.append({"sku": code, "qty": int(qty_m.group(1)) if qty_m else 1})
+    return items
+
+
+def scrape_moves(page, config):
+    page.goto(config["portal_url"] + "/do.vshow#admin/shop/move", timeout=30000)
+    time.sleep(3)
+    rows = wait_move_rows(page, timeout=30)
+    if not rows:
+        dump_diag(page, "moves_no_rows")
+        raise RuntimeError("Не удалось получить список перемещений товаров")
+
+    moves = []
+    seen = set()
+    for row in rows:
+        try:
+            mv = parse_move_row(row.inner_html())
+            if not mv or mv["number"] in seen:
+                continue
+            seen.add(mv["number"])
+            moves.append(mv)
+        except Exception:
+            continue
+    moves.sort(key=lambda x: x["time"], reverse=True)
+    print(f"Накладные получены: {len(moves)}")
+
+    max_details = config.get("move_details_limit", 10)
+    done = 0
+    for mv in moves:
+        if done >= max_details:
+            break
+        if mv["statusCode"] not in ACTIVE_MOVE_CODES:
+            continue
+        mv["items"] = fetch_move_items(page, config, mv)
+        mv["itemsParsed"] = len(mv["items"]) > 0
+        done += 1
+        time.sleep(1.5)
+    return moves
+
+
+def write_moves(moves):
+    payload = {
+        "updated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S+03:00"),
+        "moves": moves,
+    }
+    with open(MOVES_PATH, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    print(f"Сохранено накладных: {len(moves)} -> {MOVES_PATH}")
+
+
 def build_products(items, config, images=None):
     categories = config.get("categories", [])
     low_threshold = config.get("low_threshold", 6)
@@ -576,8 +727,22 @@ def write_products(products):
 
 def main():
     images_only = "--images-only" in sys.argv
+    moves_only = "--moves-only" in sys.argv
     config = load_config()
     try:
+        if moves_only:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                    viewport={"width": 1440, "height": 900},
+                )
+                page = context.new_page()
+                login(page, config)
+                moves = scrape_moves(page, config)
+                write_moves(moves)
+                browser.close()
+            return
         if images_only:
             with open(CATALOG_CACHE_PATH, encoding="utf-8") as f:
                 items = json.load(f)
@@ -610,6 +775,11 @@ def main():
             images = download_images(items, config, page.request)
             products = build_products(items, config, images)
             write_products(products)
+            try:
+                moves = scrape_moves(page, config)
+                write_moves(moves)
+            except Exception as e:
+                print(f"Перемещения товаров: не удалось ({e}) — продолжаем без них")
             browser.close()
     except FileNotFoundError as e:
         print(e)

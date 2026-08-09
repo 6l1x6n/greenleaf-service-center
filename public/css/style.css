@@ -467,7 +467,7 @@ a:hover { text-decoration: none; }
 }
 .search:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(27, 107, 63, 0.1); }
 
-.catalog-all-link { display: flex; justify-content: flex-end; margin: -6px 0 18px; }
+.catalog-all-link { display: flex; justify-content: center; margin: 26px 0 0; }
 .catalog-all-link .btn { gap: 4px; }
 .catalog-all-note { font-size: 13.5px; color: var(--muted); font-weight: 700; margin-bottom: 16px; }
 
@@ -862,6 +862,20 @@ a:hover { text-decoration: none; }
   border-radius: 999px;
   font-size: 12.5px;
 }
+.move-card .delivery-main { width: 100%; }
+.move-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.move-status { font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 999px; white-space: nowrap; }
+.move-status.mv-new { background: #eef0f3; color: #5b6472; }
+.move-status.mv-prep { background: #fdf3d7; color: #9a6b00; }
+.move-status.mv-transit { background: #dbeafe; color: #1d4ed8; }
+.move-num { font-size: 12px; color: var(--muted); font-weight: 600; }
+.move-road { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin: 12px 0 8px; }
+.move-point { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.move-point-end { color: var(--green-dark); }
+.move-track { position: relative; height: 10px; border-radius: 999px; background: repeating-linear-gradient(90deg, #dfe5df 0 14px, #f4f7f4 14px 28px); }
+.move-progress { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--green); border-radius: 999px; transition: width 0.6s ease; }
+.move-truck { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 20px; z-index: 2; transition: left 0.6s ease; line-height: 1; }
+.move-eta { font-size: 13px; font-weight: 700; color: var(--green-darker); margin-bottom: 4px; }
 
 /* ---------- Мероприятия ---------- */
 .events-grid {
@@ -1032,6 +1046,14 @@ a:hover { text-decoration: none; }
   padding: 16px 18px;
   font-weight: 600;
   display: none;
+}
+.form-success-panel { text-align: center; padding: 12px 6px 8px; }
+.form-success-panel .fsp-icon { font-size: 46px; line-height: 1; margin-bottom: 12px; animation: fsp-pop 0.45s ease; }
+.form-success-panel .fsp-title { font-size: 19px; font-weight: 800; color: var(--green-darker); margin-bottom: 6px; }
+.form-success-panel .fsp-text { font-size: 14px; color: var(--muted); line-height: 1.45; }
+@keyframes fsp-pop {
+  0% { transform: scale(0.35); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 .form.show-success .form-success { display: block; }
 .form.show-success > *:not(.form-success) { display: none; }

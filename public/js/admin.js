@@ -8,7 +8,7 @@
     scDeliveries: 'greenleaf_sc_deliveries_v1',
     events: 'greenleaf_admin_events_v1',
     scEvents: 'greenleaf_sc_events_v1',
-    products: 'greenleaf_admin_products_v1',
+    products: 'greenleaf_admin_products_v2',
     notices: 'greenleaf_admin_notices_v1',
     texts: 'greenleaf_admin_texts_v1',
     partners: 'greenleaf_partner_stores_v2'
@@ -295,16 +295,6 @@
       '</div>' +
       '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."></div>' +
       '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
-      (withAuth
-        ? '<div style="background:#f0f7f2; border-radius:12px; padding:12px 14px; margin-bottom:6px;">' +
-          '<strong style="font-size:13.5px; color:var(--green-darker);">🔐 Доступ в кабинет филиала</strong>' +
-          '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px; margin-top:8px;">' +
-          '<div class="form-group"><label>Логин СЦ</label><input name="login" value="' + h(store.login || '') + '" placeholder="например: almaty-3"></div>' +
-          '<div class="form-group"><label>Пароль</label><input name="password" value="' + h(store.password || '') + '" placeholder="пароль для входа"></div>' +
-          '</div>' +
-          '<p style="font-size:12px; color:var(--muted); margin-top:6px;">С этим логином/паролем филиал входит в админ-панель. Пароль хранится открыто (как и остальные данные сайта).</p>' +
-          '</div>'
-        : '') +
       '<div class="admin-actions">' +
       '<button class="btn btn-primary" type="submit">💾 Сохранить филиал</button>' +
       (withAuth ? '<button class="btn btn-outline danger-btn" type="button" id="storeDeleteBtn">🗑 Удалить филиал</button>' : '') +
@@ -326,10 +316,6 @@
       store.kaspi_qr = form.kaspi_qr.value;
       store.image = form.image.value;
       store.description = form.description.value;
-      if (withAuth) {
-        store.login = form.login.value;
-        store.password = form.password.value;
-      }
       var saved = lsGet(KEYS.stores) || {};
       saved[store.id] = Object.assign({}, store);
       lsSet(KEYS.stores, saved);
@@ -362,12 +348,11 @@
       '</div>' +
       '<ul class="admin-list" id="scStoresList">' +
       list.map(function (s) {
-        var loginTxt = s.login ? '<span class="muted-sku">логин: ' + h(s.login) + '</span>' : '';
         return '<li>' +
           '<div class="admin-list-main">' +
           '<strong>' + h(s.name) + '</strong>' +
           '<span>📍 ' + h(s.address || '') + ' · ' + h(s.city || '') + ' · 🕒 ' + h(s.hours || '') + '</span>' +
-          '<span>📞 ' + h(s.phone || '') + (loginTxt ? ' · ' + loginTxt : '') + '</span>' +
+          '<span>📞 ' + h(s.phone || '') + '</span>' +
           '</div>' +
           '<div class="admin-actions"><button class="btn btn-outline btn-sm" data-sc-edit="' + h(s.id) + '">✏️ Редактировать</button></div>' +
           '</li>';
@@ -389,7 +374,7 @@
     });
 
     if (selectedId === 'new') {
-      var newStore = { id: 'sc-new-' + Date.now(), name: '', city: 'Алматы', address: '', hours: '', phone: '', whatsapp: '', kaspi_qr: '', image: '', description: '', login: '', password: '' };
+      var newStore = { id: 'sc-new-' + Date.now(), name: '', city: 'Алматы', address: '', hours: '', phone: '', whatsapp: '', kaspi_qr: '', image: '', description: '' };
       state.editingStoreId = null;
       content.insertAdjacentHTML('beforeend', '<h4 style="margin-bottom:8px; color:var(--green-dark);">➕ Новый филиал</h4><form class="form admin-form" id="storeForm">' + storeFormHtml(newStore, true) + '</form>');
       bindStoreForm(content, newStore, true);
@@ -825,12 +810,10 @@
         var prodId = el.getAttribute('data-cat-prod');
         var field = el.getAttribute('data-cat-field');
         var val = el.value.trim();
-        if (field === 'status') {
-          if (!saved[prodId]) saved[prodId] = {};
-          saved[prodId].status = val;
-          return;
-        }
-        if (val === '') return;
+        var prod = state.products.find(function (x) { return x.id === prodId; });
+        var cur = prod ? prod[field] : null;
+        var curStr = cur == null ? '' : String(cur);
+        if (val === '' || val === curStr) return;
         if (!saved[prodId]) saved[prodId] = {};
         saved[prodId][field] = field === 'price' ? parseFloat(val) : val;
       });

@@ -10,9 +10,7 @@
   "whatsapp": "77771234567",
   "image": "assets/images/stores/almaty.jpg",
   "description": "Центральный сервис-центр Greenleaf в Алматы. Полный ассортимент эко-бытовой химии iLife и уходовой косметики SEALUX.",
-  "cityKey": "almaty",
-  "login": "almaty",
-  "password": "123456"
+  "cityKey": "almaty"
  },
  {
   "id": "sc-astana",
@@ -25,9 +23,7 @@
   "whatsapp": "77082693609",
   "image": "assets/images/stores/astana.jpg",
   "description": "Флагманский сервис-центр в столице. Всегда в наличии эко-порошки, гигиена CARICH и консультации для партнёров.",
-  "cityKey": "astana",
-  "login": "astana",
-  "password": "123456"
+  "cityKey": "astana"
  },
  {
   "id": "sc-shymkent",
@@ -40,9 +36,7 @@
   "whatsapp": "7019876543",
   "image": "assets/images/stores/shymkent.jpg",
   "description": "Официальный региональный пункт Greenleaf на юге Казахстана. Опт и розница продукции iLife, Nilrich, SEALUX.",
-  "cityKey": "shymkent",
-  "login": "shymkent",
-  "password": "123456"
+  "cityKey": "shymkent"
  },
  {
   "id": "sc-karaganda",
@@ -55,9 +49,7 @@
   "whatsapp": "7212345678",
   "image": "assets/images/stores/karaganda.jpg",
   "description": "Региональный сервис-центр в Караганде. Бытовые приборы Greenleaf, эко-химия и сервисное обслуживание.",
-  "cityKey": "karaganda",
-  "login": "karaganda",
-  "password": "123456"
+  "cityKey": "karaganda"
  },
  {
   "id": "sc-almaty-zhetysu",
@@ -70,9 +62,7 @@
   "phoneRaw": "+77772223456",
   "whatsapp": "77772223456",
   "image": "assets/images/stores/almaty.jpg",
-  "description": "Филиал в Жетысуском районе: полный ассортимент бытовой химии iLife и сезонной техники.",
-  "login": "almaty-zhetysu",
-  "password": "123456"
+  "description": "Филиал в Жетысуском районе: полный ассортимент бытовой химии iLife и сезонной техники."
  },
  {
   "id": "sc-almaty-dostyk",
@@ -85,9 +75,7 @@
   "phoneRaw": "+77773334567",
   "whatsapp": "77773334567",
   "image": "assets/images/stores/almaty.jpg",
-  "description": "Крупный филиал на проспекте Достык. Косметика SEALUX, гигиена CARICH и обучающие зоны для партнёров.",
-  "login": "almaty-dostyk",
-  "password": "123456"
+  "description": "Крупный филиал на проспекте Достык. Косметика SEALUX, гигиена CARICH и обучающие зоны для партнёров."
  },
  {
   "id": "sc-almaty-nauryz",
@@ -100,9 +88,7 @@
   "phoneRaw": "+77774445678",
   "whatsapp": "77774445678",
   "image": "assets/images/stores/almaty.jpg",
-  "description": "Компактный филиал в центре города: популярные позиции в наличии, остальное — под заказ за 2 дня.",
-  "login": "almaty-nauryz",
-  "password": "123456"
+  "description": "Компактный филиал в центре города: популярные позиции в наличии, остальное — под заказ за 2 дня."
  },
  {
   "id": "sc-almaty-mega",
@@ -115,9 +101,7 @@
   "phoneRaw": "+77775556789",
   "whatsapp": "77775556789",
   "image": "assets/images/stores/almaty.jpg",
-  "description": "Филиал в ТЦ Mega Park: удобная выдача, бронирование к приезду и консультации продавцов.",
-  "login": "almaty-mega",
-  "password": "123456"
+  "description": "Филиал в ТЦ Mega Park: удобная выдача, бронирование к приезду и консультации продавцов."
  },
  {
   "id": "sc-astana-nurly",
@@ -130,9 +114,7 @@
   "phoneRaw": "+77081112233",
   "whatsapp": "7081112233",
   "image": "assets/images/stores/astana.jpg",
-  "description": "Филиал на левом берегу: эко-порошки, средства для дома и сервисное обслуживание техники.",
-  "login": "astana-nurly",
-  "password": "123456"
+  "description": "Филиал на левом берегу: эко-порошки, средства для дома и сервисное обслуживание техники."
  },
  {
   "id": "sc-astana-turan",
@@ -145,9 +127,7 @@
   "phoneRaw": "+77082223344",
   "whatsapp": "7082223344",
   "image": "assets/images/stores/astana.jpg",
-  "description": "Деловой филиал: косметика SEALUX, презентации для партнёров и корпоративные заказы.",
-  "login": "astana-turan",
-  "password": "123456"
+  "description": "Деловой филиал: косметика SEALUX, презентации для партнёров и корпоративные заказы."
  },
  {
   "id": "sc-shymkent-kazybek",
@@ -160,9 +140,7 @@
   "phoneRaw": "+77011112233",
   "whatsapp": "7011112233",
   "image": "assets/images/stores/shymkent.jpg",
-  "description": "Второй филиал в Шымкенте рядом с базаром: популярные позиции iLife и CARICH в наличии.",
-  "login": "shymkent-kazybek",
-  "password": "123456"
+  "description": "Второй филиал в Шымкенте рядом с базаром: популярные позиции iLife и CARICH в наличии."
  },
  {
   "id": "sc-karaganda-stroitel",
@@ -175,8 +153,6 @@
   "phoneRaw": "+77213456789",
   "whatsapp": "7213456789",
   "image": "assets/images/stores/karaganda.jpg",
-  "description": "Филиал в районе Строителей: бытовая химия, уход и мелкая бытовая техника Greenleaf.",
-  "login": "karaganda-stroitel",
-  "password": "123456"
+  "description": "Филиал в районе Строителей: бытовая химия, уход и мелкая бытовая техника Greenleaf."
  }
 ]

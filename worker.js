@@ -3,8 +3,47 @@
 // Переменные окружения (Worker → Settings → Variables):
 //   TG_BOT_TOKEN, TG_CHAT_ID — заявки/консультации
 //   TG_ORDERS_CHAT_ID       — группа, куда бот шлёт ЗАКАЗЫ (корзина + бронь)
+//   STORE_CREDS             — JSON-секрет с учётками филиалов для /api/auth:
+//                             {"<логин>": {"password": "...", "storeId": "...", "name": "...", "role": "sc|superadmin"}, ...}
 
 const TELEGRAM_API = 'https://api.telegram.org/bot';
+
+function jsonResponse(obj, status) {
+  return new Response(JSON.stringify(obj), {
+    status: status || 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+// Вход в кабинет филиала: креды сверяются на сервере, клиенту никогда не отдаются
+async function handleStoreAuth(request, env) {
+  const raw = env.STORE_CREDS;
+  if (!raw) {
+    return jsonResponse({ ok: false, error: 'auth not configured' }, 500);
+  }
+  let creds;
+  try {
+    creds = JSON.parse(raw);
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'auth config error' }, 500);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false }, 400);
+  }
+  const login = String(body.login || '').trim().toLowerCase();
+  const pass = String(body.password || '');
+  const rec = creds[login];
+  if (rec && rec.password === pass) {
+    return jsonResponse({
+      ok: true,
+      store: { id: rec.storeId || login, name: rec.name || 'СЦ Greenleaf', role: rec.role || 'sc' }
+    });
+  }
+  return jsonResponse({ ok: false });
+}
 
 function buildText(data) {
   const name = (data.name || '').trim();
@@ -131,6 +170,11 @@ export default {
     // 1. Формы → Telegram
     if (path === '/telegram' && request.method === 'POST') {
       return handleTelegram(request, env);
+    }
+
+    // 1.1 Вход в кабинет филиала (креды только в секрете STORE_CREDS)
+    if (path === '/api/auth' && request.method === 'POST') {
+      return handleStoreAuth(request, env);
     }
 
     // 2. /admin и /admin/* → панель Decap CMS (обходим clean-url редиректы)

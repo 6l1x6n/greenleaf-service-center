@@ -76,6 +76,7 @@
       '<h3 class="row-title" style="cursor:pointer;" data-open-detail="' + Utils.esc(p.id) + '">' + Utils.esc(p.name) + '</h3>' +
       '<div class="row-meta">' +
       '<span class="badge ' + st.meta.cls + '">' + st.meta.icon + ' ' + st.meta.label + '</span>' +
+      (moveSkuMap[p.id] ? '<span class="badge st-exp">🚚 В пути · ' + Utils.fmtDate(moveSkuMap[p.id].eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>' : '') +
       '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
       '</div>' +
       qtyHtml +
@@ -602,6 +603,7 @@
   // ---------------- Поставки (общие + по филиалам) ----------------
 
   var lastDeliveries = [];
+  var moveSkuMap = {};
 
   function applyDeliveriesOverrides(list) {
     var result = list;
@@ -624,27 +626,117 @@
     return result;
   }
 
+  function transitDays(source) {
+    return /Алматы/i.test(String(source || '')) ? 2 : 1;
+  }
+
+  function moveEta(d) {
+    var start;
+    if (d.statusCode === 0) {
+      start = new Date();
+    } else {
+      start = new Date(d.date + 'T00:00:00');
+      if (isNaN(start.getTime())) start = new Date();
+    }
+    start.setDate(start.getDate() + transitDays(d.source));
+    return start;
+  }
+
+  // Позиция фуры на дороге: Новый — у склада (0%), дальше — по времени в пути
+  function moveProgress(d) {
+    if (d.statusCode === 0) return 0;
+    var start = new Date(d.date + 'T00:00:00').getTime();
+    if (isNaN(start)) return 0.5;
+    var elapsed = (Date.now() - start) / 86400000;
+    var days = transitDays(d.source);
+    return Math.max(0.06, Math.min(0.97, elapsed / days));
+  }
+
+  function moveStatusLabel(d) {
+    if (d.statusCode === 0) return { text: 'Оформлена · на складе', cls: 'mv-new' };
+    if (d.statusCode === 4) return { text: '🚚 В пути', cls: 'mv-transit' };
+    return { text: 'Готовится к отправке', cls: 'mv-prep' };
+  }
+
+  function moveCardHtml(d) {
+    var dt = new Date(d.date + 'T00:00:00');
+    var dNum = dt.toLocaleDateString('ru-RU', { day: 'numeric' });
+    var mStr = dt.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
+    var st = moveStatusLabel(d);
+    var pct = Math.round(moveProgress(d) * 100);
+    var eta = moveEta(d);
+    var etaStr = eta.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    var srcShort = String(d.source || '').replace(/поставщик.*/i, '').replace(/["']/g, '').trim() || d.source || 'Склад';
+    var sumHtml = d.sum ? ' · ' + Utils.fmtPrice(Math.round(d.sum)) : '';
+    var itemsHtml = '';
+    if (d.items && d.items.length) {
+      var names = d.items.map(function (it) {
+        var p = products.find(function (x) { return x.id === it.sku; });
+        var label = p ? p.name : (it.sku || '');
+        return '<span class="delivery-item">' + Utils.esc(label) + (it.qty > 1 ? ' × ' + it.qty : '') + '</span>';
+      });
+      itemsHtml = '<div class="delivery-items">Прибудет: ' + names.join('') + '</div>';
+    } else if (d.itemsParsed === false) {
+      itemsHtml = '<div class="delivery-items">Состав накладной уточняется</div>';
+    }
+    return '<div class="delivery move-card">' +
+      '<div class="delivery-date"><span class="d">' + dNum + '</span><span class="m">' + mStr + '</span></div>' +
+      '<div class="delivery-main">' +
+      '<div class="move-top">' +
+      '<span class="move-status ' + st.cls + '">' + st.text + '</span>' +
+      '<span class="move-num">№' + Utils.esc(d.number || '') + sumHtml + '</span>' +
+      '</div>' +
+      '<div class="move-road">' +
+      '<span class="move-point move-point-start">' + Utils.esc(srcShort) + '</span>' +
+      '<div class="move-track">' +
+      '<div class="move-progress" style="width:' + pct + '%"></div>' +
+      '<span class="move-truck" style="left:' + pct + '%">🚚</span>' +
+      '</div>' +
+      '<span class="move-point move-point-end">Наш СЦ</span>' +
+      '</div>' +
+      '<div class="move-eta">📅 Прибудет ≈ ' + etaStr + '</div>' +
+      itemsHtml +
+      '</div>' +
+      '</div>';
+  }
+
   function renderDeliveries(deliveries) {
     var el = document.getElementById('deliveriesList');
     if (!el) return;
     lastDeliveries = deliveries;
 
-    var sel = selectedStore();
     var list = deliveries;
+    var isMoves = list.some(function (d) { return d.statusCode !== undefined; });
     var scopeNote = '';
-    if (sel) {
+    var sel = selectedStore();
+
+    if (!isMoves && sel) {
       list = deliveries.filter(function (d) { return !d.storeId || d.storeId === sel.id; });
       scopeNote = '<div class="deliveries-scope">Поставки филиала: <strong>' + Utils.esc(sel.name) + '</strong> <button class="btn btn-outline btn-sm" data-select-store="all">Показать все</button></div>';
     }
 
+    if (isMoves) {
+      var cutoff = Date.now() - 21 * 86400000;
+      list = list.filter(function (d) {
+        var code = d.statusCode;
+        if (code === 7 || code === 9 || code === -1) return false;
+        if (!d.time) return true;
+        var t = new Date(d.time.replace(' ', 'T')).getTime();
+        return !isNaN(t) && t >= cutoff;
+      });
+    }
+
     if (!list.length) {
       el.innerHTML = scopeNote + '<div class="delivery"><span class="delivery-note">' +
-        (sel ? 'У этого филиала пока нет запланированных поставок.' : 'Нет данных о поставках — уточните в WhatsApp.') +
+        (isMoves
+          ? 'Нет накладных в пути. Свежие поставки появятся здесь автоматически.'
+          : (sel ? 'У этого филиала пока нет запланированных поставок.' : 'Нет данных о поставках — уточните в WhatsApp.')) +
         '</span></div>';
       return;
     }
 
     el.innerHTML = scopeNote + list.map(function (d) {
+      if (isMoves) return moveCardHtml(d);
       var dt = new Date(d.date + 'T00:00:00');
       var dNum = dt.toLocaleDateString('ru-RU', { day: 'numeric' });
       var mStr = dt.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
@@ -667,6 +759,21 @@
         '</div>' +
         '</div>';
     }).join('');
+  }
+
+  function buildMoveSkuMap(moves) {
+    moveSkuMap = {};
+    moves.forEach(function (mv) {
+      var code = mv.statusCode;
+      if (code === 0 || code === 7 || code === 9 || code === -1) return;
+      if (!mv.items) return;
+      var eta = moveEta(mv).toISOString().slice(0, 10);
+      mv.items.forEach(function (it) {
+        if (it.sku && !moveSkuMap[it.sku]) {
+          moveSkuMap[it.sku] = { eta: eta, number: mv.number };
+        }
+      });
+    });
   }
 
   // ---------------- Мероприятия (с бейджем филиала) ----------------
@@ -751,7 +858,7 @@
   function applyLocalOverrides() {
     var CUSTOM_STORES_KEY = 'greenleaf_sc_custom_stores_v1';
     var CUSTOM_PRODUCTS_KEY = 'greenleaf_sc_custom_products_v1';
-    var ADMIN_PRODUCTS_KEY = 'greenleaf_admin_products_v1';
+    var ADMIN_PRODUCTS_KEY = 'greenleaf_admin_products_v2';
     var TEXTS_KEY = 'greenleaf_admin_texts_v1';
 
     try {
@@ -781,12 +888,16 @@
     } catch (e) { console.warn('applyLocalOverrides products error', e); }
 
     try {
+      var knownCats = {};
+      products.forEach(function (p) { knownCats[p.category] = true; });
       var adminProds = JSON.parse(localStorage.getItem(ADMIN_PRODUCTS_KEY) || '{}');
       products.forEach(function (p) {
         var o = adminProds[p.id];
         if (!o) return;
         ['price', 'status', 'eta', 'incoming', 'description', 'category'].forEach(function (f) {
-          if (o[f] !== undefined && o[f] !== '') p[f] = o[f];
+          if (o[f] === undefined || o[f] === '') return;
+          if (f === 'category' && !knownCats[o[f]]) return;
+          p[f] = o[f];
         });
       });
     } catch (e) { console.warn('applyLocalOverrides admin products error', e); }
@@ -949,10 +1060,21 @@
     renderContacts();
     if (!isCatalogPage) maybeAskCity();
 
-    fetch('data/deliveries.json?t=' + Date.now())
+    fetch('data/moves.json?t=' + Date.now())
       .then(function (r) { return r.json(); })
-      .then(function (d) { renderDeliveries(applyDeliveriesOverrides(d.deliveries || [])); })
-      .catch(function () { renderDeliveries(applyDeliveriesOverrides([])); });
+      .then(function (d) {
+        var moves = d.moves || [];
+        if (!moves.length) throw new Error('moves empty');
+        buildMoveSkuMap(moves);
+        renderDeliveries(moves);
+        render();
+      })
+      .catch(function () {
+        fetch('data/deliveries.json?t=' + Date.now())
+          .then(function (r) { return r.json(); })
+          .then(function (d) { renderDeliveries(applyDeliveriesOverrides(d.deliveries || [])); })
+          .catch(function () { renderDeliveries(applyDeliveriesOverrides([])); });
+      });
 
     fetch('data/events.json?t=' + Date.now())
       .then(function (r) { return r.json(); })
