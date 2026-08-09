@@ -268,6 +268,7 @@ def enter_partner(page, config):
             page.wait_for_load_state("networkidle", timeout=20000)
         except Exception:
             pass
+        dump_form_state(page, f"after_next_{int(time.time() % 100)}")
         return True
     except Exception as e:
         print(f"Ошибка подключения партнёра: {e}")
@@ -341,7 +342,17 @@ def scrape_goods(page, config):
             if attempt >= 3:
                 raise RuntimeError("Не удалось получить каталог поставщика")
             continue
-        rows = wait_goods_rows(page)
+        rows = wait_goods_rows(page, timeout=15)
+        if not rows:
+            dump_diag(page, f"no_goods_{attempt}")
+            # Клик «Далее» мог не сработать — пробуем ещё раз и ждём дольше
+            try:
+                nxt = page.locator('input[type="submit"][value="Далее"]:not([disabled])')
+                if nxt.count() > 0:
+                    nxt.first.click(timeout=5000)
+            except Exception:
+                pass
+            rows = wait_goods_rows(page, timeout=35)
         if rows:
             break
 
