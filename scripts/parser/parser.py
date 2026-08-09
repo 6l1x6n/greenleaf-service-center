@@ -100,10 +100,37 @@ def dump_diag(page, label):
         pass
     try:
         with open(path + ".txt", "w", encoding="utf-8") as f:
-            f.write("URL: " + page.url + "\n\n" + page.inner_text("body")[:1500])
+            f.write("URL: " + page.url + "\n\n" + page.inner_text("body")[:3000])
     except Exception:
         pass
     print(f"Диагностика сохранена: {path}")
+
+
+def dump_form_state(page, label):
+    os.makedirs(DIAG_DIR, exist_ok=True)
+    try:
+        html = page.evaluate("""() => {
+            const out = [];
+            document.querySelectorAll('input, button, select').forEach(el => {
+                const name = el.getAttribute('name') || '';
+                const cq = el.getAttribute('check_query') || '';
+                const id = el.id || '';
+                if (cq || name === 'client' || name === 'login_buy' || /Далее|Найти|Проверить/.test(el.value || el.textContent || '')) {
+                    out.push({
+                        tag: el.tagName, id, name, check_query: cq,
+                        value: (el.value || '').slice(0, 40),
+                        disabled: !!el.disabled,
+                        text: (el.textContent || '').trim().slice(0, 40)
+                    });
+                }
+            });
+            return JSON.stringify(out, null, 1);
+        }""")
+        with open(os.path.join(DIAG_DIR, label + ".json"), "w", encoding="utf-8") as f:
+            f.write("URL: " + page.url + "\n\n" + html)
+        print(f"Состояние формы сохранено: {label}")
+    except Exception as e:
+        print(f"Не удалось сохранить форму {label}: {e}")
 
 
 def wait_login_or_form(page, timeout=60):
@@ -186,7 +213,8 @@ def enter_partner(page, config):
         return True
     try:
         page.wait_for_selector('input[check_query="login_buy"]', state="attached", timeout=30000)
-        page.fill('input[check_query="login_buy"]', partner)
+        field = page.locator('input[check_query="login_buy"]')
+        field.fill(partner)
         # Клиент может отсутствовать в выпадашке поиска — ставим скрытое поле напрямую,
         # dbcheck портала подтвердит логин и активирует кнопку «Далее»
         page.evaluate("""(l) => {
@@ -196,26 +224,44 @@ def enter_partner(page, config):
                 h.dispatchEvent(new Event('input', {bubbles: true}));
             }
         }""", partner)
+        # Стратегия 2: выбираем клиента из выпадающего списка, если он появился
+        try:
+            field.press("Enter")
+        except Exception:
+            pass
         deadline = time.time() + 25
-        denied_seen = False
         denied_since = None
+        dropdown_clicked = False
         while time.time() < deadline:
-            if page.locator('text="Нет доступа"').count() > 0:
-                if not denied_since:
-                    denied_since = time.time()
-                # «Нет доступа» может мигать при загрузке — реагируем, только если держится 4 сек
-                if not denied_seen and time.time() - denied_since >= 4:
-                    denied_seen = True
-                    dump_diag(page, f"partner_denied_{int(time.time() % 100)}")
-            else:
-                denied_since = None
-            if page.locator('input[type="submit"][value="Далее"]:not([disabled])').count() > 0:
-                break
+            try:
+                if page.locator('text="Нет доступа"').count() > 0:
+                    if not denied_since:
+                        denied_since = time.time()
+                    if time.time() - denied_since >= 4:
+                        dump_diag(page, f"partner_denied_{int(time.time() % 100)}")
+                        dump_form_state(page, f"partner_denied_form_{int(time.time() % 100)}")
+                        print("Партнёр отклонён порталом (Нет доступа)")
+                        return False
+                else:
+                    denied_since = None
+                if page.locator('input[type="submit"][value="Далее"]:not([disabled])').count() > 0:
+                    break
+                if not dropdown_clicked:
+                    dropdown_item = page.locator('.ui-autocomplete li, ul.autocomplete li, [role="option"]').first
+                    if dropdown_item.count() > 0:
+                        dropdown_item.click(timeout=3000)
+                        dropdown_clicked = True
+                        page.evaluate("""(l) => {
+                            const h = document.querySelector('input[name="client"]');
+                            if (h) { h.value = l; h.dispatchEvent(new Event('input', {bubbles: true})); }
+                        }""", partner)
+            except Exception:
+                pass
             time.sleep(0.5)
         else:
-            if denied_seen:
-                print("Партнёр отклонён порталом (Нет доступа)")
-                return False
+            dump_form_state(page, "partner_no_next")
+            dump_diag(page, "partner_no_next")
+            print("Кнопка «Далее» не активировалась — клиент не подтверждён")
             return False
         page.click('input[type="submit"][value="Далее"]', timeout=15000)
         try:
