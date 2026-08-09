@@ -66,7 +66,7 @@ def load_config():
         )
     config["sc_login"] = os.environ.get("SC_LOGIN", config.get("sc_login", ""))
     config["sc_password"] = os.environ.get("SC_PASSWORD", config.get("sc_password", ""))
-    config["partner_login"] = os.environ.get("PARTNER_LOGIN", config.get("partner_login", ""))
+    config["partner_login"] = os.environ.get("PARTNER_LOGIN") or config.get("partner_login", "")
     return config
 
 
@@ -247,9 +247,18 @@ def enter_partner(page, config):
                 if page.locator('input[type="submit"][value="Далее"]:not([disabled])').count() > 0:
                     break
                 if not dropdown_clicked:
-                    dropdown_item = page.locator('.ui-autocomplete li, ul.autocomplete li, [role="option"]').first
-                    if dropdown_item.count() > 0:
-                        dropdown_item.click(timeout=3000)
+                    dropdown_items = page.locator('.ui-autocomplete li, ul.autocomplete li, [role="option"]')
+                    count = dropdown_items.count()
+                    if count > 0:
+                        target_idx = None
+                        for i in range(min(count, 20)):
+                            text = (dropdown_items.nth(i).inner_text() or "").strip()
+                            if partner.lower() in text.lower() or ("PART_" + partner.lower()) in text.lower():
+                                target_idx = i
+                                break
+                        if target_idx is None:
+                            target_idx = 0
+                        dropdown_items.nth(target_idx).click(timeout=3000)
                         dropdown_clicked = True
                         page.evaluate("""(l) => {
                             const h = document.querySelector('input[name="client"]');

@@ -55,7 +55,6 @@ jobs:
         env:
           SC_LOGIN: ${{ secrets.SC_LOGIN }}
           SC_PASSWORD: ${{ secrets.SC_PASSWORD }}
-          PARTNER_LOGIN: ${{ secrets.PARTNER_LOGIN }}
         run: python scripts/parser/parser.py
 
       - name: Upload diag (если парсер что-то сохранил)
