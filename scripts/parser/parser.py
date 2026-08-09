@@ -627,19 +627,21 @@ def fetch_move_items(page, config, mv):
         pass
     items = []
     seen = set()
-    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", page.content(), re.DOTALL | re.IGNORECASE):
-        if "<td" not in row:
+    html = page.content()
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL | re.IGNORECASE):
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL | re.IGNORECASE)
+        if len(cells) < 3:
             continue
-        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", row)).strip()
-        m = PRODUCT_CODE_STRICT_RE.search(text)
-        if not m:
-            continue
-        code = m.group(0)
-        if code in seen:
+        code = _cell_text(cells[1])
+        if not PRODUCT_CODE_STRICT_RE.match(code) or code in seen:
             continue
         seen.add(code)
-        qty_m = re.search(r"(?:кол[-\s]?во|шт)[\s:×x*]*(\d+)", text, re.IGNORECASE)
-        items.append({"sku": code, "qty": int(qty_m.group(1)) if qty_m else 1})
+        qty = 1
+        if len(cells) >= 7:
+            qty_m = re.search(r"(\d+)", _cell_text(cells[6]))
+            if qty_m:
+                qty = int(qty_m.group(1))
+        items.append({"sku": code, "name": clean_product_name(_cell_text(cells[2])), "qty": qty})
     return items
 
 
