@@ -39,7 +39,7 @@ async function handleStoreAuth(request, env) {
   if (rec && rec.password === pass) {
     return jsonResponse({
       ok: true,
-      store: { id: rec.storeId || login, name: rec.name || 'СЦ Greenleaf', role: rec.role || 'sc' }
+      store: { id: rec.storeId || rec.id || login, name: rec.name || 'СЦ Greenleaf', role: rec.role || 'sc' }
     });
   }
   return jsonResponse({ ok: false });
