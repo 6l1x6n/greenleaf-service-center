@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-09T22:13:04+03:00",
+  "updated": "2026-08-09T22:22:30+03:00",
   "moves": [
     {
       "number": "3299532",
@@ -11,8 +11,14 @@
       "recipient": "S240534",
       "status": "Новый",
       "statusCode": 0,
-      "items": [],
-      "itemsParsed": false
+      "items": [
+        {
+          "sku": "ASA087",
+          "name": "iLiFE Моющее средство для белья Чистота и мягкость/3,2 кг/аромат лаванды",
+          "qty": 60
+        }
+      ],
+      "itemsParsed": true
     },
     {
       "number": "3299531",
@@ -24,8 +30,14 @@
       "recipient": "S240534",
       "status": "Новый",
       "statusCode": 0,
-      "items": [],
-      "itemsParsed": false
+      "items": [
+        {
+          "sku": "ASA156",
+          "name": "ILIFE Ароматизированное средство для чистки ванной /720g",
+          "qty": 300
+        }
+      ],
+      "itemsParsed": true
     },
     {
       "number": "3289020",
