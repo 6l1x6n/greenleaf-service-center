@@ -9,7 +9,7 @@ from playwright.sync_api import sync_playwright
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
-PRODUCTS_PATH = os.path.join(ROOT_DIR, "data", "products.json")
+PRODUCTS_PATH = os.path.join(ROOT_DIR, "public", "data", "products.json")
 
 PRODUCT_CODE_STRICT_RE = re.compile(r"^[A-Z]{3}\d{3}$")
 BOX_PREFIX_RE = re.compile(
@@ -34,12 +34,18 @@ def clean_product_name(raw_name):
 
 def load_config():
     path = os.path.join(BASE_DIR, "config.json")
-    if not os.path.exists(path):
+    example_path = os.path.join(BASE_DIR, "config.example.json")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            config = json.load(f)
+    elif os.path.exists(example_path):
+        with open(example_path, encoding="utf-8") as f:
+            config = json.load(f)
+        print("config.json не найден — использую config.example.json")
+    else:
         raise FileNotFoundError(
-            "Нет config.json. Скопируйте config.example.json: cp config.example.json config.json"
+            "Нет config.json и config.example.json. Скопируйте config.example.json: cp config.example.json config.json"
         )
-    with open(path, encoding="utf-8") as f:
-        config = json.load(f)
     config["sc_login"] = os.environ.get("SC_LOGIN", config.get("sc_login", ""))
     config["sc_password"] = os.environ.get("SC_PASSWORD", config.get("sc_password", ""))
     return config

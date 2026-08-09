@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Подписка GreenLeaf — партнёрство со скидкой 50%</title>
+  <meta name="description"
+    content="Подписка GreenLeaf: станьте партнёром и получайте скидку 50% на бытовую химию, косметику и товары для дома. Готовый бизнес, бонусы, обучение и поддержка.">
+  <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <header class="header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">
+        <img src="assets/images/logo.png" alt="Greenleaf">
+        <span class="logo-text">Greenleaf<small>Подписка и партнёрство</small></span>
+      </a>
+      <nav class="nav" id="nav">
+        <a href="index.html#sc">Сервис-центры</a>
+        <a href="index.html">Каталог</a>
+        <a href="index.html#deliveries">Поставки</a>
+        <a href="index.html#events">Презентации</a>
+        <a href="index.html#contacts">Контакты</a>
+        <a href="podpiska.html" class="active">Подписка</a>
+      </nav>
+      <div class="header-actions">
+        <button class="btn btn-outline btn-sm" onclick="location.href='cabinet.html'">Войти</button>
+        <a class="btn btn-whatsapp btn-sm" id="waHeader" href="#" target="_blank" rel="noopener">Написать в WhatsApp</a>
+        <button class="burger" id="burger" aria-label="Открыть меню"><span></span><span></span><span></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <section class="sub-top">
+      <div class="container">
+        <nav class="breadcrumbs">
+          <a href="index.html">Главная страница</a> » <span>Подписка GreenLeaf</span>
+        </nav>
+        <h1>Условия подписки и партнерства в GreenLeaf</h1>
+      </div>
+    </section>
+
+    <section class="sub-intro">
+      <div class="container split sub-intro-grid">
+        <div class="sub-intro-text">
+          <h2>🌿 Экологичные брендовые товары для вашего дома, здоровья и красоты</h2>
+          <p>Уникальная возможность перейти на экологически чистую продукцию премиального качества, созданную для
+            ежедневного использования всей семьёй.</p>
+          <p>В ассортименте — брендовые товары из 6 стран:</p>
+          <ul class="sub-list">
+            <li>средства личной гигиены</li>
+            <li>бытовая химия для уборки и стирки</li>
+            <li>уходовая и декоративная косметика</li>
+            <li>одежда и парфюмерия</li>
+          </ul>
+          <p>Вся продукция сертифицирована по международным стандартам качества:</p>
+          <div class="cert-badges">
+            <span class="cert-badge">GMP</span>
+            <span class="cert-badge">ISO 9001</span>
+            <span class="cert-badge">HALAL</span>
+          </div>
+          <div class="sub-cta">
+            <a href="#podpiska_info" class="btn btn-primary btn-lg">Смотреть варианты подписки</a>
+            <a href="#partner" class="btn btn-accent btn-lg">Получить консультацию</a>
+          </div>
+        </div>
+
+        <div class="partner-form-card sub-form-card">
+          <h3>💬 Получить консультацию</h3>
+          <p class="form-desc">Оставьте заявку — менеджер Greenleaf свяжется с вами и расскажет о подписке.</p>
+          <form class="form" data-type="consultation">
+            <input name="name" placeholder="Ваше имя *" required>
+            <input name="phone" type="tel" placeholder="+7 (___) ___-__-__ *" required>
+            <select name="contact" required>
+              <option value="" selected disabled>Способ связи</option>
+              <option value="Whatsapp">Whatsapp</option>
+              <option value="Телефон">Телефон</option>
+            </select>
+            <select name="city" class="city-select" required>
+              <option value="" selected disabled>Город</option>
+            </select>
+            <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
+            <input class="hp" name="company" tabindex="-1" autocomplete="off">
+            <label class="form-consent">
+              <input type="checkbox" checked>
+              <span>Нажимая на кнопку «Отправить», Вы соглашаетесь с обработкой Ваших персональных данных в
+                соответствии с нашей Политикой конфиденциальности</span>
+            </label>
+            <button class="btn btn-primary btn-lg" type="submit">Отправить</button>
+            <p class="form-success">Заявка отправлена! Свяжемся с вами в ближайшее время.</p>
+            <p class="form-error">Проверьте обязательные поля.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="podpiska_info" class="section alt">
+      <div class="container">
+        <h2>Станьте партнёром компании и получайте продукцию со скидкой 50%</h2>
+        <p class="section-sub">Выберите пакет подписки — каждая регистрация включает скидку, бизнес-кабинет и стартовый
+          набор продукции.</p>
+
+        <div class="plans-grid">
+          <div class="plan-card">
+            <div class="plan-media">
+              <img src="assets/images/podpiska/nabor-bloom.webp" alt="Стартовый набор Бронза" loading="lazy">
+              <span class="plan-tag plan-tag-bronze">🥉 Бронза</span>
+            </div>
+            <div class="plan-body">
+              <div class="plan-status">Статус «Бронза» — Лояльный клиент</div>
+              <div class="plan-price">Регистрация: 50 000 ₸</div>
+              <div class="plan-block-title">Вы получаете:</div>
+              <ul class="plan-list">
+                <li>Постоянную скидку 50% на весь ассортимент</li>
+                <li>Персональный бизнес-кабинет (Back Office)</li>
+                <li>Готовую систему для старта бизнеса</li>
+              </ul>
+              <div class="plan-block-title">🎁 Стартовый набор:</div>
+              <ul class="plan-list plan-list-gift">
+                <li>Омега-3 (2 упаковки)</li>
+                <li>Зубная паста</li>
+                <li>Натуральное мыло из козьего молока</li>
+              </ul>
+              <div class="plan-block-title">🚀 Дополнительные возможности:</div>
+              <ul class="plan-list plan-list-extra">
+                <li>Доход с рекомендаций и привлечения клиентов</li>
+                <li>Бонусы с товарооборота</li>
+                <li>Доход от продаж</li>
+                <li>Кэшбэк с личных покупок</li>
+              </ul>
+              <button class="btn btn-outline btn-lg plan-btn" data-plan="Бронза">Стать партнером</button>
+            </div>
+          </div>
+
+          <div class="plan-card plan-card-featured">
+            <div class="plan-media">
+              <img src="assets/images/podpiska/packet_platina.jpg" alt="Бизнес-пакет Платина" loading="lazy">
+              <span class="plan-tag plan-tag-platinum">💎 Платина</span>
+            </div>
+            <div class="plan-body">
+              <div class="plan-status">Бизнес-пакет «Платина»</div>
+              <div class="plan-price">Регистрация: 188 000 ₸</div>
+              <div class="plan-block-title">Вы получаете:</div>
+              <ul class="plan-list">
+                <li>Постоянную скидку 50% на весь ассортимент</li>
+                <li>Персональный Back Office</li>
+                <li>Готовую бизнес-систему</li>
+              </ul>
+              <div class="plan-block-title">🎁 Премиальный стартовый набор:</div>
+              <ul class="plan-list plan-list-gift">
+                <li>Набор швейцарской косметики SEALUXE</li>
+                <li>Гель для стирки</li>
+                <li>Средство для мытья посуды</li>
+                <li>Гигиенические средства</li>
+                <li>Зубная паста</li>
+                <li>Бамбуковые салфетки</li>
+              </ul>
+              <div class="plan-block-title">💰 Дополнительные преимущества:</div>
+              <ul class="plan-list plan-list-extra">
+                <li>Возможность открытия собственного сервисного центра (франшиза)</li>
+                <li>Ежедневные и ежемесячные бонусы</li>
+                <li>Доход с командного и мирового товарооборота</li>
+              </ul>
+              <div class="plan-block-title">🎁 Бонусные программы:</div>
+              <ul class="plan-list plan-list-bonus">
+                <li>Путешествия</li>
+                <li>Автобонус</li>
+                <li>Жилищный бонус</li>
+                <li>Премии за развитие бизнеса</li>
+              </ul>
+              <button class="btn btn-primary btn-lg plan-btn" data-plan="Платина">Стать партнером</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="partner" class="section">
+      <div class="container split sub-partner-grid">
+        <div class="sub-intro-text">
+          <h2>Как стать партнером GreenLeaf?</h2>
+          <p>Выбор за вами — быть клиентом или стать партнёром и развивать собственный бизнес. Оставьте заявку, и мы
+            свяжемся с вами для предоставления более подробной информации.</p>
+        </div>
+        <div class="partner-form-card sub-form-card">
+          <h3>💬 Получить консультацию</h3>
+          <p class="form-desc">Оставьте заявку — менеджер Greenleaf свяжется с вами и расскажет о подписке.</p>
+          <form class="form" data-type="consultation">
+            <input name="name" placeholder="Ваше имя *" required>
+            <input name="phone" type="tel" placeholder="+7 (___) ___-__-__ *" required>
+            <select name="contact" required>
+              <option value="" selected disabled>Способ связи</option>
+              <option value="Whatsapp">Whatsapp</option>
+              <option value="Телефон">Телефон</option>
+            </select>
+            <select name="city" class="city-select" required>
+              <option value="" selected disabled>Город</option>
+            </select>
+            <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
+            <input class="hp" name="company" tabindex="-1" autocomplete="off">
+            <label class="form-consent">
+              <input type="checkbox" checked>
+              <span>Нажимая на кнопку «Отправить», Вы соглашаетесь с обработкой Ваших персональных данных в
+                соответствии с нашей Политикой конфиденциальности</span>
+            </label>
+            <button class="btn btn-primary btn-lg" type="submit">Отправить</button>
+            <p class="form-success">Заявка отправлена! Свяжемся с вами в ближайшее время.</p>
+            <p class="form-error">Проверьте обязательные поля.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Готовая система для вашего успеха</h2>
+        <p class="section-sub">Компания предоставляет:</p>
+        <div class="system-grid">
+          <div class="feature">
+            <div class="feature-ico">📚</div>
+            <h3>Пошаговое обучение</h3>
+            <p>Разбираетесь в продукте и бизнесе с нуля — от первых шагов до уверенного роста.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-ico">🤝</div>
+            <h3>Поддержка наставников</h3>
+            <p>Личный наставник помогает на каждом этапе и отвечает на все вопросы.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-ico">🗺️</div>
+            <h3>Готовая бизнес-модель</h3>
+            <p>Проверенная система, которая уже работает — остаётся следовать плану.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-ico">💻</div>
+            <h3>Онлайн и офлайн сопровождение</h3>
+            <p>Помощь в любое время: личные встречи, вебинары и материалы в личном кабинете.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-ico">📈</div>
+            <h3>Долгосрочный доход</h3>
+            <p>Возможность построения стабильного дохода на года вперёд.</p>
+          </div>
+        </div>
+        <p class="system-note">Начните пользоваться качественной продукцией и создайте собственный источник дохода.</p>
+        <div class="sub-cta">
+          <a href="#partner" class="btn btn-accent btn-lg">Начать бизнес с Greenleaf</a>
+          <button class="btn btn-outline btn-lg join-team-btn" type="button">Присоединиться к команде</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <span>© <span id="year"></span> Сервис-центр Greenleaf · Подписка и партнёрство</span>
+      <span>Есть вопросы? <a href="#" id="waFooter">Напишите в WhatsApp</a></span>
+    </div>
+  </footer>
+
+  <div class="modal-overlay hidden" id="modalOverlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="Закрыть">✕</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="js/ui.js"></script>
+  <script src="js/cities.js"></script>
+  <script src="js/forms.js"></script>
+  <script src="js/podpiska.js"></script>
+</body>
+
+</html>

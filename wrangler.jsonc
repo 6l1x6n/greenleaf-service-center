@@ -1,18 +1,15 @@
 {
-  // Cloudflare Worker: сайт Greenleaf (статик-ассеты из корня репозитория)
+  // Cloudflare Worker: сайт Greenleaf (статик-ассеты из public/)
   // + обработка форм → Telegram в worker.js
+  // TG_BOT_TOKEN и TG_CHAT_ID — секреты Worker: npx wrangler secret put <ИМЯ>
   "name": "mygreenleaf",
   "main": "worker.js",
   "compatibility_date": "2025-06-01",
   "assets": {
-    "directory": "./",
+    "directory": "./public",
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
     "run_worker_first": true
-  },
-  "vars": {
-    "TG_BOT_TOKEN": "7029530810:***REMOVED***",
-    "TG_CHAT_ID": "@xensia_bot"
   }
 }

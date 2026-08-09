@@ -38,6 +38,25 @@ function buildText(data) {
     notice: [
       '📢 Уведомление для Сервис-Центров',
       data.notice ? '💬 ' + data.notice : null
+    ],
+    subscription: [
+      '📦 Заявка на подписку',
+      data.package ? '🎁 Пакет: ' + data.package : null,
+      data.contact ? '📱 Способ связи: ' + data.contact : null,
+      data.city ? '🏙️ Город: ' + data.city : null,
+      data.comment ? '💬 ' + data.comment : null
+    ],
+    consultation: [
+      '💬 Консультация по партнёрству',
+      data.contact ? '📱 Способ связи: ' + data.contact : null,
+      data.city ? '🏙️ Город: ' + data.city : null,
+      data.comment ? '💬 ' + data.comment : null
+    ],
+    join_team: [
+      '🤝 Присоединение к команде',
+      data.contact ? '📱 Способ связи: ' + data.contact : null,
+      data.city ? '🏙️ Город: ' + data.city : null,
+      data.comment ? '💬 ' + data.comment : null
     ]
   };
 
