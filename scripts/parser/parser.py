@@ -1,4 +1,3 @@
-import concurrent.futures
 import json
 import os
 import re
@@ -12,6 +11,7 @@ from playwright.sync_api import sync_playwright
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
 PRODUCTS_PATH = os.path.join(ROOT_DIR, "public", "data", "products.json")
+CATALOG_CACHE_PATH = os.path.join(ROOT_DIR, "scripts", "parser", ".catalog_cache.json")
 
 PRODUCT_CODE_STRICT_RE = re.compile(r"^[A-Z]{3}\d{3}$")
 BOX_PREFIX_RE = re.compile(
@@ -23,6 +23,21 @@ BOX_PREFIX_RE = re.compile(
 )
 AVAILABLE_QTY_RE = re.compile(r"Доступно для продажи:\s*(\d+)")
 IMG_SRC_RE = re.compile(r'<img[^>]+src="([^"]+)"', re.IGNORECASE)
+IMG_ATTR_RE = re.compile(
+    r'<img[^>]+(?:data-src|data-original|data-lazy-src|srcset)="([^"]+)"', re.IGNORECASE
+)
+PLACEHOLDER_RE = re.compile(r"(placeholder|pixel|blank|\.gif$)", re.IGNORECASE)
+
+
+def extract_image_url(html):
+    for pattern in (IMG_ATTR_RE, IMG_SRC_RE):
+        for m in pattern.finditer(html):
+            url = m.group(1).strip()
+            if not url or PLACEHOLDER_RE.search(url):
+                continue
+            url = url.split()[0]
+            return url
+    return ""
 
 
 def clean_product_name(raw_name):
@@ -51,6 +66,7 @@ def load_config():
         )
     config["sc_login"] = os.environ.get("SC_LOGIN", config.get("sc_login", ""))
     config["sc_password"] = os.environ.get("SC_PASSWORD", config.get("sc_password", ""))
+    config["partner_login"] = os.environ.get("PARTNER_LOGIN", config.get("partner_login", ""))
     return config
 
 
@@ -149,24 +165,31 @@ def login(page, config):
 
 
 def open_shop(page, config):
-    try:
-        page.wait_for_selector('a[href="#admin/shop/buy"]', state="attached", timeout=30000)
-        page.click('a[href="#admin/shop/buy"]', timeout=15000)
-    except Exception:
-        try:
-            page.click('a:has-text("Новая продажа")', timeout=15000)
-        except Exception:
-            page.goto(config["portal_url"] + "/do.vshow#admin/shop/buy", timeout=30000)
-    time.sleep(2)
+    # Каталог — страница «Новая продажа»: выбираем партнёра (partner_login), «Далее» открывает
+    # каталог chgoods (place=purchase/create) со всеми товарами.
+    page.goto(config["portal_url"] + "/do.vshow#admin/shop/buy", timeout=30000)
+    time.sleep(3)
 
 
 def enter_partner(page, config):
+    partner = config.get("partner_login", "")
+    if not partner:
+        return True
     try:
         page.wait_for_selector('input[check_query="login_buy"]', state="attached", timeout=30000)
-        page.fill('input[check_query="login_buy"]', config["partner_login"])
-        deadline = time.time() + 20
+        page.fill('input[check_query="login_buy"]', partner)
+        # Клиент может отсутствовать в выпадашке поиска — ставим скрытое поле напрямую,
+        # dbcheck портала подтвердит логин и активирует кнопку «Далее»
+        page.evaluate("""(l) => {
+            const h = document.querySelector('input[name="client"]');
+            if (h) {
+                h.value = l;
+                h.dispatchEvent(new Event('input', {bubbles: true}));
+            }
+        }""", partner)
+        deadline = time.time() + 25
         while time.time() < deadline:
-            if page.locator('text="Не найдено"').count() > 0:
+            if page.locator('text="Нет доступа"').count() > 0:
                 return False
             if page.locator('input[type="submit"][value="Далее"]:not([disabled])').count() > 0:
                 break
@@ -210,8 +233,7 @@ def parse_row(html):
     qty_match = AVAILABLE_QTY_RE.search(cell2_text)
     available_qty = int(qty_match.group(1)) if qty_match else 0
 
-    img_match = IMG_SRC_RE.search(cells[1])
-    image_url = img_match.group(1) if img_match else ""
+    image_url = extract_image_url(html)
 
     price_match = re.search(r"<b>\s*([\d\s]+)", cells[3], re.DOTALL)
     if not price_match:
@@ -251,21 +273,17 @@ def scrape_goods(page, config):
             if attempt >= 3:
                 raise RuntimeError("Не удалось получить каталог поставщика")
             continue
-        try:
-            page.wait_for_selector('input[name="query"]', state="visible", timeout=30000)
-        except Exception:
-            if attempt >= 3:
-                raise RuntimeError("Не удалось получить каталог поставщика")
-            continue
         rows = wait_goods_rows(page)
         if rows:
             break
 
     if not rows:
+        dump_diag(page, "scrape_failed")
         raise RuntimeError("Не удалось получить каталог поставщика")
 
     all_items = []
     skipped_codes = []
+    seen_codes = set()
     max_pages = config.get("max_pages", 200)
 
     for _ in range(max_pages):
@@ -273,13 +291,28 @@ def scrape_goods(page, config):
         if not rows:
             break
 
+        # Прокручиваем до последней строки — форсируем ленивую загрузку картинок
+        last = rows[-1]
+        try:
+            last.scroll_into_view_if_needed(timeout=5000)
+            time.sleep(0.3)
+        except Exception:
+            pass
+
+        new_count = 0
         for row in rows:
             try:
                 parsed = parse_row(row.inner_html())
-                if parsed:
-                    all_items.append(parsed)
-                    if parsed.get("skipped"):
-                        skipped_codes.append(parsed["code"])
+                if not parsed:
+                    continue
+                code = parsed.get("code")
+                if code in seen_codes:
+                    continue
+                seen_codes.add(code)
+                all_items.append(parsed)
+                new_count += 1
+                if parsed.get("skipped"):
+                    skipped_codes.append(code)
             except Exception:
                 pass
 
@@ -300,7 +333,7 @@ def scrape_goods(page, config):
         except Exception:
             break
 
-    print(f"Каталог получен: {len(all_items)} позиций")
+    print(f"Каталог получен: {len(all_items)} позиций ({new_count} на последней итерации)")
     if skipped_codes:
         print(f"Пропущено позиций (код не формата ABC123): {len(skipped_codes)}")
 
@@ -345,16 +378,22 @@ def image_local_path(code, url):
     return os.path.join(IMAGES_DIR, code + ext)
 
 
-def fetch_image(path, urls):
+def fetch_image(path, urls, session=None):
     if os.path.exists(path):
         return True
     os.makedirs(IMAGES_DIR, exist_ok=True)
     tmp = path + ".tmp"
     for url in urls:
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
-                data = resp.read()
+            if session is not None:
+                resp = session.get(url)
+                if not resp.ok:
+                    continue
+                data = resp.body()
+            else:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
+                    data = resp.read()
             if len(data) < 200:
                 continue
             with open(tmp, "wb") as f:
@@ -371,7 +410,7 @@ def fetch_image(path, urls):
     return False
 
 
-def download_images(items, config):
+def download_images(items, config, session=None):
     if not config.get("download_images", True):
         return {}
     tasks = []
@@ -386,12 +425,12 @@ def download_images(items, config):
         pending[path] = it["code"]
         tasks.append((path, urls))
     done = 0
-    if tasks:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as ex:
-            futures = [ex.submit(fetch_image, p, urls) for p, urls in tasks]
-            for fut in concurrent.futures.as_completed(futures):
-                if fut.result():
-                    done += 1
+    # Последовательно: sync-API Playwright нельзя вызывать из потоков
+    for path, urls in tasks:
+        if fetch_image(path, urls, session):
+            done += 1
+        if done > 0 and (done % 50) == 0:
+            print(f"Изображения: {done}/{len(tasks)}...")
     print(f"Изображения: {done} скачано, {len(tasks) - done} пропущено/уже было")
     result = {}
     for path, code in pending.items():
@@ -444,8 +483,26 @@ def write_products(products):
 
 
 def main():
+    images_only = "--images-only" in sys.argv
     config = load_config()
     try:
+        if images_only:
+            with open(CATALOG_CACHE_PATH, encoding="utf-8") as f:
+                items = json.load(f)
+            print(f"Каталог из кэша: {len(items)} позиций")
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                    viewport={"width": 1440, "height": 900},
+                )
+                page = context.new_page()
+                login(page, config)
+                images = download_images(items, config, page.request)
+                products = build_products(items, config, images)
+                write_products(products)
+                browser.close()
+            return
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(
@@ -456,6 +513,11 @@ def main():
             login(page, config)
             open_shop(page, config)
             items = scrape_goods(page, config)
+            with open(CATALOG_CACHE_PATH, "w", encoding="utf-8") as f:
+                json.dump(items, f, ensure_ascii=False, indent=2)
+            images = download_images(items, config, page.request)
+            products = build_products(items, config, images)
+            write_products(products)
             browser.close()
     except FileNotFoundError as e:
         print(e)
@@ -464,9 +526,6 @@ def main():
     except RuntimeError as e:
         print(f"Ошибка: {e}")
         sys.exit(1)
-
-    products = build_products(items, config, download_images(items, config))
-    write_products(products)
 
 
 if __name__ == "__main__":

@@ -130,6 +130,53 @@
     if (time) time.required = method === 'cash';
   }
 
+  function blink(field) {
+    if (!field) return;
+    field.classList.add('field-blink');
+    setTimeout(function () { field.classList.remove('field-blink'); }, 1600);
+  }
+
+  function contactFieldsOk() {
+    var name = orderForm.querySelector('input[name="name"]');
+    var phone = orderForm.querySelector('input[name="phone"]');
+    var ok = true;
+    if (!name.value.trim()) { blink(name); ok = false; }
+    if (!phone.value.trim()) { blink(phone); ok = false; }
+    if (!ok) (name.value.trim() ? phone : name).focus();
+    return ok;
+  }
+
+  function cashFieldsOk() {
+    if (state.payment !== 'cash') return true;
+    var date = document.getElementById('pickupDate');
+    var time = document.getElementById('pickupTime');
+    var ok = true;
+    if (!date.value) { blink(date); ok = false; }
+    if (!time.value) { blink(time); ok = false; }
+    return ok;
+  }
+
+  function kaspiQr() {
+    var st = Utils.getStore();
+    if (st && st.kaspi_qr) return st.kaspi_qr;
+    var sel = window.CatalogSelectedStore ? window.CatalogSelectedStore() : null;
+    return (sel && sel.kaspi_qr) || '';
+  }
+
+  function payWithQr(total) {
+    var totalEl = summaryEl.querySelector('.sum-total');
+    var totalTxt = Utils.fmtPrice(total);
+    Utils.openModal(
+      '<h3>💳 Оплата по Kaspi QR</h3>' +
+      '<p class="modal-product">Откройте приложение Kaspi.kz → «Сканировать» и наведите на QR-код.</p>' +
+      '<div style="text-align:center; margin:14px 0;">' +
+      '<img src="' + Utils.esc(kaspiQr()) + '" alt="Kaspi QR" style="width:220px; height:220px; object-fit:contain; border-radius:12px; background:#fff; padding:8px; border:1px solid var(--line);">' +
+      '</div>' +
+      '<p class="modal-price" style="text-align:center;">К оплате: <b>' + totalTxt + '</b></p>' +
+      '<p class="form-note" style="text-align:center;">Сумма скопирована — вставьте её в приложении после сканирования.</p>'
+    );
+  }
+
   function copyTotal() {
     var totalEl = summaryEl.querySelector('.sum-total');
     var total = Number(totalEl.getAttribute('data-total')) || 0;
@@ -159,6 +206,13 @@
       return;
     }
     if (e.target.closest('#kaspiPayBtn')) {
+      if (!contactFieldsOk() || !cashFieldsOk()) return;
+      var qr = kaspiQr();
+      if (qr) {
+        copyTotal();
+        payWithQr(Number(summaryEl.querySelector('.sum-total').getAttribute('data-total')) || 0);
+        return;
+      }
       copyTotal();
       var win = window.open('https://kaspi.kz', '_blank', 'noopener');
       if (!win) Utils.showToast('Откройте приложение Kaspi и вставьте сумму');
@@ -187,6 +241,7 @@
     partnerInput.addEventListener('input', function () {
       var valid = partnerModeValid(partnerInput.value);
       state.partnerMode = valid;
+      setField('orderPartnerId', partnerInput.value.trim());
       var hint = document.getElementById('partnerHint');
       if (hint) {
         hint.textContent = valid
@@ -224,5 +279,9 @@
   }
 
   setPayment('kaspi');
+  orderForm.querySelectorAll('input, select').forEach(function (el) {
+    el.addEventListener('input', function () { el.classList.remove('field-blink'); });
+    el.addEventListener('change', function () { el.classList.remove('field-blink'); });
+  });
   init();
 })();

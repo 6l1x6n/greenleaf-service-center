@@ -291,8 +291,9 @@
       '</div>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
       '<div class="form-group"><label>WhatsApp (только цифры, с 7)</label><input name="whatsapp" value="' + h(store.whatsapp) + '" placeholder="77001234567"></div>' +
-      '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."></div>' +
+      '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
       '</div>' +
+      '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."></div>' +
       '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
       (withAuth
         ? '<div style="background:#f0f7f2; border-radius:12px; padding:12px 14px; margin-bottom:6px;">' +
@@ -322,6 +323,7 @@
       store.hours = form.hours.value;
       store.phone = form.phone.value;
       store.whatsapp = form.whatsapp.value;
+      store.kaspi_qr = form.kaspi_qr.value;
       store.image = form.image.value;
       store.description = form.description.value;
       if (withAuth) {
@@ -387,7 +389,7 @@
     });
 
     if (selectedId === 'new') {
-      var newStore = { id: 'sc-new-' + Date.now(), name: '', city: 'Алматы', address: '', hours: '', phone: '', whatsapp: '', image: '', description: '', login: '', password: '' };
+      var newStore = { id: 'sc-new-' + Date.now(), name: '', city: 'Алматы', address: '', hours: '', phone: '', whatsapp: '', kaspi_qr: '', image: '', description: '', login: '', password: '' };
       state.editingStoreId = null;
       content.insertAdjacentHTML('beforeend', '<h4 style="margin-bottom:8px; color:var(--green-dark);">➕ Новый филиал</h4><form class="form admin-form" id="storeForm">' + storeFormHtml(newStore, true) + '</form>');
       bindStoreForm(content, newStore, true);

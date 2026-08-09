@@ -9,42 +9,67 @@
   "categories": [
     {
       "name": "Газонокосилки",
-      "keywords": ["газонокосил"],
+      "keywords": [
+        "газонокосил"
+      ],
       "image": "assets/images/products/lawnmower.svg"
     },
     {
       "name": "Триммеры",
-      "keywords": ["триммер"],
+      "keywords": [
+        "триммер"
+      ],
       "image": "assets/images/products/trimmer.svg"
     },
     {
       "name": "Мотокосы",
-      "keywords": ["мотокос", "мотокоса"],
+      "keywords": [
+        "мотокос",
+        "мотокоса"
+      ],
       "image": "assets/images/products/brushcutter.svg"
     },
     {
       "name": "Бензопилы",
-      "keywords": ["бензопил", "пил"],
+      "keywords": [
+        "бензопил",
+        "пил"
+      ],
       "image": "assets/images/products/chainsaw.svg"
     },
     {
       "name": "Кусторезы",
-      "keywords": ["кусторез"],
+      "keywords": [
+        "кусторез"
+      ],
       "image": "assets/images/products/hedgetrimmer.svg"
     },
     {
       "name": "Снегоуборщики",
-      "keywords": ["снегоуборщик"],
+      "keywords": [
+        "снегоуборщик"
+      ],
       "image": "assets/images/products/snowblower.svg"
     },
     {
       "name": "Мотокультиваторы",
-      "keywords": ["культиватор", "мотоблок"],
+      "keywords": [
+        "культиватор",
+        "мотоблок"
+      ],
       "image": "assets/images/products/tiller.svg"
     },
     {
       "name": "Масла и расходники",
-      "keywords": ["масло", "свеча", "фильтр", "цепь", "шина", "леска", "нож"],
+      "keywords": [
+        "масло",
+        "свеча",
+        "фильтр",
+        "цепь",
+        "шина",
+        "леска",
+        "нож"
+      ],
       "image": "assets/images/products/oil.svg"
     }
   ]

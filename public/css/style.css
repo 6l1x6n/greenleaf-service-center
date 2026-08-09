@@ -999,6 +999,16 @@ a:hover { text-decoration: none; }
 .form-error { color: var(--danger); font-size: 13.5px; display: none; }
 .form.show-error .form-error { display: block; }
 
+/* Мигание незаполненных обязательных полей */
+@keyframes fieldBlink {
+  0%, 100% { border-color: var(--line); box-shadow: none; }
+  50% { border-color: var(--danger); box-shadow: 0 0 0 4px rgba(214, 40, 40, 0.15); }
+}
+.field-blink {
+  animation: fieldBlink 0.5s ease-in-out 3;
+  border-color: var(--danger) !important;
+}
+
 /* ---------- Контакты ---------- */
 .split { display: grid; grid-template-columns: 1fr; gap: 28px; align-items: start; }
 @media (min-width: 900px) { .split { grid-template-columns: 1fr 1fr; } }
