@@ -6,6 +6,16 @@
   "price_multiplier": 2,
   "low_threshold": 6,
   "max_pages": 200,
+  "desc_limit": 80,
+  "central_store_id": "sc-astana",
+  "stores": [
+    {
+      "id": "sc-astana",
+      "login": "",
+      "password": "",
+      "partner": "kz44326234"
+    }
+  ],
   "categories": [
     {
       "name": "Зубная гигиена",

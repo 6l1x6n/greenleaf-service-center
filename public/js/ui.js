@@ -109,6 +109,29 @@
     if (window.CatalogRefreshContacts) window.CatalogRefreshContacts();
   }
 
+  // ---------------- Векторные иконки (SVG) ----------------
+  // Эмодзи-символы не отрисовываются на части устройств — используем SVG.
+
+  var SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"';
+
+  function iconX(size) {
+    return '<svg ' + SVG_ATTRS + ' width="' + (size || 13) + '" height="' + (size || 13) + '" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>';
+  }
+
+  function iconTrash(size) {
+    return '<svg ' + SVG_ATTRS + ' width="' + (size || 15) + '" height="' + (size || 15) + '" aria-hidden="true">' +
+      '<path d="M4 7h16"/><path d="M9.5 7V5.2c0-.6.5-1.2 1.1-1.2h2.8c.6 0 1.1.6 1.1 1.2V7"/>' +
+      '<path d="M6.5 7l.9 12.2c0 .6.5 1.2 1.1 1.2h7c.6 0 1.1-.6 1.1-1.2L17.5 7"/>' +
+      '<path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+  }
+
+  function iconTruck(size) {
+    return '<svg ' + SVG_ATTRS + ' width="' + (size || 22) + '" height="' + (size || 22) + '" aria-hidden="true">' +
+      '<rect x="2" y="6.5" width="11.5" height="8.5" rx="1.4"/>' +
+      '<path d="M13.5 9.5h4.4l3.1 3.1V15h-7.5z"/>' +
+      '<circle cx="6.4" cy="17.4" r="1.7"/><circle cx="17.3" cy="17.4" r="1.7"/></svg>';
+  }
+
   window.Utils = {
     openModal: openModal,
     closeModal: closeModal,
@@ -117,7 +140,10 @@
     fmtDate: fmtDate,
     esc: esc,
     getStore: function () { return store; },
-    waLink: waLink
+    waLink: waLink,
+    iconX: iconX,
+    iconTrash: iconTrash,
+    iconTruck: iconTruck
   };
 
   document.getElementById('year').textContent = new Date().getFullYear();

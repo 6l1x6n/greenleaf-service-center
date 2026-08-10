@@ -48,7 +48,7 @@
         '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(p.id) + '" min="1" max="999" value="' + (Number(item.qty) || 1) + '" aria-label="Количество">' +
         '<button class="qty-btn" data-cart-inc="' + Utils.esc(p.id) + '" aria-label="Увеличить">+</button>' +
         '</div>' +
-        '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины">✕</button>';
+        '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины">' + Utils.iconX(12) + '</button>';
     }
     return '<button class="btn btn-primary btn-sm" data-cart-add="' + Utils.esc(p.id) + '">🛒 В корзину</button>';
   }
@@ -273,10 +273,17 @@
 
   // ---------------- Товар: модалка, резерв ----------------
 
+  // СЦ, которому принадлежит склад s240534 (Толе Би 55) — источник остатков каталога
+  function centralStore() {
+    return stores.find(function (s) { return /толе\s*би/i.test(s.address || ''); }) || null;
+  }
+
   function openProductDetailModal(p) {
+    var central = centralStore();
+    var centralName = central ? central.name : 'СЦ Greenleaf Астана (Толе Би 55)';
     var qtyLine = '';
     if (typeof p.quantity === 'number' && p.quantity > 0) {
-      qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно на складе: <b>' + p.quantity + ' шт.</b></div>';
+      qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно в ' + Utils.esc(centralName) + ': <b>' + p.quantity + ' шт.</b></div>';
     }
     var stockRows = '';
     var storeStockLines = [];
@@ -288,7 +295,7 @@
     if (storeStockLines.length) {
       stockRows = storeStockLines.join('');
     } else {
-      stockRows = '<div class="product-stock-item">В наличии на центральном складе</div>';
+      stockRows = '<div class="product-stock-item"><span>📍 <strong>' + Utils.esc(centralName) + ':</strong></span> <span>В наличии — данные обновляются автоматически</span></div>';
     }
     Utils.openModal(
       '<div class="modal-product-detail">' +
@@ -691,7 +698,7 @@
       '<span class="move-point move-point-start">' + Utils.esc(srcShort) + '</span>' +
       '<div class="move-track">' +
       '<div class="move-progress" style="width:' + pct + '%"></div>' +
-      '<span class="move-truck" style="left:' + pct + '%">🚚</span>' +
+      '<span class="move-truck" style="left:clamp(10px,' + pct + '%,calc(100% - 10px))">' + Utils.iconTruck(22) + '</span>' +
       '</div>' +
       '<span class="move-point move-point-end">Наш СЦ</span>' +
       '</div>' +
@@ -813,6 +820,13 @@
     try { return JSON.parse(localStorage.getItem('greenleaf_event_bookings_v1') || '{}'); } catch (e) { return {}; }
   }
 
+  function eventMyBooked(id) {
+    try {
+      var mine = JSON.parse(localStorage.getItem('greenleaf_event_my_v1') || '{}');
+      return !!mine[String(id)];
+    } catch (e) { return false; }
+  }
+
   function eventRemaining(ev) {
     if (ev.slots == null) return null;
     var booked = Number(eventBookings()[String(ev.id)]) || 0;
@@ -858,9 +872,12 @@
       var slotsTxt = 'Мест: ' + Utils.esc(ev.slots != null ? ev.slots : '—');
       if (remaining !== null) slotsTxt += ' · Осталось: ' + remaining;
       var full = remaining !== null && remaining <= 0;
-      var btnHtml = full
-        ? '<button class="btn btn-outline" disabled>Мест нет</button>'
-        : '<button class="btn btn-primary" data-event="' + Utils.esc(ev.id) + '">Записаться</button>';
+      var myBooked = eventMyBooked(ev.id);
+      var btnHtml = myBooked
+        ? '<button class="btn btn-outline" disabled>✅ Вы записаны</button>'
+        : full
+          ? '<button class="btn btn-outline" disabled>Мест нет</button>'
+          : '<button class="btn btn-primary" data-event="' + Utils.esc(ev.id) + '">Записаться</button>';
       return '<article class="event' + (when ? ' event-when-card-' + when.cls : '') + '">' +
         '<div class="event-top"><div class="event-date">' + whenBadge + dt + ' · ' + Utils.esc(ev.time || '') + '</div>' + storeTag + '</div>' +
         '<h3>' + Utils.esc(ev.title) + '</h3>' +
@@ -875,6 +892,10 @@
   window.addEventListener('event:booked', function () { renderEvents(lastEvents); });
 
   function eventModal(ev) {
+    if (eventMyBooked(ev.id)) {
+      Utils.showToast('Вы уже записаны на это мероприятие');
+      return;
+    }
     if (eventRemaining(ev) === 0) {
       Utils.showToast('К сожалению, места закончились');
       return;

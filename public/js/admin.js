@@ -284,7 +284,7 @@
       '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
       '<div class="admin-actions">' +
       '<button class="btn btn-primary" type="submit">💾 Сохранить филиал</button>' +
-      (withAuth ? '<button class="btn btn-outline danger-btn" type="button" id="storeDeleteBtn">🗑 Удалить филиал</button>' : '') +
+      (withAuth ? '<button class="btn btn-outline danger-btn" type="button" id="storeDeleteBtn">' + Utils.iconTrash(14) + 'Удалить филиал</button>' : '') +
       '</div>' +
       '</div>';
   }
@@ -318,7 +318,7 @@
         delete saved[store.id];
         lsSet(KEYS.stores, saved);
         state.editingStoreId = null;
-        Utils.showToast('🗑 Филиал удалён');
+        Utils.showToast('Филиал удалён');
         loadData().then(function () { openSection('sc'); });
       });
     }
@@ -537,7 +537,7 @@
           '</div>' +
           '<div class="admin-actions">' +
           '<button class="btn btn-outline btn-sm" data-del-edit="' + h(d.id) + '">✏️ Изменить</button>' +
-          '<button class="btn btn-outline btn-sm danger-btn" data-del-remove="' + h(d.id) + '">🗑 Удалить</button>' +
+          '<button class="btn btn-outline btn-sm danger-btn" data-del-remove="' + h(d.id) + '">' + Utils.iconTrash(14) + 'Удалить</button>' +
           '</div></li>';
       }).join('') || '<li style="color:var(--muted);">Поставок пока нет — добавьте первую.</li>';
     }
@@ -646,7 +646,7 @@
           '</div>' +
           '<div class="admin-actions">' +
           '<button class="btn btn-outline btn-sm" data-ev-edit="' + h(ev.id) + '">✏️ Изменить</button>' +
-          '<button class="btn btn-outline btn-sm danger-btn" data-ev-remove="' + h(ev.id) + '">🗑 Удалить</button>' +
+          '<button class="btn btn-outline btn-sm danger-btn" data-ev-remove="' + h(ev.id) + '">' + Utils.iconTrash(14) + 'Удалить</button>' +
           '</div></li>';
       }).join('') || '<li style="color:var(--muted);">Мероприятий пока нет — добавьте первое.</li>';
     }
@@ -774,7 +774,7 @@
           '<div class="admin-actions" style="flex-wrap:wrap;">' +
           (s.status !== 'active' ? '<button class="btn btn-primary btn-sm" data-pt-approve="' + h(s.id) + '">✅ Одобрить</button>' : '') +
           (s.status !== 'rejected' ? '<button class="btn btn-outline btn-sm danger-btn" data-pt-reject="' + h(s.id) + '">🚫 Отклонить</button>' : '') +
-          '<button class="btn btn-outline btn-sm danger-btn" data-pt-remove="' + h(s.id) + '">🗑 Удалить</button>' +
+          '<button class="btn btn-outline btn-sm danger-btn" data-pt-remove="' + h(s.id) + '">' + Utils.iconTrash(14) + 'Удалить</button>' +
           '</div></li>';
       }).join('')
         : '<li style="color:var(--muted);">Заявок пока нет. Новые заявки с формы «Регистрация магазина» появятся здесь.</li>') +
@@ -803,7 +803,7 @@
         if (!confirm('Удалить заявку «' + item.storeName + '»?')) return;
         removeStoreCardFromRequest(item);
         list = list.filter(function (x) { return x.id !== id; });
-        Utils.showToast('🗑 Заявка удалена');
+        Utils.showToast('Заявка удалена');
       }
       savePartnerStores(list);
       openSection('partners');

@@ -408,6 +408,24 @@ a:hover { text-decoration: none; }
   padding-top: 4px;
 }
 
+/* Компактные карточки СЦ на мобильных — больше карточек на экране */
+@media (max-width: 640px) {
+  .sc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .sc-card-media { aspect-ratio: 16 / 10; }
+  .sc-card-body { padding: 10px 12px 12px; gap: 4px; }
+  .sc-card-title { font-size: 13.5px; }
+  .sc-card-line { font-size: 11.5px; }
+  .sc-card-line:nth-of-type(2), .sc-card-line:nth-of-type(3) { display: none; }
+  .sc-card-check { top: 6px; right: 6px; font-size: 10.5px; padding: 3px 8px; }
+  .sc-card-hint { display: none; }
+}
+@media (max-width: 380px) {
+  .sc-grid { grid-template-columns: 1fr; }
+}
+
 /* Плашка выбранного СЦ */
 .sc-active-banner {
   background:
@@ -558,12 +576,14 @@ a:hover { text-decoration: none; }
   border: 1px solid var(--line);
   background: #fff;
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1;
   cursor: pointer;
   transition: 0.15s;
-  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
+.cart-item-x svg { display: block; }
 .cart-item-x:hover { border-color: var(--danger); color: var(--danger); background: #fdf0f0; }
 .cart-item-trash {
   width: 30px;
@@ -572,12 +592,14 @@ a:hover { text-decoration: none; }
   border: 1.5px solid var(--line);
   background: #fff;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1;
   cursor: pointer;
   transition: 0.15s;
-  font-family: var(--font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
+.cart-item-trash svg { display: block; }
 .cart-item-trash:hover { border-color: var(--danger); color: var(--danger); background: #fdf0f0; }
 .cart-hide-note {
   display: flex;
@@ -763,7 +785,12 @@ a:hover { text-decoration: none; }
   border-color: var(--line) !important;
   background: #fff !important;
   color: var(--muted) !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
 }
+.row-remove svg { display: block; }
+.btn svg { vertical-align: -2px; }
 .row-remove:hover { border-color: var(--danger) !important; color: var(--danger) !important; background: #fdf0f0 !important; }
 
 @media (max-width: 900px) {
@@ -968,7 +995,7 @@ a:hover { text-decoration: none; }
 .move-point-end { color: var(--green-dark); }
 .move-track { position: relative; height: 10px; border-radius: 999px; background: repeating-linear-gradient(90deg, #dfe5df 0 14px, #f4f7f4 14px 28px); }
 .move-progress { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--green); border-radius: 999px; transition: width 0.6s ease; }
-.move-truck { position: absolute; top: 50%; transform: translate(-50%, -50%) scaleX(-1); font-size: 20px; z-index: 2; transition: left 0.6s ease; line-height: 1; }
+.move-truck { position: absolute; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; color: var(--green-dark); z-index: 2; pointer-events: none; transition: left 0.6s ease; line-height: 1; }
 .move-eta { font-size: 13px; font-weight: 700; color: var(--green-darker); margin-bottom: 4px; }
 
 /* ---------- Мероприятия ---------- */

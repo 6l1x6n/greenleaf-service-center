@@ -5,6 +5,7 @@ import sys
 import time
 import urllib.request
 from datetime import datetime
+from html.parser import HTMLParser
 
 from playwright.sync_api import sync_playwright
 
@@ -12,7 +13,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
 PRODUCTS_PATH = os.path.join(ROOT_DIR, "public", "data", "products.json")
 MOVES_PATH = os.path.join(ROOT_DIR, "public", "data", "moves.json")
-CATALOG_CACHE_PATH = os.path.join(ROOT_DIR, "scripts", "parser", ".catalog_cache.json")
+STORE_STOCK_PATH = os.path.join(ROOT_DIR, "public", "data", "store-stock.json")
+CATALOG_CACHE_PATH = os.path.join(BASE_DIR, ".catalog_cache.json")
+GOODS_CACHE_PATH = os.path.join(BASE_DIR, ".goods_cache.json")
+GOODS_ID_CACHE_PATH = os.path.join(BASE_DIR, ".goods_id_map.json")
 
 PRODUCT_CODE_STRICT_RE = re.compile(r"^[A-Z]{3}\d{3}$")
 BOX_PREFIX_RE = re.compile(
@@ -69,6 +73,28 @@ def load_config():
     config["sc_password"] = os.environ.get("SC_PASSWORD", config.get("sc_password", ""))
     config["partner_login"] = os.environ.get("PARTNER_LOGIN") or config.get("partner_login", "")
     return config
+
+
+def get_stores(config):
+    """Список сервис-центров для парсинга (каталог каждого парсится по кодам
+    и вливается в единую базу). Пустые поля наследуют значения из config/env."""
+    stores = config.get("stores") or []
+    if not stores:
+        stores = [{
+            "id": config.get("central_store_id", "sc-astana"),
+            "login": config.get("sc_login", ""),
+            "partner": config.get("partner_login", ""),
+        }]
+    return stores
+
+
+def build_store_config(config, store):
+    cfg = dict(config)
+    cfg["sc_id"] = store.get("id") or config.get("central_store_id", "sc-astana")
+    cfg["sc_login"] = store.get("login") or config.get("sc_login", "")
+    cfg["sc_password"] = store.get("password") or config.get("sc_password", "")
+    cfg["partner_login"] = store.get("partner") or config.get("partner_login", "")
+    return cfg
 
 
 def find_goods_rows(page):
@@ -340,6 +366,16 @@ def parse_row(html):
     }
 
 
+GOODS_ID_BY_CODE = {}  # код товара каталога -> id товара на портале (data-id строки buy-страницы)
+
+
+def save_goods_id_map():
+    if not GOODS_ID_BY_CODE:
+        return
+    with open(GOODS_ID_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(GOODS_ID_BY_CODE, f, ensure_ascii=False, indent=2)
+
+
 def scrape_goods(page, config):
     rows = []
     for attempt in range(1, 4):
@@ -402,6 +438,12 @@ def scrape_goods(page, config):
                 new_count += 1
                 if parsed.get("skipped"):
                     skipped_codes.append(code)
+                try:
+                    gid = row.get_attribute("data-id")
+                    if gid and code and not parsed.get("skipped"):
+                        GOODS_ID_BY_CODE[code] = int(gid)
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -426,6 +468,7 @@ def scrape_goods(page, config):
     if skipped_codes:
         print(f"Пропущено позиций (код не формата ABC123): {len(skipped_codes)}")
 
+    save_goods_id_map()
     return [it for it in all_items if not it.get("skipped")]
 
 
@@ -691,30 +734,99 @@ def write_moves(moves):
     print(f"Сохранено накладных: {len(moves)} -> {MOVES_PATH}")
 
 
-def build_products(items, config, images=None):
+# ---------------- Единая база товаров ----------------
+# products.json — постоянная база: карточка создаётся один раз по коду (sku),
+# дальше парсер обновляет только количество по каждому сервис-центру (stock[sc])
+# и динамические характеристики (название, цены, фото). Описание статично:
+# заполняется один раз при создании карточки, дальше его меняют только админы.
+# Карточки никогда не удаляются и не пересоздаются.
+
+
+def load_base_products():
+    if not os.path.exists(PRODUCTS_PATH):
+        print("База товаров не найдена — начнём с пустой")
+        return []
+    try:
+        with open(PRODUCTS_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("products") or []
+    except Exception as e:
+        print(f"База товаров: не удалось прочитать ({e}) — начнём с пустой")
+        return []
+
+
+def base_index(products):
+    return {p["sku"]: p for p in products if p.get("sku")}
+
+
+def merge_sc_items(base_products, items, sc_id, config, images=None, descriptions=None):
+    """Вливает каталог одного сервис-центра в базу: по коду обновляет количество
+    и динамические характеристики, новые коды создают новые карточки.
+    Описание не перезаписывается (заполняется только при создании карточки)."""
     categories = config.get("categories", [])
     low_threshold = config.get("low_threshold", 6)
     multiplier = config.get("price_multiplier", 2)
+    central = config.get("central_store_id", "sc-astana")
     images = images or {}
-    products = []
+    descriptions = descriptions or {}
+
+    for p in base_products:
+        p.setdefault("stock", {})
+        p.setdefault("eta", None)
+        p.setdefault("incoming", None)
+        p.setdefault("description", "")
+
+    by_code = base_index(base_products)
+    created = 0
+    updated = 0
     for it in items:
-        if not it["name"]:
+        code = it.get("code")
+        if not code or not it.get("name"):
             continue
         category = classify_category(it["name"], categories)
-        products.append({
-            "id": it["code"],
-            "sku": it["code"],
-            "name": it["name"],
-            "category": category,
-            "price": round(it["sale_price"] * multiplier),
-            "partner_price": round(it["sale_price"]),
-            "quantity": it["quantity"],
-            "image": images.get(it["code"]) or image_for_category(category, categories),
-            "status": status_from_qty(it["quantity"], low_threshold),
-            "eta": None,
-            "incoming": None,
-        })
-    return products
+        price = round(it["sale_price"] * multiplier)
+        partner_price = round(it["sale_price"])
+        img = images.get(code)
+        card = by_code.get(code)
+        if card is None:
+            card = {
+                "id": code,
+                "sku": code,
+                "name": it["name"],
+                "category": category,
+                "price": price,
+                "partner_price": partner_price,
+                "quantity": 0,
+                "image": img or image_for_category(category, categories),
+                "status": "out",
+                "eta": None,
+                "incoming": None,
+                "description": descriptions.get(code, ""),
+                "stock": {},
+            }
+            by_code[code] = card
+            created += 1
+        else:
+            card["name"] = it["name"]
+            card["category"] = category
+            card["price"] = price
+            card["partner_price"] = partner_price
+            if img:
+                card["image"] = img
+            updated += 1
+        card["stock"][sc_id] = it["quantity"]
+
+    # quantity/status — производные от центрального филиала (для фронта без изменений)
+    for card in by_code.values():
+        qty = int(card["stock"].get(central, 0) or 0)
+        card["quantity"] = qty
+        card["status"] = status_from_qty(qty, low_threshold)
+
+    print(
+        f"База {sc_id}: создано карточек {created}, обновлено {updated}, "
+        f"всего в базе {len(by_code)}"
+    )
+    return list(by_code.values())
 
 
 def write_products(products):
@@ -724,11 +836,244 @@ def write_products(products):
     }
     with open(PRODUCTS_PATH, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
-    print(f"Сохранено товаров: {len(products)} -> {PRODUCTS_PATH}")
+    print(f"Сохранено карточек: {len(products)} -> {PRODUCTS_PATH}")
+
+
+# ---------------- Описания товаров ----------------
+# Короткие описания отдаёт API магазина (api.getShopGoods), полные тексты
+# («Состав», «Свойства», «Срок годности»…) лежат на публичных карточках
+# https://greenleaf-global.com/shop/<path>/<slug>_n/ в блоке .product__text.
+
+DESC_SECTION_HEADERS = (
+    "Описание", "Состав", "Свойства", "Применение", "Способ применения",
+    "Способ хранения", "Срок годности", "Особенности", "Действие", "Назначение",
+)
+
+
+class ProductTextParser(HTMLParser):
+    """Извлекает текстовые блоки описания из блока .product__text публичной карточки."""
+
+    def __init__(self):
+        super().__init__()
+        self.in_text = False
+        self.depth = 0
+        self.cur = []
+        self.blocks = []
+
+    def handle_starttag(self, tag, attrs):
+        cls = dict(attrs).get("class", "") or ""
+        if tag == "div" and "product__text" in cls.split():
+            self.in_text = True
+            self.depth = 1
+            return
+        if self.in_text:
+            if tag == "div":
+                self.depth += 1
+            elif tag in ("p", "br", "li", "h2", "h3", "h4"):
+                self.cur.append("\n")
+
+    def handle_endtag(self, tag):
+        if not self.in_text:
+            return
+        if tag == "div":
+            self.depth -= 1
+            if self.depth <= 0:
+                self.in_text = False
+                self._flush()
+        elif tag in ("p", "li", "h2", "h3", "h4"):
+            self._flush()
+
+    def handle_data(self, data):
+        if self.in_text:
+            self.cur.append(data)
+
+    def _flush(self):
+        text = re.sub(r"\s+", " ", "".join(self.cur)).strip()
+        self.cur = []
+        if text:
+            self.blocks.append(text)
+
+
+def extract_public_description(html):
+    parser = ProductTextParser()
+    try:
+        parser.feed(html)
+    except Exception:
+        return ""
+    blocks = [b for b in parser.blocks if not b.startswith("Другие товары из категории")]
+    return "\n".join(blocks)
+
+
+def fetch_public_description(code, goods, config):
+    if not goods.get("path") or not goods.get("name"):
+        return ""
+    url = (
+        config["portal_url"]
+        + "/shop/"
+        + goods["path"].strip("/")
+        + "/"
+        + goods["name"].strip("/")
+        + "/"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            html = resp.read().decode("utf-8", "ignore")
+        desc = extract_public_description(html)
+        if not desc:
+            print(f"Описание {code}: пустой блок .product__text ({url})")
+        return desc
+    except Exception as e:
+        print(f"Описание {code}: страница недоступна ({url}) — {e}")
+        return ""
+
+
+def fetch_goods_map(page, config, ids=None):
+    """Карта товаров портала по кодам каталога (точный поиск code=...).
+
+    Постраничный обход неполон: штучные товары (NWA110 и т.п.) в нём
+    отсутствуют, но возвращаются по прямому запросу code=<код>.
+    """
+    if not ids:
+        return []
+    fields = "id,code,path,name,title,description"
+    goods = page.evaluate(
+        """async (a) => {
+            const out = [];
+            for (let i = 0; i < a.codes.length; i += 20) {
+                const chunk = a.codes.slice(i, i + 20);
+                const res = await Promise.all(chunk.map(async c => {
+                    const r = await fetch('/api/v1/shop/goods?fields=' + a.fields + '&code=' + c);
+                    if (!r.ok) return [];
+                    const d = await r.json();
+                    return (d || []).map(g => ({
+                        id: g.id,
+                        code: g.code || '',
+                        path: g.path || '',
+                        name: g.name || '',
+                        title: (g.title && g.title['ru']) || '',
+                        description: (g.description && g.description['ru']) || ''
+                    }));
+                }));
+                res.forEach(arr => out.push(...arr));
+            }
+            return out;
+        }""",
+        {"fields": fields, "codes": ids},
+    )
+    print(f"Товары портала (API): {len(goods)}")
+    with open(GOODS_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(goods, f, ensure_ascii=False, indent=2)
+    return goods
+
+
+def load_existing_descriptions():
+    if not os.path.exists(PRODUCTS_PATH):
+        return {}
+    try:
+        with open(PRODUCTS_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return {p["sku"]: p.get("description") for p in data.get("products", [])}
+    except Exception:
+        return {}
+
+
+def scrape_descriptions(items, goods_map, config):
+    """Инкрементально добирает описания товаров (только отсутствующие)."""
+    existing = load_existing_descriptions()
+    missing = [
+        it for it in items
+        if it.get("code") and not (existing.get(it["code"]) or "").strip()
+    ]
+    limit = config.get("desc_limit", 80)
+    todo = missing[:limit]
+    if not todo:
+        print("Описания: все товары уже имеют описания")
+        return {}
+
+    api_desc = {
+        g["code"]: g["description"]
+        for gs in goods_map.values()
+        for g in gs
+        if g.get("description") and str(g.get("description")).strip()
+    }
+    new = {}
+    done = 0
+    for it in todo:
+        code = it["code"]
+        desc = ""
+        for goods in goods_map.get(code, []):
+            desc = fetch_public_description(code, goods, config)
+            if desc:
+                break
+        if not desc:
+            desc = api_desc.get(code, "")
+        if desc:
+            new[code] = desc
+        done += 1
+        if done % 20 == 0:
+            print(f"Описания: {done}/{len(todo)}...")
+        time.sleep(0.15)
+    print(f"Описания: получено {len(new)} из {len(todo)}")
+    return new
+
+
+# ---------------- Остатки по филиалам ----------------
+# store-stock.json — производный файл из единой базы (stock по каждому СЦ),
+# его читают фронт и админка; формат строк сохранён («В наличии (N шт)»/«Ожидается»).
+
+
+def write_store_stock(products, config):
+    stock_data = {}
+    for p in products:
+        for sc_id, qty in (p.get("stock") or {}).items():
+            qty = int(qty or 0)
+            stock_data.setdefault(sc_id, {})[p["id"]] = (
+                f"В наличии ({qty} шт)" if qty > 0 else "Ожидается"
+            )
+
+    payload = {
+        "updated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S+03:00"),
+        "stock": stock_data,
+    }
+    with open(STORE_STOCK_PATH, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    total = sum(len(v) for v in stock_data.values())
+    print(f"Остатки по филиалам: {list(stock_data)} ({total} позиций) -> {STORE_STOCK_PATH}")
+
+
+def run_parse_store(page, store_config, base_products):
+    """Парсит каталог одного сервис-центра и вливает его в единую базу."""
+    sc_id = store_config["sc_id"]
+    print(f"--- Сервис-Центр: {sc_id} ---")
+    login(page, store_config)
+    open_shop(page, store_config)
+    items = scrape_goods(page, store_config)
+    with open(CATALOG_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=2)
+
+    # Описания подтягиваются один раз — только для новых кодов, существующие не трогаем
+    known = {p["sku"] for p in base_products}
+    new_items = [it for it in items if it.get("code") and it["code"] not in known]
+    goods_map = {}
+    if new_items:
+        try:
+            codes = [it["code"] for it in new_items]
+            goods = fetch_goods_map(page, store_config, ids=codes)
+            for g in goods:
+                if g.get("code"):
+                    goods_map.setdefault(g["code"], []).append(g)
+        except Exception as e:
+            print(f"Карта товаров портала: не удалось ({e}) — описания новых карточек пропущены")
+        descriptions = scrape_descriptions(new_items, goods_map, store_config)
+    else:
+        descriptions = {}
+
+    images = download_images(items, store_config, page.request)
+    return merge_sc_items(base_products, items, sc_id, store_config, images, descriptions)
 
 
 def main():
-    images_only = "--images-only" in sys.argv
     moves_only = "--moves-only" in sys.argv
     config = load_config()
     try:
@@ -740,26 +1085,10 @@ def main():
                     viewport={"width": 1440, "height": 900},
                 )
                 page = context.new_page()
-                login(page, config)
-                moves = scrape_moves(page, config)
+                store_config = build_store_config(config, get_stores(config)[0])
+                login(page, store_config)
+                moves = scrape_moves(page, store_config)
                 write_moves(moves)
-                browser.close()
-            return
-        if images_only:
-            with open(CATALOG_CACHE_PATH, encoding="utf-8") as f:
-                items = json.load(f)
-            print(f"Каталог из кэша: {len(items)} позиций")
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-                    viewport={"width": 1440, "height": 900},
-                )
-                page = context.new_page()
-                login(page, config)
-                images = download_images(items, config, page.request)
-                products = build_products(items, config, images)
-                write_products(products)
                 browser.close()
             return
         with sync_playwright() as p:
@@ -769,19 +1098,21 @@ def main():
                 viewport={"width": 1440, "height": 900},
             )
             page = context.new_page()
-            login(page, config)
-            open_shop(page, config)
-            items = scrape_goods(page, config)
-            with open(CATALOG_CACHE_PATH, "w", encoding="utf-8") as f:
-                json.dump(items, f, ensure_ascii=False, indent=2)
-            images = download_images(items, config, page.request)
-            products = build_products(items, config, images)
-            write_products(products)
-            try:
-                moves = scrape_moves(page, config)
-                write_moves(moves)
-            except Exception as e:
-                print(f"Перемещения товаров: не удалось ({e}) — продолжаем без них")
+            stores = get_stores(config)
+            central = config.get("central_store_id", "sc-astana")
+            base_products = load_base_products()
+            print(f"База товаров: {len(base_products)} карточек, СЦ: {[s['id'] for s in stores]}")
+            for store in stores:
+                store_config = build_store_config(config, store)
+                base_products = run_parse_store(page, store_config, base_products)
+                if store.get("id") == central:
+                    try:
+                        moves = scrape_moves(page, store_config)
+                        write_moves(moves)
+                    except Exception as e:
+                        print(f"Перемещения товаров: не удалось ({e}) — продолжаем без них")
+            write_products(base_products)
+            write_store_stock(base_products, config)
             browser.close()
     except FileNotFoundError as e:
         print(e)

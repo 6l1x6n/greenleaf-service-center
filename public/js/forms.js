@@ -3,6 +3,13 @@
 
   var ENDPOINT = '/telegram';
 
+  function alreadyBookedEvent(eventId) {
+    try {
+      var mine = JSON.parse(localStorage.getItem('greenleaf_event_my_v1') || '{}');
+      return !!mine[String(eventId)];
+    } catch (e) { return false; }
+  }
+
   function collectFormData(form) {
     var data = { type: form.getAttribute('data-type') };
     form.querySelectorAll('input, select, textarea').forEach(function (el) {
@@ -85,6 +92,12 @@
 
     var data = collectFormData(form);
 
+    // Повторная запись на мероприятие с того же устройства — блокируем
+    if (data.type === 'event' && data.event_id && alreadyBookedEvent(data.event_id)) {
+      Utils.showToast('Вы уже записаны на это мероприятие');
+      return;
+    }
+
     // Заказы (корзина) — валидация своих полей
     if (data.type === 'order') {
       var isCash = data.payment === 'Наличные при получении';
@@ -119,6 +132,11 @@
             var bookings = JSON.parse(localStorage.getItem('greenleaf_event_bookings_v1') || '{}');
             bookings[data.event_id] = (Number(bookings[data.event_id]) || 0) + 1;
             localStorage.setItem('greenleaf_event_bookings_v1', JSON.stringify(bookings));
+          } catch (e) { }
+          try {
+            var mine = JSON.parse(localStorage.getItem('greenleaf_event_my_v1') || '{}');
+            mine[data.event_id] = Date.now();
+            localStorage.setItem('greenleaf_event_my_v1', JSON.stringify(mine));
           } catch (e) { }
           window.dispatchEvent(new CustomEvent('event:booked', { detail: { id: data.event_id } }));
         }
