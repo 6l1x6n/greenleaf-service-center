@@ -20,7 +20,7 @@
     updateAuthBtn();
   }
 
-  // Вход проверяется на сервере (Cloudflare Worker): креды живут только в секрете STORE_CREDS
+  // Вход проверяется на сервере (Cloudflare Worker): креды живут только в секрете STORE_CREDS / KV
   function login(login, pass) {
     var l = String(login || '').trim().toLowerCase();
     var p = String(pass || '');
@@ -33,11 +33,35 @@
       return r.json();
     }).then(function (data) {
       if (data && data.ok && data.store) {
-        return { id: data.store.id, login: l, name: data.store.name, role: data.store.role };
+        return {
+          id: data.store.id,
+          login: l,
+          name: data.store.name,
+          role: data.store.role,
+          email: data.store.email || '',
+          phone: data.store.phone || '',
+          token: data.token || ''
+        };
       }
       return null;
     }).catch(function () {
       return null;
+    });
+  }
+
+  function getToken() {
+    var u = getCurrentUser();
+    return (u && u.token) || '';
+  }
+
+  // API-запрос к Worker от имени авторизованного пользователя (токен в заголовке)
+  function api(path, options) {
+    var opts = options || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    var token = getToken();
+    if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return null; });
     });
   }
 
@@ -72,7 +96,9 @@
     setCurrentUser: setCurrentUser,
     login: login,
     isSuperadmin: isSuperadmin,
-    updateAuthBtn: updateAuthBtn
+    updateAuthBtn: updateAuthBtn,
+    getToken: getToken,
+    api: api
   };
 
   document.addEventListener('DOMContentLoaded', updateAuthBtn);

@@ -60,20 +60,21 @@
         <!-- Регистрация клиента -->
         <div id="authRegView" class="hidden">
           <h3 style="margin-bottom:6px;">📝 Регистрация</h3>
-          <p class="modal-product">Оставьте заявку — менеджер Greenleaf свяжется с вами.</p>
+          <p class="modal-product">Создайте аккаунт — логин и пароль придут на почту.</p>
 
-          <form class="form" data-type="client_registration">
+          <form class="form" data-register-client="1">
             <input name="name" placeholder="Ваше имя *" required>
             <input name="phone" type="tel" placeholder="Телефон для связи *" required>
+            <input name="email" type="email" placeholder="Email — на него придёт логин и пароль *" required autocomplete="email">
             <select name="city" class="city-select" required>
               <option value="" selected disabled>Город</option>
             </select>
             <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
             <input class="hp" name="company" tabindex="-1" autocomplete="off">
-            <button class="btn btn-primary btn-lg" type="submit">Отправить заявку</button>
-            <p class="form-note">🔒 Заявка ни к чему не обязывает.</p>
-            <p class="form-success">Заявка отправлена! Свяжемся с вами в ближайшее время.</p>
-            <p class="form-error">Проверьте обязательные поля.</p>
+            <button class="btn btn-primary btn-lg" type="submit">Зарегистрироваться</button>
+            <p class="form-note">🔒 Логин и пароль придут на указанную почту. Письмо ни к чему не обязывает.</p>
+            <p class="form-success">Аккаунт создан! Проверьте почту — мы отправили логин и пароль.</p>
+            <p class="form-error">Проверьте обязательные поля, email должен быть корректным.</p>
           </form>
 
           <button class="auth-switch-link" type="button" id="authOwnerBtn">Я владелец магазина</button>
@@ -87,7 +88,13 @@
               <h3 style="margin-bottom:6px;">🏬 Регистрация магазина</h3>
               <p class="modal-product">Введите данные вашей торговой точки или проекта.</p>
 
-              <form class="form" data-type="partner">
+              <div class="auth-tabs">
+                <button class="auth-tab active" type="button" data-owner-tab="partner">Заявка партнёра</button>
+                <button class="auth-tab" type="button" data-owner-tab="sc">Стать Сервис-Центром</button>
+              </div>
+
+              <!-- Заявка партнёра -->
+              <form class="form" data-type="partner" data-owner-form="partner">
                 <input name="name" placeholder="ФИО / Имя представителя *" required>
                 <input name="phone" type="tel" placeholder="Телефон для связи *" required>
                 <input name="storeName" placeholder="Название магазина / проекта *" required>
@@ -105,6 +112,27 @@
                 <p class="form-note">🔒 Отправка заявки ни к чему не обязывает.</p>
                 <p class="form-success">Заявка отправлена! Ваш магазин добавлен в список запросов со статусом «На рассмотрении».</p>
                 <p class="form-error">Проверьте обязательные поля.</p>
+              </form>
+
+              <!-- Регистрация Сервис-Центра -->
+              <form class="form" data-sc-register="1" data-owner-form="sc">
+                <input name="name" placeholder="ФИО владельца магазина *" required>
+                <input name="phone" type="tel" placeholder="Телефон для связи *" required>
+                <input name="email" type="email" placeholder="Email — на него придут логин и пароль кабинета *" required autocomplete="email">
+                <input name="storeName" placeholder="Название магазина / Сервис-Центра *" required>
+                <select name="city" class="city-select" required>
+                  <option value="" selected disabled>Город *</option>
+                </select>
+                <input name="address" placeholder="Точный адрес *" required>
+                <input name="officeCode" placeholder="Код личного кабинета (например: S240-534) *" required>
+                <input name="portalLogin" placeholder="Логин кабинета поставщика (для парсера) *" required autocomplete="off">
+                <input name="portalPassword" type="password" placeholder="Пароль кабинета поставщика (для парсера) *" required autocomplete="new-password">
+                <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
+                <input class="hp" name="company" tabindex="-1" autocomplete="off">
+                <button class="btn btn-primary btn-lg" type="submit">Отправить заявку</button>
+                <p class="form-note">🔐 Данные для авторизации передаются только главному администратору и используются исключительно для автоматической синхронизации остатков товаров. На сайте не публикуются. После подтверждения логин и пароль кабинета Сервис-Центра придут на указанную почту.</p>
+                <p class="form-success">Заявка отправлена! Администратор проверит данные — при подтверждении логин и пароль придут на вашу почту.</p>
+                <p class="form-error">Заполните все обязательные поля.</p>
               </form>
             </div>
 
@@ -126,6 +154,33 @@
     <div id="adminLayout" class="admin-layout hidden">
       <aside class="admin-sidebar" id="adminNav"></aside>
       <div class="admin-content" id="adminContent"></div>
+    </div>
+
+    <!-- Личный кабинет клиента -->
+    <div id="clientLayout" class="hidden">
+      <div class="container" style="max-width:720px; padding-top:32px; padding-bottom:32px;">
+        <div class="card admin-login-card">
+          <h3 style="margin-bottom:6px;">🧑 Личный кабинет</h3>
+          <p class="modal-product">Здравствуйте, <b id="clientName"></b>! Здесь ваш профиль Greenleaf.</p>
+
+          <div class="contacts-info" style="margin-top:14px;">
+            <div class="row"><span class="lbl">Email</span><span id="clientEmail">—</span></div>
+            <div class="row"><span class="lbl">Телефон</span><span id="clientPhone">—</span></div>
+            <div class="row"><span class="lbl">Статус</span><span>Аккаунт клиента</span></div>
+          </div>
+
+          <div class="admin-note" style="margin-top:14px;">
+            🛒 Заказы оформляются на странице корзины (кнопка «Корзина» в шапке сайта).
+            📦 Подписка на партнёрскую цену −50% — на странице <a href="podpiska.html">«Подписка»</a>.
+          </div>
+
+          <div class="admin-actions" style="margin-top:14px;">
+            <a class="btn btn-primary" href="index.html">🏠 На сайт</a>
+            <a class="btn btn-outline" href="podpiska.html">📦 Подписка −50%</a>
+            <a class="btn btn-outline" href="#" id="clientLogoutBtn">🚪 Выйти</a>
+          </div>
+        </div>
+      </div>
     </div>
 
   </main>

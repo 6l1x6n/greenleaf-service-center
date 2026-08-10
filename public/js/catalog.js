@@ -200,9 +200,10 @@
       return;
     }
 
-    var inStockHere = products.filter(function (p) {
+    var hasDataHere = StoreStock.hasData(store.id);
+    var inStockHere = hasDataHere ? products.filter(function (p) {
       return StoreStock.available(p, store.id);
-    }).length;
+    }).length : 0;
 
     var filtered = !state.showAllCatalog;
 
@@ -213,16 +214,17 @@
       '<div class="sc-banner-text">' +
       '<h3>🏬 ' + Utils.esc(store.name) + '</h3>' +
       '<p>' + Utils.esc(store.description || '') + '</p>' +
+      (hasDataHere ? '' : '<p style="color:var(--muted);">🕓 В этом филиале каталог пока не подключён — товары появятся автоматически после регистрации филиала.</p>') +
       '<div class="sc-banner-meta">' +
       '<span>📍 ' + Utils.esc(store.address) + '</span>' +
       '<span>🕒 ' + Utils.esc(store.hours) + '</span>' +
       '<span>📞 ' + Utils.esc(store.phone) + '</span>' +
-      (inStockHere ? '<span>📦 Позиций в наличии: ' + inStockHere + '</span>' : '') +
+      (hasDataHere && inStockHere ? '<span>📦 Позиций в наличии: ' + inStockHere + '</span>' : '') +
       '</div>' +
       '</div>' +
       '</div>' +
       '<div class="sc-banner-actions">' +
-      (filtered
+      (filtered && hasDataHere && inStockHere > 0
         ? '<button class="btn btn-primary btn-sm" data-catalog-all="1">📦 Сейчас показаны только товары в наличии здесь — Показать все</button>'
         : '') +
       '<a class="btn btn-whatsapp btn-sm" href="https://wa.me/' + store.whatsapp + '?text=' + encodeURIComponent('Здравствуйте! Интересует наличие в филиале ' + store.name) + '" target="_blank" rel="noopener">📱 Написать в СЦ</a>' +
@@ -264,8 +266,10 @@
 
     var map = document.getElementById('map');
     if (map) {
-      map.src = 'https://yandex.ru/map-widget/v1/?text=' + encodeURIComponent(s.address || '');
+      map.src = 'https://static.maps.2gis.com/1.0?center=71.394568,51.126181&zoom=17&size=1200,600';
     }
+    var mapLink = document.getElementById('mapLink');
+    if (mapLink) mapLink.href = 'https://go.2gis.com/eKKpH';
   }
 
   window.CatalogRefreshContacts = renderContacts;
@@ -282,7 +286,14 @@
     var central = centralStore();
     var centralName = central ? central.name : 'СЦ Greenleaf Астана (Толе Би 55)';
     var qtyLine = '';
-    if (typeof p.quantity === 'number' && p.quantity > 0) {
+    var sel = selectedStore();
+    if (sel && StoreStock.hasData(sel.id)) {
+      var selTxt = StoreStock.text(sel.id, p.id);
+      if (selTxt !== undefined && String(selTxt).trim() !== '') {
+        qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно в ' + Utils.esc(sel.name) + ': <b>' + Utils.esc(selTxt) + '</b></div>';
+      }
+    }
+    if (!qtyLine && typeof p.quantity === 'number' && p.quantity > 0) {
       qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно в ' + Utils.esc(centralName) + ': <b>' + p.quantity + ' шт.</b></div>';
     }
     var stockRows = '';
@@ -323,7 +334,7 @@
       '<div class="product-stock-list">' + stockRows + '</div>' +
       '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">' +
       '<button class="btn btn-primary" style="flex:1;" data-reserve="' + Utils.esc(p.id) + '">🛒 Забронировать к приезду</button>' +
-      '<a class="btn btn-whatsapp" style="flex:1;" href="' + Utils.waLink('Здравствуйте! Интересует позиция: ' + p.name + ' (' + p.sku + ')') + '" target="_blank" rel="noopener">📱 Задать вопрос в WhatsApp</a>' +
+      '<button class="btn btn-accent" style="flex:1;" data-cart-add="' + Utils.esc(p.id) + '">🛒 Добавить в корзину</button>' +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -339,8 +350,11 @@
       var q = state.query.trim().toLowerCase();
       var okQ = !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1;
       var okStore = true;
-      if (state.selectedStoreId && state.selectedStoreId !== 'all' && !state.showAllCatalog) {
-        okStore = StoreStock.available(p, state.selectedStoreId);
+      if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+        // Филиал без данных каталога — в нём нет товаров; с данными — фильтр остатков
+        okStore = StoreStock.hasData(state.selectedStoreId)
+          ? (state.showAllCatalog || StoreStock.available(p, state.selectedStoreId))
+          : false;
       }
       return okCat && okStock && okQ && okStore;
     });
@@ -351,8 +365,18 @@
       list = list.slice(0, MAIN_PAGE_LIMIT);
     }
     grid.innerHTML = list.map(rowHtml).join('');
+    var allLink = document.getElementById('catalogAllLink');
+    if (allLink) {
+      allLink.classList.toggle('hidden', list.length < MAIN_PAGE_LIMIT);
+    }
     var emptyEl = document.getElementById('empty');
-    if (emptyEl) emptyEl.classList.toggle('hidden', list.length > 0);
+    if (emptyEl) {
+      emptyEl.classList.toggle('hidden', list.length > 0);
+      var noData = state.selectedStoreId && state.selectedStoreId !== 'all' && !StoreStock.hasData(state.selectedStoreId);
+      emptyEl.innerHTML = noData
+        ? 'В этом сервис-центре товары пока не подключены.<br>Напишите нам в WhatsApp — поможем оформить заказ в ближайшем филиале.'
+        : 'Ничего не найдено.<br>Оставьте заявку — сообщим, когда товар появится.';
+    }
   }
 
   function renderChips() {
@@ -458,15 +482,36 @@
     var cartAdd = e.target.closest('[data-cart-add]');
     if (cartAdd) {
       e.stopPropagation();
-      Cart.add(cartAdd.getAttribute('data-cart-add'), 1);
+      var addId = cartAdd.getAttribute('data-cart-add');
+      var addMax = (state.selectedStoreId && state.selectedStoreId !== 'all') ? StoreStock.count(state.selectedStoreId, addId) : null;
+      var addItem = Cart.get().find(function (i) { return i.id === addId; });
+      var addCur = addItem ? (Number(addItem.qty) || 0) : 0;
+      if (addMax !== null && addCur >= addMax) {
+        Utils.showToast('⚠️ В филиале доступно только ' + addMax + ' шт.');
+        return;
+      }
+      Cart.add(addId, 1);
       Utils.showToast('🛒 Добавлено в корзину');
+      var modalBtn = cartAdd.closest('.modal') ? cartAdd : null;
+      if (modalBtn) {
+        modalBtn.innerHTML = '✅ В корзине';
+        modalBtn.disabled = true;
+      }
       return;
     }
 
     var cartInc = e.target.closest('[data-cart-inc]');
     if (cartInc) {
       e.stopPropagation();
-      Cart.add(cartInc.getAttribute('data-cart-inc'), 1);
+      var incId = cartInc.getAttribute('data-cart-inc');
+      var incMax = (state.selectedStoreId && state.selectedStoreId !== 'all') ? StoreStock.count(state.selectedStoreId, incId) : null;
+      var incItem = Cart.get().find(function (i) { return i.id === incId; });
+      var incCur = incItem ? (Number(incItem.qty) || 1) : 1;
+      if (incMax !== null && incCur >= incMax) {
+        Utils.showToast('⚠️ В филиале доступно только ' + incMax + ' шт.');
+        return;
+      }
+      Cart.add(incId, 1);
       return;
     }
 
@@ -543,6 +588,22 @@
       renderCityChips();
       renderStoresGrid();
       return;
+    }
+  });
+
+  // Ручной ввод количества — клампинг по остатку выбранного СЦ
+  document.addEventListener('change', function (e) {
+    var inp = e.target.closest('[data-cart-qty]');
+    if (!inp) return;
+    var id = inp.getAttribute('data-cart-qty');
+    var qty = parseInt(inp.value, 10);
+    if (isNaN(qty) || qty < 1) return;
+    if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+      var max = StoreStock.count(state.selectedStoreId, id);
+      if (max !== null && qty > max) {
+        Utils.showToast('⚠️ В филиале доступно только ' + max + ' шт. — количество уменьшено');
+        Cart.setQty(id, max);
+      }
     }
   });
 
@@ -1067,6 +1128,21 @@
       stores = await storesRes.json();
     } catch (e) {
       console.warn('Could not load stores.json', e);
+    }
+
+    // Сервис-Центры из KV (зарегистрированные суперадмином) — приоритетнее статичного списка
+    try {
+      var apiRes = await fetch('/api/stores?t=' + Date.now());
+      var apiData = await apiRes.json();
+      var kvStores = (apiData && apiData.stores) || [];
+      var byId = {};
+      kvStores.forEach(function (s) { byId[s.id] = s; });
+      stores = stores.map(function (s) { return byId[s.id] ? Object.assign({}, s, byId[s.id]) : s; });
+      kvStores.forEach(function (s) {
+        if (!stores.some(function (x) { return x.id === s.id; })) stores.push(s);
+      });
+    } catch (e) {
+      console.warn('Could not load /api/stores', e);
     }
 
     await StoreStock.load();

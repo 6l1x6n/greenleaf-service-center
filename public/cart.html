@@ -70,6 +70,8 @@
 
             <div class="cart-pickup" id="cartPickup">🏬 Товары можно забрать в выбранном Сервис-Центре или уточнить у менеджера.</div>
 
+            <div class="reserve-timer hidden" id="reserveTimer"></div>
+
             <div class="cart-summary-rows">
               <div class="cart-sum-row"><span>Товары</span><span class="sum-goods">—</span></div>
               <div class="cart-sum-row"><span>Пакет-упаковка</span><span class="sum-package">—</span></div>
@@ -90,6 +92,10 @@
               <div class="kaspi-amount">К оплате: <b class="sum-total" data-total="0">—</b></div>
               <button class="btn btn-primary btn-lg" type="button" id="kaspiPayBtn">💳 Оплатить через Kaspi</button>
               <p class="form-note">Сумма скопируется автоматически. Откройте приложение Kaspi → «Перевод» → вставьте сумму. Оплаченную сумму мы проверим по оповещению и включим в заказ.</p>
+              <label class="kaspi-paid hidden" id="kaspiPaidWrap">
+                <input type="checkbox" id="kaspiPaid" name="kaspi_paid" value="1">
+                <span>Я оплатил(а) заказ через Kaspi — можно оформлять</span>
+              </label>
             </div>
 
             <div class="pay-panel hidden" data-pay-panel="cash">
@@ -99,6 +105,9 @@
             <form class="form" data-type="order" id="orderForm">
               <input type="hidden" name="payment" id="orderPayment">
               <input type="hidden" name="order_items" id="orderItems">
+              <input type="hidden" name="order_items_json" id="orderItemsJson">
+              <input type="hidden" name="order_id" id="orderId">
+              <input type="hidden" name="order_store_id" id="orderStoreId">
               <input type="hidden" name="order_total" id="orderTotal">
               <input type="hidden" name="order_package" id="orderPackage">
               <input type="hidden" name="order_qty" id="orderQtyTotal">
@@ -114,7 +123,8 @@
                 <input type="time" id="pickupTime" name="pickup_time">
               </div>
               <input class="hp" name="company" tabindex="-1" autocomplete="off">
-              <button class="btn btn-primary btn-lg" type="submit" id="orderSubmitBtn">Оформить заказ</button>
+              <button class="btn btn-primary btn-lg" type="submit" id="orderSubmitBtn" disabled>Оформить заказ</button>
+              <p class="form-note" id="submitGateNote" style="color:var(--orange,#b26a00);">Для Kaspi: нажмите «Оплатить через Kaspi» и отметьте оплату, чтобы оформить заказ.</p>
               <p class="form-success">Заказ отправлен!</p>
               <p class="form-error">Проверьте заполнение полей.</p>
             </form>

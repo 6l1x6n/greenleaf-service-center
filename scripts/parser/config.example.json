@@ -7,10 +7,10 @@
   "low_threshold": 6,
   "max_pages": 200,
   "desc_limit": 80,
-  "central_store_id": "sc-astana",
+  "central_store_id": "s240534",
   "stores": [
     {
-      "id": "sc-astana",
+      "id": "s240534",
       "login": "",
       "password": "",
       "partner": "kz44326234"

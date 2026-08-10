@@ -15,6 +15,96 @@
 
   var SELECTED_KEY = 'greenleaf_sc_selected_v1';
 
+  // ---- Бронь товаров (2 минуты, как места в кинотеатре) ----
+  var RESERVE_TTL = 120;
+  var RESERVE_KEY = 'greenleaf_order_reservation_v1';
+  var reserve = { orderId: '', expiresAt: 0, interval: null, signature: '' };
+  var kaspiPaid = false;
+  var paymentStarted = false;
+  var submitBtn = document.getElementById('orderSubmitBtn');
+  var reserveTimerEl = document.getElementById('reserveTimer');
+
+  function orderId() {
+    if (!reserve.orderId) {
+      try { reserve.orderId = sessionStorage.getItem(RESERVE_KEY) || ''; } catch (e) { }
+      if (!reserve.orderId) {
+        reserve.orderId = 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        try { sessionStorage.setItem(RESERVE_KEY, reserve.orderId); } catch (e) { }
+      }
+    }
+    return reserve.orderId;
+  }
+
+  function availableCount(l) {
+    if (!state.storeId) return null;
+    return StoreStock.count(state.storeId, l.p.id);
+  }
+
+  function lineQtyValid(l) {
+    var max = availableCount(l);
+    return max === null || l.qty <= max;
+  }
+
+  function hideTimer() {
+    if (reserveTimerEl) reserveTimerEl.classList.add('hidden');
+    if (reserve.interval) { clearInterval(reserve.interval); reserve.interval = null; }
+  }
+
+  function startTimer() {
+    if (!reserveTimerEl) return;
+    reserveTimerEl.classList.remove('hidden');
+    if (reserve.interval) clearInterval(reserve.interval);
+    function tick() {
+      var left = reserve.expiresAt - Date.now();
+      if (left <= 0) {
+        reserve.signature = '';
+        scheduleReserve();
+        if (window.Utils) Utils.showToast('⏳ Бронь истекла — продлеваем, не откладывайте оформление');
+        return;
+      }
+      var s = Math.ceil(left / 1000);
+      var mm = Math.floor(s / 60);
+      var ss = s % 60;
+      reserveTimerEl.innerHTML = '⏳ Товары зарезервированы на <b>' + mm + ':' + (ss < 10 ? '0' : '') + ss + '</b> — успейте оформить заказ, иначе бронь снимется и товар снова станет доступен другим покупателям.';
+    }
+    tick();
+    reserve.interval = setInterval(tick, 1000);
+  }
+
+  function scheduleReserve() {
+    if (window.__stockReserveOff) return;
+    var t = totals();
+    if (!state.storeId || !t.lines.length) { hideTimer(); return; }
+    var signature = state.storeId + '|' + t.lines.map(function (l) { return l.p.id + ':' + l.qty; }).join(',');
+    if (signature === reserve.signature && reserve.expiresAt > Date.now()) return;
+    reserve.signature = signature;
+    setField('orderId', orderId());
+    setField('orderStoreId', state.storeId);
+    fetch('/api/reserve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: orderId(),
+        storeId: state.storeId,
+        items: t.lines.map(function (l) { return { productId: l.p.id, qty: l.qty }; }),
+        ttlSeconds: RESERVE_TTL
+      })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.ok) { hideTimer(); return; }
+      reserve.expiresAt = Number(d.expiresAt) || (Date.now() + RESERVE_TTL * 1000);
+      startTimer();
+    }).catch(function () { hideTimer(); });
+  }
+
+  function updateSubmitGate() {
+    if (!submitBtn) return;
+    var needPay = state.payment === 'kaspi';
+    var ok = !needPay || (paymentStarted && kaspiPaid);
+    submitBtn.disabled = !ok;
+    var note = document.getElementById('submitGateNote');
+    if (note) note.style.display = needPay && !ok ? '' : 'none';
+  }
+
   function partnerModeValid(id) {
     return /^[a-z]{2}\d{8}$/i.test(String(id || '').trim());
   }
@@ -111,7 +201,7 @@
       '<div class="cart-item-ctrl">' +
       '<div class="qty-stepper">' +
       '<button class="qty-btn" data-cart-dec="' + Utils.esc(l.p.id) + '" aria-label="Уменьшить">−</button>' +
-      '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(l.p.id) + '" min="1" max="999" value="' + l.qty + '" aria-label="Количество">' +
+      '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(l.p.id) + '" min="1" max="' + (function () { var m = availableCount(l); return m === null ? 999 : m; }()) + '" value="' + l.qty + '" aria-label="Количество">' +
       '<button class="qty-btn" data-cart-inc="' + Utils.esc(l.p.id) + '" aria-label="Увеличить">+</button>' +
       '</div>' +
       '<button class="cart-item-trash" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Убрать из корзины">' + Utils.iconTrash(15) + '</button>' +
@@ -225,6 +315,15 @@
     var time = document.getElementById('pickupTime');
     if (date) date.required = method === 'cash';
     if (time) time.required = method === 'cash';
+    if (method === 'cash') {
+      kaspiPaid = false;
+      paymentStarted = false;
+      var paidWrap = document.getElementById('kaspiPaidWrap');
+      if (paidWrap) paidWrap.classList.add('hidden');
+      var paidEl = document.getElementById('kaspiPaid');
+      if (paidEl) paidEl.checked = false;
+    }
+    updateSubmitGate();
   }
 
   function blink(field) {
@@ -307,11 +406,15 @@
       if (qr) {
         copyTotal();
         payWithQr(Number(summaryEl.querySelector('.sum-total').getAttribute('data-total')) || 0);
-        return;
+      } else {
+        copyTotal();
+        var win = window.open('https://kaspi.kz', '_blank', 'noopener');
+        if (!win) Utils.showToast('Откройте приложение Kaspi и вставьте сумму');
       }
-      copyTotal();
-      var win = window.open('https://kaspi.kz', '_blank', 'noopener');
-      if (!win) Utils.showToast('Откройте приложение Kaspi и вставьте сумму');
+      paymentStarted = true;
+      var paidWrap = document.getElementById('kaspiPaidWrap');
+      if (paidWrap) paidWrap.classList.remove('hidden');
+      updateSubmitGate();
       return;
     }
     var storeOpt = e.target.closest('[name="cart-store"]');
@@ -332,9 +435,32 @@
     var hideHidden = e.target.closest('[data-cart-hide-hidden]');
     if (hideHidden) { state.showHiddenItems = false; render(); return; }
     var add = e.target.closest('[data-cart-add]');
-    if (add) { Cart.add(add.getAttribute('data-cart-add'), 1); return; }
+    if (add) {
+      var addId = add.getAttribute('data-cart-add');
+      var addMax = state.storeId ? StoreStock.count(state.storeId, addId) : null;
+      var addCur = 0;
+      var addItem = Cart.get().find(function (i) { return i.id === addId; });
+      if (addItem) addCur = Number(addItem.qty) || 0;
+      if (addMax !== null && addCur >= addMax) {
+        Utils.showToast('⚠️ В филиале доступно только ' + addMax + ' шт.');
+        return;
+      }
+      Cart.add(addId, 1);
+      return;
+    }
     var inc = e.target.closest('[data-cart-inc]');
-    if (inc) { Cart.add(inc.getAttribute('data-cart-inc'), 1); return; }
+    if (inc) {
+      var incId = inc.getAttribute('data-cart-inc');
+      var incMax = state.storeId ? StoreStock.count(state.storeId, incId) : null;
+      var incItem = Cart.get().find(function (i) { return i.id === incId; });
+      var incCur = incItem ? (Number(incItem.qty) || 1) : 1;
+      if (incMax !== null && incCur >= incMax) {
+        Utils.showToast('⚠️ В филиале доступно только ' + incMax + ' шт.');
+        return;
+      }
+      Cart.add(incId, 1);
+      return;
+    }
     var dec = e.target.closest('[data-cart-dec]');
     if (dec) {
       var dId = dec.getAttribute('data-cart-dec');
@@ -348,6 +474,56 @@
     var rm = e.target.closest('[data-cart-remove]');
     if (rm) { Cart.remove(rm.getAttribute('data-cart-remove')); }
   });
+
+  // Ручной ввод количества — клампинг по остатку (после глобального обработчика cart.js)
+  document.addEventListener('change', function (e) {
+    var inp = e.target.closest('[data-cart-qty]');
+    if (!inp) return;
+    var id = inp.getAttribute('data-cart-qty');
+    var qty = parseInt(inp.value, 10);
+    if (isNaN(qty) || qty < 1) return;
+    var max = state.storeId ? StoreStock.count(state.storeId, id) : null;
+    if (max !== null && qty > max) {
+      Utils.showToast('⚠️ В филиале доступно только ' + max + ' шт. — количество уменьшено');
+      Cart.setQty(id, max);
+    }
+  });
+
+  var kaspiPaidEl = document.getElementById('kaspiPaid');
+  if (kaspiPaidEl) {
+    kaspiPaidEl.addEventListener('change', function () {
+      kaspiPaid = kaspiPaidEl.checked;
+      updateSubmitGate();
+    });
+  }
+
+  // Валидация перед отправкой (forms.js уже проверит defaultPrevented)
+  if (orderForm) {
+    orderForm.addEventListener('submit', function (e) {
+      var t = totals();
+      var bad = t.lines.filter(function (l) { return !lineQtyValid(l); });
+      if (bad.length) {
+        e.preventDefault();
+        var l0 = bad[0];
+        Utils.showToast('⚠️ «' + l0.p.name + '» — в филиале доступно только ' + availableCount(l0) + ' шт. Уменьшите количество.');
+        var inp = document.querySelector('[data-cart-qty="' + l0.p.id + '"]');
+        if (inp) blink(inp);
+        return;
+      }
+      if (state.payment === 'kaspi' && !(paymentStarted && kaspiPaid)) {
+        e.preventDefault();
+        Utils.showToast('⚠️ Сначала оплатите через Kaspi и отметьте «Я оплатил(а) заказ»');
+        var payBtn = document.getElementById('kaspiPayBtn');
+        if (payBtn) blink(payBtn);
+        return;
+      }
+      setField('orderId', orderId());
+      setField('orderStoreId', state.storeId || '');
+      setField('orderItemsJson', JSON.stringify(t.lines.map(function (l) {
+        return { productId: l.p.id, sku: l.p.sku, name: l.p.name, qty: l.qty, price: l.price };
+      })));
+    });
+  }
 
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
@@ -375,6 +551,9 @@
   }
 
   window.addEventListener('order:sent', function () {
+    reserve.signature = '';
+    reserve.expiresAt = 0;
+    hideTimer();
     Cart.clear();
     emptyEl.classList.add('hidden');
     viewEl.classList.add('hidden');
@@ -385,6 +564,7 @@
   Cart.onChange(function () {
     Cart.updateBadge();
     render();
+    scheduleReserve();
   });
 
   async function init() {
@@ -407,6 +587,7 @@
     if (saved && saved.id) state.storeId = saved.id;
 
     render();
+    scheduleReserve();
   }
 
   setPayment('kaspi');

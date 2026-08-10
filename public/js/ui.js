@@ -158,15 +158,29 @@
 
   function loadBaseStock() {
     if (baseStockLoaded) return baseStockLoaded;
-    baseStockLoaded = fetch('data/store-stock.json?t=' + Date.now())
+    // Эффективные остатки (база − продажи − активные брони) с Worker;
+    // при недоступности API (офлайн-разработка) — статический файл.
+    baseStockLoaded = fetch('/api/stock?t=' + Date.now())
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        baseStock = (d && d.stock) || {};
-        baseStockUpdated = (d && d.updated) || '';
+        if (d && d.stock) {
+          baseStock = d.stock;
+          baseStockUpdated = (d && d.updated) || '';
+          return;
+        }
+        throw new Error('no stock');
       })
       .catch(function () {
-        baseStock = {};
-        baseStockUpdated = '';
+        return fetch('data/store-stock.json?t=' + Date.now())
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            baseStock = (d && d.stock) || {};
+            baseStockUpdated = (d && d.updated) || '';
+          })
+          .catch(function () {
+            baseStock = {};
+            baseStockUpdated = '';
+          });
       });
     return baseStockLoaded;
   }
@@ -190,17 +204,30 @@
   }
 
   function isAvailableInStore(p, storeId) {
-    if (!storeStockData(storeId)) return true;
+    // Если у филиала нет данных об остатках — товаров в нём нет
+    if (!storeStockData(storeId)) return false;
     var t = stockText(storeId, p && p.id);
     if (t === undefined || t === null || String(t).trim() === '') return false;
     t = String(t);
     return t.indexOf('Нет') !== 0 && t.indexOf('Ожидается') === -1;
   }
 
+  // Число из «В наличии (26 шт)» → 26; «Нет…» → 0; «Ожидается…»/без числа → null (лимита нет)
+  function stockCount(storeId, productId) {
+    var t = stockText(storeId, productId);
+    if (t === undefined || t === null) return null;
+    t = String(t).trim();
+    if (t === '' || t.indexOf('Ожидается') !== -1) return null;
+    if (t.indexOf('Нет') === 0) return 0;
+    var m = t.match(/(\d+)\s*шт/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
   window.StoreStock = {
     load: loadBaseStock,
     hasData: storeStockData,
     text: stockText,
+    count: stockCount,
     available: isAvailableInStore,
     updated: function () { return baseStockUpdated; }
   };

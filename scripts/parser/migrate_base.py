@@ -54,7 +54,7 @@ def main():
             if p.get("sku") in by_code:
                 stock[sc_id] = parse_stock_text(by_code[p["sku"]])
         if not stock and p.get("quantity") is not None:
-            stock = {"sc-astana": int(p.get("quantity") or 0)}
+            stock = {"s240534": int(p.get("quantity") or 0)}
         p["stock"] = stock
         if stock:
             with_stock += 1

@@ -72,7 +72,49 @@ def load_config():
     config["sc_login"] = os.environ.get("SC_LOGIN", config.get("sc_login", ""))
     config["sc_password"] = os.environ.get("SC_PASSWORD", config.get("sc_password", ""))
     config["partner_login"] = os.environ.get("PARTNER_LOGIN") or config.get("partner_login", "")
+    worker_stores = load_stores_from_worker()
+    if worker_stores:
+        config["stores"] = worker_stores
     return config
+
+
+def load_stores_from_worker():
+    """Список сервис-центров с кредами — из Cloudflare Worker (KV), по API-ключу.
+
+    Адрес и ключ задаются переменными окружения SC_API_URL / SC_API_KEY
+    (GitHub Secrets). Если недоступно — парсер работает по config.json.
+    """
+    url = os.environ.get("SC_API_URL", "").strip().rstrip("/")
+    key = os.environ.get("SC_API_KEY", "").strip()
+    if not url or not key:
+        return None
+    try:
+        req = urllib.request.Request(
+            url + "/api/parser-config",
+            headers={"X-API-Key": key, "User-Agent": "greenleaf-parser/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8", "ignore"))
+        stores = data.get("stores") or []
+        if not stores:
+            print("Worker: активных СЦ нет — используем config.json")
+            return None
+        normalized = []
+        for s in stores:
+            if not s.get("login"):
+                print(f"Worker: СЦ {s.get('id', '?')} без логина — пропускаю")
+                continue
+            normalized.append({
+                "id": s.get("id") or s.get("officeCode") or s["login"].lower(),
+                "login": s["login"],
+                "password": s.get("password", ""),
+                "partner": s.get("partner", ""),
+            })
+        print(f"Worker: получено СЦ: {[s['id'] for s in normalized]}")
+        return normalized
+    except Exception as e:
+        print(f"Worker: не удалось получить СЦ ({e}) — используем config.json")
+        return None
 
 
 def get_stores(config):
@@ -81,7 +123,7 @@ def get_stores(config):
     stores = config.get("stores") or []
     if not stores:
         stores = [{
-            "id": config.get("central_store_id", "sc-astana"),
+            "id": config.get("central_store_id", "s240534"),
             "login": config.get("sc_login", ""),
             "partner": config.get("partner_login", ""),
         }]
@@ -90,7 +132,7 @@ def get_stores(config):
 
 def build_store_config(config, store):
     cfg = dict(config)
-    cfg["sc_id"] = store.get("id") or config.get("central_store_id", "sc-astana")
+    cfg["sc_id"] = store.get("id") or config.get("central_store_id", "s240534")
     cfg["sc_login"] = store.get("login") or config.get("sc_login", "")
     cfg["sc_password"] = store.get("password") or config.get("sc_password", "")
     cfg["partner_login"] = store.get("partner") or config.get("partner_login", "")
@@ -766,7 +808,7 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
     categories = config.get("categories", [])
     low_threshold = config.get("low_threshold", 6)
     multiplier = config.get("price_multiplier", 2)
-    central = config.get("central_store_id", "sc-astana")
+    central = config.get("central_store_id", "s240534")
     images = images or {}
     descriptions = descriptions or {}
 
@@ -1099,7 +1141,7 @@ def main():
             )
             page = context.new_page()
             stores = get_stores(config)
-            central = config.get("central_store_id", "sc-astana")
+            central = config.get("central_store_id", "s240534")
             base_products = load_base_products()
             print(f"База товаров: {len(base_products)} карточек, СЦ: {[s['id'] for s in stores]}")
             for store in stores:

@@ -31,7 +31,9 @@
     editingDeliveryId: null,
     editingEventId: null,
     selectedScId: null,
-    editingStoreId: null
+    editingStoreId: null,
+    newStoreFromApp: null,
+    lastAppId: null
   };
 
   var SECTIONS = {
@@ -42,6 +44,7 @@
     deliveries: { label: '🚚 Поставки', roles: ['superadmin', 'sc'] },
     events: { label: '📅 Мероприятия', roles: ['superadmin', 'sc'] },
     partners: { label: '🤝 Заявки магазинов', roles: ['superadmin'] },
+    scApps: { label: '🗂 Заявки СЦ', roles: ['superadmin'] },
     catalog: { label: '🛒 Каталог товаров', roles: ['superadmin'] },
     notices: { label: '📢 Уведомления СЦ', roles: ['superadmin', 'sc'] },
     texts: { label: '✏️ Тексты сайта', roles: ['superadmin'] }
@@ -151,7 +154,24 @@
   }
 
   function loadData() {
-    var p1 = loadJSON('data/stores.json').catch(function () { return []; });
+    var p1 = loadJSON('data/stores.json')
+      .catch(function () { return []; })
+      .then(function (base) {
+        // Зарегистрированные СЦ (Worker KV) — приоритетнее статичного списка
+        return fetch('/api/stores?t=' + Date.now())
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            var kv = (d && d.stores) || [];
+            var byId = {};
+            kv.forEach(function (s) { byId[s.id] = s; });
+            var merged = base.map(function (s) { return byId[s.id] ? Object.assign({}, s, byId[s.id]) : s; });
+            kv.forEach(function (s) {
+              if (!merged.some(function (x) { return x.id === s.id; })) merged.push(s);
+            });
+            return merged;
+          })
+          .catch(function () { return base; });
+      });
     var p2 = loadJSON('data/products.json').then(function (d) { return d.products || []; }).catch(function () { return []; });
     var p3 = loadJSON('data/deliveries.json').then(function (d) { return mergeDeliveries(d.deliveries || []); }).catch(function () { return mergeDeliveries([]); });
     var p4 = loadJSON('data/events.json').then(function (d) { return mergeEvents(d.events || []); }).catch(function () { return mergeEvents([]); });
@@ -192,6 +212,7 @@
       deliveries: renderDeliveries,
       events: renderEvents,
       partners: renderPartners,
+      scApps: renderScApplications,
       catalog: renderCatalog,
       notices: renderNotices,
       texts: renderTexts
@@ -276,17 +297,47 @@
       '<div class="form-group"><label>Часы работы</label><input name="hours" value="' + h(store.hours) + '" placeholder="Пн–Вс 10:00 – 20:00"></div>' +
       '<div class="form-group"><label>Телефон</label><input name="phone" value="' + h(store.phone) + '" placeholder="+7 (700) 000-00-00"></div>' +
       '</div>' +
+      '<div class="form-group"><label>Email владельца (сюда придут логин и пароль кабинета)</label><input name="email" type="email" value="' + h(store.email || '') + '" placeholder="owner@mail.kz"></div>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
       '<div class="form-group"><label>WhatsApp (только цифры, с 7)</label><input name="whatsapp" value="' + h(store.whatsapp) + '" placeholder="77001234567"></div>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
       '</div>' +
       '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."></div>' +
       '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
+      '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
+      '<strong style="font-size:14px;">🔌 Подключение к порталу (автосинхронизация остатков)</strong>' +
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
+      '<div class="form-group"><label>Код личного кабинета</label><input name="officeCode" value="' + h(store.officeCode || '') + '" placeholder="S240-534"></div>' +
+      '<div class="form-group"><label>Логин кабинета поставщика (для парсера)</label><input name="portalLogin" value="' + h(store.portalLogin || '') + '" placeholder="s240534"></div>' +
+      '</div>' +
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
+      '<div class="form-group"><label>Пароль кабинета поставщика (для парсера)</label><input name="portalPassword" type="password" value="' + h(store.portalPassword || '') + '" placeholder="••••••••"></div>' +
+      '<div class="form-group"><label>Логин партнёра для каталога</label><input name="partner" value="' + h(store.partner || '') + '" placeholder="kz44326234"></div>' +
+      '</div>' +
+      '<p class="form-note">🔐 Пароль хранится только в Cloudflare KV и используется исключительно парсером для автосинхронизации остатков. На сайте не публикуется.</p>' +
+      '</div>' +
       '<div class="admin-actions">' +
       '<button class="btn btn-primary" type="submit">💾 Сохранить филиал</button>' +
       (withAuth ? '<button class="btn btn-outline danger-btn" type="button" id="storeDeleteBtn">' + Utils.iconTrash(14) + 'Удалить филиал</button>' : '') +
       '</div>' +
       '</div>';
+  }
+
+  function issuedCredsHtml(rec, phone) {
+    var wa = '';
+    var digits = String(phone || '').replace(/\D/g, '');
+    if (digits) {
+      wa = 'https://wa.me/' + digits + '?text=' + encodeURIComponent(
+        'Здравствуйте! Ваш Сервис-Центр подключён к каталогу Greenleaf. Логин: ' + rec.authLogin + ', пароль: ' + rec.authPassword + '. Вход: сайт → «Войти».'
+      );
+    }
+    return '<div class="admin-card" style="border-color:var(--green); margin-top:12px;">' +
+      '<strong style="color:var(--green-darker);">🔐 Доступ для Сервис-Центра</strong>' +
+      '<p style="margin:6px 0;">Логин: <b>' + h(rec.authLogin) + '</b><br>Пароль: <b>' + h(rec.authPassword) + '</b></p>' +
+      '<div class="admin-actions">' +
+      '<button class="btn btn-outline btn-sm" data-copy="' + h(rec.authLogin + ' / ' + rec.authPassword) + '">📋 Копировать</button>' +
+      (wa ? '<a class="btn btn-whatsapp btn-sm" href="' + wa + '" target="_blank" rel="noopener">📱 Отправить владельцу</a>' : '') +
+      '</div></div>';
   }
 
   function bindStoreForm(content, store, withAuth) {
@@ -303,6 +354,65 @@
       store.kaspi_qr = form.kaspi_qr.value;
       store.image = form.image.value;
       store.description = form.description.value;
+      store.officeCode = form.officeCode ? form.officeCode.value : '';
+      store.portalLogin = form.portalLogin ? form.portalLogin.value : '';
+      store.portalPassword = form.portalPassword ? form.portalPassword.value : '';
+      store.partner = form.partner ? form.partner.value : '';
+      store.email = form.email ? form.email.value : '';
+      store.phoneRaw = (store.phone || '').replace(/\D/g, '');
+      if (store.phoneRaw && !store.whatsapp) store.whatsapp = store.phoneRaw;
+
+      var isRegistered = !!(store.officeCode || store.portalLogin || store.portalPassword);
+      if (isRegistered) {
+        // Подключённый СЦ хранится в Worker KV (карточка + креды для парсера + выданный доступ)
+        var officeId = String(store.officeCode || '').replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+        var isNew = !store.id || String(store.id).indexOf('sc-new-') === 0;
+        var payload = {
+          id: isNew ? (officeId || store.id) : store.id,
+          officeCode: store.officeCode,
+          name: store.name,
+          city: store.city,
+          cityKey: store.cityKey,
+          address: store.address,
+          hours: store.hours,
+          phone: store.phone,
+          phoneRaw: store.phoneRaw,
+          whatsapp: store.whatsapp,
+          email: store.email,
+          image: store.image,
+          description: store.description,
+          partner: store.partner,
+          portalLogin: store.portalLogin,
+          portalPassword: store.portalPassword,
+          authLogin: store.authLogin || '',
+          authPassword: store.authPassword || ''
+        };
+        Auth.api('/api/sc-store', { method: 'POST', body: JSON.stringify(payload) }).then(function (data) {
+          if (!data || !data.ok) {
+            Utils.showToast('⚠️ Не удалось сохранить в Worker. Войдите заново (сессия истекла).');
+            return;
+          }
+          var rec = data.store;
+          store.id = rec.id;
+          store.authLogin = rec.authLogin;
+          store.authPassword = rec.authPassword;
+          Utils.showToast('✅ Сервис-Центр сохранён — остатки будут парситься автоматически');
+          if (state.lastAppId) {
+            Auth.api('/api/sc-application', { method: 'POST', body: JSON.stringify({ id: state.lastAppId, action: 'approve' }) });
+            state.lastAppId = null;
+          }
+          var credsPanel = content.querySelector('#issuedCreds');
+          if (!credsPanel) {
+            credsPanel = document.createElement('div');
+            credsPanel.id = 'issuedCreds';
+            content.appendChild(credsPanel);
+          }
+          credsPanel.innerHTML = issuedCredsHtml(rec, store.phoneRaw || store.phone);
+          loadData().then(function () { openSection(state.section); });
+        });
+        return;
+      }
+
       var saved = lsGet(KEYS.stores) || {};
       saved[store.id] = Object.assign({}, store);
       lsSet(KEYS.stores, saved);
@@ -310,10 +420,31 @@
       loadData().then(function () { openSection(state.section); });
     });
 
+    content.addEventListener('click', function (e) {
+      var copyBtn = e.target.closest('[data-copy]');
+      if (!copyBtn) return;
+      var text = copyBtn.getAttribute('data-copy');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { Utils.showToast('📋 Скопировано'); });
+      }
+    });
+
     var delBtn = content.querySelector('#storeDeleteBtn');
     if (delBtn) {
       delBtn.addEventListener('click', function () {
         if (!confirm('Удалить филиал «' + store.name + '»? Восстановить его можно будет только вручную.')) return;
+        var isRegistered = !!(store.officeCode || store.portalLogin || store.portalPassword);
+        if (isRegistered) {
+          Auth.api('/api/sc-store', { method: 'DELETE', body: JSON.stringify({ id: store.id }) }).then(function (res) {
+            var saved = lsGet(KEYS.stores) || {};
+            delete saved[store.id];
+            lsSet(KEYS.stores, saved);
+            state.editingStoreId = null;
+            Utils.showToast(res && res.ok ? '✅ Филиал удалён (карточка в Worker тоже)' : '⚠️ Удалено локально, карточка в Worker не удалилась');
+            loadData().then(function () { openSection('sc'); });
+          });
+          return;
+        }
         var saved = lsGet(KEYS.stores) || {};
         delete saved[store.id];
         lsSet(KEYS.stores, saved);
@@ -337,7 +468,7 @@
       list.map(function (s) {
         return '<li>' +
           '<div class="admin-list-main">' +
-          '<strong>' + h(s.name) + '</strong>' +
+          '<strong>' + h(s.name) + (s.portalLogin ? ' <span class="badge st-in" title="Остатки синхронизируются автоматически">🔌 автоостатки</span>' : '') + '</strong>' +
           '<span>📍 ' + h(s.address || '') + ' · ' + h(s.city || '') + ' · 🕒 ' + h(s.hours || '') + '</span>' +
           '<span>📞 ' + h(s.phone || '') + '</span>' +
           '</div>' +
@@ -361,8 +492,27 @@
     });
 
     if (selectedId === 'new') {
-      var newStore = { id: 'sc-new-' + Date.now(), name: '', city: 'Алматы', address: '', hours: '', phone: '', whatsapp: '', kaspi_qr: '', image: '', description: '' };
+      var fromApp = state.newStoreFromApp || null;
+      var newStore = fromApp
+        ? {
+          id: fromApp.officeId || 'sc-new-' + Date.now(),
+          officeCode: fromApp.officeCode || '',
+          name: fromApp.storeName || '',
+          city: fromApp.city || 'Алматы',
+          address: fromApp.address || '',
+          hours: '',
+          phone: fromApp.phone || '',
+          whatsapp: fromApp.phoneRaw || fromApp.phone || '',
+          email: fromApp.email || '',
+          kaspi_qr: '',
+          image: '',
+          description: '',
+          portalLogin: fromApp.portalLogin || '',
+          portalPassword: fromApp.portalPassword || ''
+        }
+        : { id: 'sc-new-' + Date.now(), name: '', city: 'Алматы', address: '', hours: '', phone: '', whatsapp: '', email: '', kaspi_qr: '', image: '', description: '', officeCode: '', portalLogin: '', portalPassword: '', partner: '' };
       state.editingStoreId = null;
+      state.newStoreFromApp = null;
       content.insertAdjacentHTML('beforeend', '<h4 style="margin-bottom:8px; color:var(--green-dark);">➕ Новый филиал</h4><form class="form admin-form" id="storeForm">' + storeFormHtml(newStore, true) + '</form>');
       bindStoreForm(content, newStore, true);
       return;
@@ -810,6 +960,82 @@
     });
   }
 
+  // ---------------- Заявки Сервис-Центров (суперадмин, Worker KV) ----------------
+
+  function renderScApplications(content) {
+    content.insertAdjacentHTML('beforeend',
+      '<div class="admin-card">' +
+      '<p style="color:var(--muted); font-size:13.5px; margin-bottom:12px;">Заявки на подключение Сервис-Центра приходят из формы регистрации («Войти» → «Регистрация» → «Я владелец магазина» → «Сервис-Центр»). Проверьте, что заявитель действительно владелец магазина, и создайте карточку — остатки этого СЦ начнут парситься автоматически.</p>' +
+      '<div id="scAppsList">Загружаем заявки…</div>' +
+      '</div>'
+    );
+    var listEl = content.querySelector('#scAppsList');
+
+    Auth.api('/api/sc-applications').then(function (data) {
+      var apps = (data && data.applications) || [];
+      if (!apps.length) {
+        listEl.innerHTML = '<div class="owner-req-empty">Заявок пока нет. Новые заявки появятся здесь автоматически.</div>';
+        return;
+      }
+      listEl.innerHTML = '<ul class="admin-list">' + apps.map(function (a) {
+        var badge = a.status === 'pending' ? '⏳ На рассмотрении' : (a.status === 'rejected' ? '❌ Отклонена' : '✅ Одобрена');
+        return '<li>' +
+          '<div class="admin-list-main">' +
+          '<strong>' + h(a.storeName || 'Магазин') + ' <span style="font-weight:400; font-size:12.5px; color:var(--muted);">' + h(badge) + '</span></strong>' +
+          '<span>🔑 Код кабинета: <b>' + h(a.officeCode || '—') + '</b> · 👤 ' + h(a.name || '') + ' · 📞 ' + h(a.phone || '') + '</span>' +
+          (a.email ? '<span>📧 <b>' + h(a.email) + '</b> — сюда придут логин и пароль кабинета</span>' : '') +
+          '<span>📍 ' + h(a.city || '') + (a.address ? ', ' + h(a.address) : '') + '</span>' +
+          '<span style="color:var(--muted);">👤 Логин поставщика: ' + h(a.portalLogin || '—') + ' · 🔒 Пароль: <b>' + h(a.portalPassword || '—') + '</b></span>' +
+          (a.comment ? '<span style="color:var(--muted);">«' + h(a.comment) + '»</span>' : '') +
+          '<span style="color:var(--muted); font-size:12px;">🕐 ' + h(new Date(a.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
+          '</div>' +
+          '<div class="admin-actions" style="flex-wrap:wrap;">' +
+          (a.status === 'pending' ? '<button class="btn btn-primary btn-sm" data-sc-app-approve="' + h(a.id) + '">✅ Подтвердить и создать СЦ</button>' : '') +
+          (a.status !== 'approved' ? '<button class="btn btn-outline btn-sm" data-sc-app-edit="' + h(a.id) + '">✏️ Редактировать перед созданием</button>' : '') +
+          (a.status !== 'approved' && a.status !== 'rejected' ? '<button class="btn btn-outline btn-sm danger-btn" data-sc-app-reject="' + h(a.id) + '">🚫 Отклонить</button>' : '') +
+          '</div></li>';
+      }).join('') + '</ul>';
+
+      listEl.addEventListener('click', function (e) {
+        var approveBtn = e.target.closest('[data-sc-app-approve]');
+        if (approveBtn) {
+          var app = apps.find(function (x) { return x.id === approveBtn.getAttribute('data-sc-app-approve'); });
+          if (!app) return;
+          if (!confirm('Создать карточку СЦ «' + app.storeName + '» из заявки? Логин и пароль кабинета уйдут на ' + (app.email || 'указанную почту') + '.')) return;
+          Auth.api('/api/sc-application', { method: 'POST', body: JSON.stringify({ id: app.id, action: 'approve', create: true }) }).then(function (res) {
+            if (res && res.store) {
+              Utils.showToast('✅ СЦ создан: ' + res.store.name + ' — доступы отправлены на почту');
+            } else {
+              Utils.showToast('✅ Заявка одобрена');
+            }
+            openSection('scApps');
+          });
+          return;
+        }
+        var editBtn = e.target.closest('[data-sc-app-edit]');
+        if (editBtn) {
+          var appEdit = apps.find(function (x) { return x.id === editBtn.getAttribute('data-sc-app-edit'); });
+          if (!appEdit) return;
+          state.lastAppId = appEdit.id;
+          state.editingStoreId = 'new';
+          state.newStoreFromApp = appEdit;
+          openSection('sc');
+          return;
+        }
+        var rejectBtn = e.target.closest('[data-sc-app-reject]');
+        if (rejectBtn) {
+          var app2 = apps.find(function (x) { return x.id === rejectBtn.getAttribute('data-sc-app-reject'); });
+          if (!app2) return;
+          if (!confirm('Отклонить заявку «' + app2.storeName + '»?')) return;
+          Auth.api('/api/sc-application', { method: 'POST', body: JSON.stringify({ id: app2.id, action: 'reject' }) }).then(function () {
+            Utils.showToast('🚫 Заявка отклонена');
+            openSection('scApps');
+          });
+        }
+      });
+    });
+  }
+
   // ---------------- Каталог товаров ----------------
 
   function renderCatalog(content) {
@@ -980,15 +1206,38 @@
   function showLogin() {
     document.getElementById('loginScreen').classList.remove('hidden');
     document.getElementById('adminLayout').classList.add('hidden');
+    var clientLayout = document.getElementById('clientLayout');
+    if (clientLayout) clientLayout.classList.add('hidden');
     var badge = document.getElementById('adminUserBadge');
     var logout = document.getElementById('adminLogoutBtn');
     if (badge) badge.classList.add('hidden');
     if (logout) logout.classList.add('hidden');
   }
 
+  function showClientPanel() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('adminLayout').classList.add('hidden');
+    var clientLayout = document.getElementById('clientLayout');
+    if (!clientLayout) { showPanel(); return; }
+    clientLayout.classList.remove('hidden');
+    var user = state.user || {};
+    var nameEl = document.getElementById('clientName');
+    if (nameEl) nameEl.textContent = user.name || user.login || 'клиент';
+    var emailEl = document.getElementById('clientEmail');
+    if (emailEl) emailEl.textContent = user.email || user.login || '—';
+    var phoneEl = document.getElementById('clientPhone');
+    if (phoneEl) phoneEl.textContent = user.phone || '—';
+    var badge = document.getElementById('adminUserBadge');
+    var logout = document.getElementById('adminLogoutBtn');
+    if (badge) { badge.classList.remove('hidden'); badge.innerHTML = '🧑 ' + h(user.name || user.login || 'клиент'); }
+    if (logout) logout.classList.remove('hidden');
+  }
+
   function showPanel() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('adminLayout').classList.remove('hidden');
+    var clientLayout = document.getElementById('clientLayout');
+    if (clientLayout) clientLayout.classList.add('hidden');
     var badge = document.getElementById('adminUserBadge');
     var logout = document.getElementById('adminLogoutBtn');
     if (badge) { badge.classList.remove('hidden'); badge.innerHTML = '🟢 ' + h(state.user.name); }
@@ -1034,6 +1283,10 @@
         if (user) {
           Auth.setCurrentUser(user);
           state.user = user;
+          if (user.role === 'client') {
+            showClientPanel();
+            return;
+          }
           loadData().then(showPanel);
         } else {
           document.getElementById('adminLoginErr').style.display = 'block';
@@ -1049,9 +1302,19 @@
     document.getElementById('adminLogoutBtn').addEventListener('click', function () {
       Auth.setCurrentUser(null);
       state.user = null;
-      Utils.showToast('Вы вышли из админ-панели');
+      Utils.showToast('Вы вышли из аккаунта');
       showLogin();
     });
+
+    var clientLogout = document.getElementById('clientLogoutBtn');
+    if (clientLogout) {
+      clientLogout.addEventListener('click', function (e) {
+        e.preventDefault();
+        Auth.setCurrentUser(null);
+        state.user = null;
+        showLogin();
+      });
+    }
 
     document.getElementById('adminNav').addEventListener('click', function (e) {
       var btn = e.target.closest('[data-section]');
@@ -1062,7 +1325,11 @@
     var user = Auth.getCurrentUser();
     if (user) {
       state.user = user;
-      loadData().then(showPanel);
+      if (user.role === 'client') {
+        showClientPanel();
+      } else {
+        loadData().then(showPanel);
+      }
     } else {
       showLogin();
     }

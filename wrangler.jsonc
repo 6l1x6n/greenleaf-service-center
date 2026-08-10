@@ -5,6 +5,12 @@
   "name": "mygreenleaf",
   "main": "worker.js",
   "compatibility_date": "2025-06-01",
+  "kv_namespaces": [
+    {
+      "binding": "SC_STORES",
+      "id": "24ef0b12e7a74c618643d21b52edceec"
+    }
+  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
