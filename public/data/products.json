@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-10T10:47:44+03:00",
+  "updated": "2026-08-10T14:04:16+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -12,7 +12,11 @@
       "image": "assets/images/products/NWA110.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 42
+      },
+      "description": ""
     },
     {
       "id": "YZA059",
@@ -25,7 +29,11 @@
       "image": "assets/images/products/YZA059.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 15
+      },
+      "description": ""
     },
     {
       "id": "SBD059",
@@ -38,7 +46,11 @@
       "image": "assets/images/products/SBD059.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 216
+      },
+      "description": ""
     },
     {
       "id": "ASA082",
@@ -51,7 +63,11 @@
       "image": "assets/images/products/ASA082.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 96
+      },
+      "description": ""
     },
     {
       "id": "KLA084",
@@ -64,7 +80,11 @@
       "image": "assets/images/products/KLA084.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "KLA083",
@@ -77,7 +97,11 @@
       "image": "assets/images/products/KLA083.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 40
+      },
+      "description": ""
     },
     {
       "id": "KLA088",
@@ -90,7 +114,11 @@
       "image": "assets/images/products/KLA088.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 101
+      },
+      "description": ""
     },
     {
       "id": "LYA072",
@@ -103,7 +131,11 @@
       "image": "assets/images/products/LYA072.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 48
+      },
+      "description": ""
     },
     {
       "id": "JDA067",
@@ -116,7 +148,11 @@
       "image": "assets/images/products/JDA067.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 79
+      },
+      "description": ""
     },
     {
       "id": "ASA083",
@@ -129,7 +165,11 @@
       "image": "assets/images/products/ASA083.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 46
+      },
+      "description": ""
     },
     {
       "id": "EBB020",
@@ -142,7 +182,11 @@
       "image": "assets/images/products/EBB020.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 181
+      },
+      "description": ""
     },
     {
       "id": "DAE086",
@@ -155,7 +199,11 @@
       "image": "assets/images/products/DAE086.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "KLA170",
@@ -168,7 +216,11 @@
       "image": "assets/images/products/KLA170.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 566
+      },
+      "description": ""
     },
     {
       "id": "CCA036",
@@ -181,7 +233,11 @@
       "image": "assets/images/products/CCA036.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 5
+      },
+      "description": ""
     },
     {
       "id": "KLA007",
@@ -194,7 +250,11 @@
       "image": "assets/images/products/KLA007.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "EAA023",
@@ -207,7 +267,11 @@
       "image": "assets/images/products/EAA023.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 62
+      },
+      "description": ""
     },
     {
       "id": "LPA043",
@@ -220,7 +284,11 @@
       "image": "assets/images/products/LPA043.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 67
+      },
+      "description": ""
     },
     {
       "id": "KLA260",
@@ -233,7 +301,11 @@
       "image": "assets/images/products/KLA260.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 114
+      },
+      "description": ""
     },
     {
       "id": "KLA261",
@@ -246,7 +318,11 @@
       "image": "assets/images/products/KLA261.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 106
+      },
+      "description": ""
     },
     {
       "id": "ASF066",
@@ -259,7 +335,11 @@
       "image": "assets/images/products/ASF066.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 44
+      },
+      "description": ""
     },
     {
       "id": "EAA020",
@@ -272,7 +352,11 @@
       "image": "assets/images/products/EAA020.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 11
+      },
+      "description": ""
     },
     {
       "id": "ASF063",
@@ -285,7 +369,11 @@
       "image": "assets/images/products/ASF063.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 69
+      },
+      "description": ""
     },
     {
       "id": "CCC031",
@@ -298,7 +386,11 @@
       "image": "assets/images/products/CCC031.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "CGA146",
@@ -311,7 +403,11 @@
       "image": "assets/images/products/CGA146.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 21
+      },
+      "description": ""
     },
     {
       "id": "CCA038",
@@ -324,7 +420,11 @@
       "image": "assets/images/products/CCA038.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "CCA033",
@@ -337,7 +437,11 @@
       "image": "assets/images/products/CCA033.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 209
+      },
+      "description": ""
     },
     {
       "id": "CCB025",
@@ -350,7 +454,11 @@
       "image": "assets/images/products/CCB025.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "EBB002",
@@ -363,7 +471,11 @@
       "image": "assets/images/products/EBB002.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 6
+      },
+      "description": ""
     },
     {
       "id": "CCC001",
@@ -376,7 +488,11 @@
       "image": "assets/images/products/CCC001.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 12
+      },
+      "description": ""
     },
     {
       "id": "CCC002",
@@ -389,7 +505,11 @@
       "image": "assets/images/products/CCC002.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 16
+      },
+      "description": ""
     },
     {
       "id": "CCC029",
@@ -402,7 +522,11 @@
       "image": "assets/images/products/CCC029.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 86
+      },
+      "description": ""
     },
     {
       "id": "EBB025",
@@ -415,7 +539,11 @@
       "image": "assets/images/products/EBB025.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "CCC027",
@@ -428,7 +556,11 @@
       "image": "assets/images/products/CCC027.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "EAA004",
@@ -441,7 +573,11 @@
       "image": "assets/images/products/EAA004.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "YBA045",
@@ -454,7 +590,11 @@
       "image": "assets/images/products/YBA045.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 42
+      },
+      "description": ""
     },
     {
       "id": "EAA022",
@@ -467,7 +607,11 @@
       "image": "assets/images/products/EAA022.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 76
+      },
+      "description": ""
     },
     {
       "id": "EBB016",
@@ -480,7 +624,11 @@
       "image": "assets/images/products/EBB016.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 108
+      },
+      "description": ""
     },
     {
       "id": "CBD003",
@@ -493,7 +641,11 @@
       "image": "assets/images/products/CBD003.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 41
+      },
+      "description": ""
     },
     {
       "id": "CBC035",
@@ -506,7 +658,11 @@
       "image": "assets/images/products/CBC035.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "KLA133",
@@ -519,7 +675,11 @@
       "image": "assets/images/products/KLA133.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 77
+      },
+      "description": ""
     },
     {
       "id": "DAD001",
@@ -532,7 +692,11 @@
       "image": "assets/images/products/DAD001.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 227
+      },
+      "description": ""
     },
     {
       "id": "DAD192",
@@ -545,7 +709,11 @@
       "image": "assets/images/products/DAD192.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 237
+      },
+      "description": ""
     },
     {
       "id": "ASF067",
@@ -558,7 +726,11 @@
       "image": "assets/images/products/ASF067.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 105
+      },
+      "description": ""
     },
     {
       "id": "KLA087",
@@ -571,7 +743,11 @@
       "image": "assets/images/products/KLA087.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 116
+      },
+      "description": ""
     },
     {
       "id": "ASA059",
@@ -584,7 +760,11 @@
       "image": "assets/images/products/ASA059.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 110
+      },
+      "description": ""
     },
     {
       "id": "DAD191",
@@ -597,7 +777,11 @@
       "image": "assets/images/products/DAD191.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 320
+      },
+      "description": ""
     },
     {
       "id": "DAD169",
@@ -610,7 +794,11 @@
       "image": "assets/images/products/DAD169.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 55
+      },
+      "description": ""
     },
     {
       "id": "DAD193",
@@ -623,7 +811,11 @@
       "image": "assets/images/products/DAD193.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 562
+      },
+      "description": ""
     },
     {
       "id": "DAD003",
@@ -636,7 +828,11 @@
       "image": "assets/images/products/DAD003.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 105
+      },
+      "description": ""
     },
     {
       "id": "DAD190",
@@ -649,7 +845,11 @@
       "image": "assets/images/products/DAD190.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 566
+      },
+      "description": ""
     },
     {
       "id": "CCA034",
@@ -662,7 +862,11 @@
       "image": "assets/images/products/CCA034.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 298
+      },
+      "description": ""
     },
     {
       "id": "CIA061",
@@ -675,7 +879,11 @@
       "image": "assets/images/products/CIA061.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 150
+      },
+      "description": ""
     },
     {
       "id": "CBA051",
@@ -688,7 +896,11 @@
       "image": "assets/images/products/CBA051.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 33
+      },
+      "description": ""
     },
     {
       "id": "CIA050",
@@ -701,7 +913,11 @@
       "image": "assets/images/products/CIA050.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "KLA055",
@@ -714,7 +930,11 @@
       "image": "assets/images/products/KLA055.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 45
+      },
+      "description": ""
     },
     {
       "id": "DAD004",
@@ -727,7 +947,11 @@
       "image": "assets/images/products/DAD004.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 352
+      },
+      "description": ""
     },
     {
       "id": "KLA091",
@@ -740,7 +964,11 @@
       "image": "assets/images/products/KLA091.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 86
+      },
+      "description": ""
     },
     {
       "id": "KLA173",
@@ -753,7 +981,11 @@
       "image": "assets/images/products/KLA173.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 56
+      },
+      "description": ""
     },
     {
       "id": "CAB040",
@@ -766,7 +998,11 @@
       "image": "assets/images/products/CAB040.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 138
+      },
+      "description": ""
     },
     {
       "id": "CAA038",
@@ -779,7 +1015,11 @@
       "image": "assets/images/products/CAA038.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 69
+      },
+      "description": ""
     },
     {
       "id": "CIA063",
@@ -792,7 +1032,11 @@
       "image": "assets/images/products/CIA063.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 31
+      },
+      "description": ""
     },
     {
       "id": "CBE035",
@@ -805,7 +1049,11 @@
       "image": "assets/images/products/CBE035.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "KLA120",
@@ -818,7 +1066,11 @@
       "image": "assets/images/products/KLA120.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 14
+      },
+      "description": ""
     },
     {
       "id": "SBA018",
@@ -831,7 +1083,11 @@
       "image": "assets/images/products/SBA018.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 11
+      },
+      "description": ""
     },
     {
       "id": "KLA107",
@@ -844,7 +1100,11 @@
       "image": "assets/images/products/KLA107.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "XNA035",
@@ -857,7 +1117,11 @@
       "image": "assets/images/products/XNA035.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 35
+      },
+      "description": ""
     },
     {
       "id": "SAA065",
@@ -870,7 +1134,11 @@
       "image": "assets/images/products/SAA065.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 24
+      },
+      "description": ""
     },
     {
       "id": "LGI021",
@@ -883,7 +1151,11 @@
       "image": "assets/images/products/LGI021.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 185
+      },
+      "description": ""
     },
     {
       "id": "QJA002",
@@ -896,7 +1168,11 @@
       "image": "assets/images/products/QJA002.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "CIA013",
@@ -909,7 +1185,11 @@
       "image": "assets/images/products/CIA013.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 38
+      },
+      "description": ""
     },
     {
       "id": "CIA012",
@@ -922,7 +1202,11 @@
       "image": "assets/images/products/CIA012.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 33
+      },
+      "description": ""
     },
     {
       "id": "CIA015",
@@ -935,7 +1219,11 @@
       "image": "assets/images/products/CIA015.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 38
+      },
+      "description": ""
     },
     {
       "id": "LYA042",
@@ -948,7 +1236,11 @@
       "image": "assets/images/products/LYA042.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "KAC919",
@@ -961,7 +1253,11 @@
       "image": "assets/images/products/KAC919.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 16
+      },
+      "description": ""
     },
     {
       "id": "LGE062",
@@ -974,7 +1270,11 @@
       "image": "assets/images/products/LGE062.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 17
+      },
+      "description": ""
     },
     {
       "id": "CEA071",
@@ -987,7 +1287,11 @@
       "image": "assets/images/products/CEA071.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "CEA079",
@@ -1000,7 +1304,11 @@
       "image": "assets/images/products/CEA079.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 41
+      },
+      "description": ""
     },
     {
       "id": "KLA222",
@@ -1013,7 +1321,11 @@
       "image": "assets/images/products/KLA222.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "KAC918",
@@ -1026,7 +1338,11 @@
       "image": "assets/images/products/KAC918.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 34
+      },
+      "description": ""
     },
     {
       "id": "KLA128",
@@ -1039,7 +1355,11 @@
       "image": "assets/images/products/KLA128.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 21
+      },
+      "description": ""
     },
     {
       "id": "KLA109",
@@ -1052,7 +1372,11 @@
       "image": "assets/images/products/KLA109.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 279
+      },
+      "description": ""
     },
     {
       "id": "CBC038",
@@ -1065,7 +1389,11 @@
       "image": "assets/images/products/CBC038.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "CGA147",
@@ -1078,7 +1406,11 @@
       "image": "assets/images/products/CGA147.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "LGZ059",
@@ -1091,7 +1423,11 @@
       "image": "assets/images/products/LGZ059.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "CEA069",
@@ -1104,7 +1440,11 @@
       "image": "assets/images/products/CEA069.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 20
+      },
+      "description": ""
     },
     {
       "id": "JDA115",
@@ -1117,7 +1457,11 @@
       "image": "assets/images/products/JDA115.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 49
+      },
+      "description": ""
     },
     {
       "id": "JDA114",
@@ -1130,7 +1474,11 @@
       "image": "assets/images/products/JDA114.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 35
+      },
+      "description": ""
     },
     {
       "id": "JDA113",
@@ -1143,7 +1491,11 @@
       "image": "assets/images/products/JDA113.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 53
+      },
+      "description": ""
     },
     {
       "id": "JDA112",
@@ -1156,7 +1508,11 @@
       "image": "assets/images/products/JDA112.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 27
+      },
+      "description": ""
     },
     {
       "id": "LYA088",
@@ -1169,7 +1525,11 @@
       "image": "assets/images/products/LYA088.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 7
+      },
+      "description": ""
     },
     {
       "id": "NAZ477",
@@ -1182,7 +1542,11 @@
       "image": "assets/images/products/NAZ477.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 39
+      },
+      "description": ""
     },
     {
       "id": "NWA120",
@@ -1195,7 +1559,11 @@
       "image": "assets/images/products/NWA120.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 22
+      },
+      "description": ""
     },
     {
       "id": "NWA119",
@@ -1208,7 +1576,11 @@
       "image": "assets/images/products/NWA119.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 28
+      },
+      "description": ""
     },
     {
       "id": "ASA057",
@@ -1221,7 +1593,11 @@
       "image": "assets/images/products/ASA057.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 128
+      },
+      "description": ""
     },
     {
       "id": "ASG044",
@@ -1234,7 +1610,11 @@
       "image": "assets/images/products/ASG044.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 9
+      },
+      "description": ""
     },
     {
       "id": "NWA121",
@@ -1247,7 +1627,11 @@
       "image": "assets/images/products/NWA121.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 25
+      },
+      "description": ""
     },
     {
       "id": "ASF060",
@@ -1260,7 +1644,11 @@
       "image": "assets/images/products/ASF060.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "DAC059",
@@ -1273,7 +1661,11 @@
       "image": "assets/images/products/DAC059.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "NWA051",
@@ -1286,7 +1678,11 @@
       "image": "assets/images/products/NWA051.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 83
+      },
+      "description": ""
     },
     {
       "id": "CGA134",
@@ -1299,7 +1695,11 @@
       "image": "assets/images/products/CGA134.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "DAD178",
@@ -1312,7 +1712,11 @@
       "image": "assets/images/products/DAD178.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 767
+      },
+      "description": ""
     },
     {
       "id": "DAD179",
@@ -1325,7 +1729,11 @@
       "image": "assets/images/products/DAD179.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 664
+      },
+      "description": ""
     },
     {
       "id": "DAD180",
@@ -1338,7 +1746,11 @@
       "image": "assets/images/products/DAD180.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 324
+      },
+      "description": ""
     },
     {
       "id": "SAA069",
@@ -1351,7 +1763,11 @@
       "image": "assets/images/products/SAA069.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 256
+      },
+      "description": ""
     },
     {
       "id": "KAC917",
@@ -1364,7 +1780,11 @@
       "image": "assets/images/products/KAC917.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "ASA187",
@@ -1377,7 +1797,11 @@
       "image": "assets/images/products/ASA187.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 137
+      },
+      "description": ""
     },
     {
       "id": "ASA114",
@@ -1390,7 +1814,11 @@
       "image": "assets/images/products/ASA114.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "KLA144",
@@ -1403,7 +1831,11 @@
       "image": "assets/images/products/KLA144.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "KLA095",
@@ -1416,7 +1848,11 @@
       "image": "assets/images/products/KLA095.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "KLA006",
@@ -1429,7 +1865,11 @@
       "image": "assets/images/products/KLA006.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "KLA004",
@@ -1442,7 +1882,11 @@
       "image": "assets/images/products/KLA004.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "ASF065",
@@ -1455,7 +1899,11 @@
       "image": "assets/images/products/ASF065.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 47
+      },
+      "description": ""
     },
     {
       "id": "ASA156",
@@ -1468,7 +1916,11 @@
       "image": "assets/images/products/ASA156.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 98
+      },
+      "description": ""
     },
     {
       "id": "ASA056",
@@ -1481,7 +1933,11 @@
       "image": "assets/images/products/ASA056.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "ASF023",
@@ -1494,7 +1950,11 @@
       "image": "assets/images/products/ASF023.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 132
+      },
+      "description": ""
     },
     {
       "id": "ASF019",
@@ -1507,7 +1967,11 @@
       "image": "assets/images/products/ASF019.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "ASA091",
@@ -1520,7 +1984,11 @@
       "image": "assets/images/products/ASA091.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 63
+      },
+      "description": ""
     },
     {
       "id": "ASF035",
@@ -1533,7 +2001,11 @@
       "image": "assets/images/products/ASF035.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 81
+      },
+      "description": ""
     },
     {
       "id": "ASA087",
@@ -1546,7 +2018,11 @@
       "image": "assets/images/products/ASA087.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 36
+      },
+      "description": ""
     },
     {
       "id": "ASA086",
@@ -1559,7 +2035,11 @@
       "image": "assets/images/products/ASA086.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 53
+      },
+      "description": ""
     },
     {
       "id": "ASA017",
@@ -1572,7 +2052,11 @@
       "image": "assets/images/products/ASA017.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 60
+      },
+      "description": ""
     },
     {
       "id": "CBB017",
@@ -1585,7 +2069,11 @@
       "image": "assets/images/products/CBB017.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 179
+      },
+      "description": ""
     },
     {
       "id": "KAC300",
@@ -1598,7 +2086,11 @@
       "image": "assets/images/products/KAC300.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "ASF033",
@@ -1611,7 +2103,11 @@
       "image": "assets/images/products/ASF033.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 54
+      },
+      "description": ""
     },
     {
       "id": "ASF034",
@@ -1624,7 +2120,11 @@
       "image": "assets/images/products/ASF034.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "ASF016",
@@ -1637,7 +2137,11 @@
       "image": "assets/images/products/ASF016.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 18
+      },
+      "description": ""
     },
     {
       "id": "ASD014",
@@ -1650,7 +2154,11 @@
       "image": "assets/images/products/ASD014.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 30
+      },
+      "description": ""
     },
     {
       "id": "ASF026",
@@ -1663,7 +2171,11 @@
       "image": "assets/images/products/ASF026.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 151
+      },
+      "description": ""
     },
     {
       "id": "DAC047",
@@ -1676,7 +2188,11 @@
       "image": "assets/images/products/DAC047.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "DAC010",
@@ -1689,7 +2205,11 @@
       "image": "assets/images/products/DAC010.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "DAC019",
@@ -1702,7 +2222,11 @@
       "image": "assets/images/products/DAC019.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 53
+      },
+      "description": ""
     },
     {
       "id": "CGA109",
@@ -1715,7 +2239,11 @@
       "image": "assets/images/products/CGA109.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 224
+      },
+      "description": ""
     },
     {
       "id": "DAC054",
@@ -1728,7 +2256,11 @@
       "image": "assets/images/products/DAC054.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 11
+      },
+      "description": ""
     },
     {
       "id": "ASA138",
@@ -1741,7 +2273,11 @@
       "image": "assets/images/products/ASA138.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 109
+      },
+      "description": ""
     },
     {
       "id": "KAC298",
@@ -1754,7 +2290,11 @@
       "image": "assets/images/products/KAC298.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "ASA139",
@@ -1767,7 +2307,11 @@
       "image": "assets/images/products/ASA139.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 182
+      },
+      "description": ""
     },
     {
       "id": "KLA021",
@@ -1780,7 +2324,11 @@
       "image": "assets/images/products/KLA021.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 255
+      },
+      "description": ""
     },
     {
       "id": "NAG021",
@@ -1793,7 +2341,11 @@
       "image": "assets/images/products/NAG021.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 58
+      },
+      "description": ""
     },
     {
       "id": "NAG020",
@@ -1806,7 +2358,11 @@
       "image": "assets/images/products/NAG020.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 47
+      },
+      "description": ""
     },
     {
       "id": "KBA008",
@@ -1819,7 +2375,11 @@
       "image": "assets/images/products/KBA008.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 19
+      },
+      "description": ""
     },
     {
       "id": "DAK003",
@@ -1832,7 +2392,11 @@
       "image": "assets/images/products/DAK003.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "DAA110",
@@ -1845,7 +2409,11 @@
       "image": "assets/images/products/DAA110.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 71
+      },
+      "description": ""
     },
     {
       "id": "DAA109",
@@ -1858,7 +2426,11 @@
       "image": "assets/images/products/DAA109.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 114
+      },
+      "description": ""
     },
     {
       "id": "DAA068",
@@ -1871,7 +2443,11 @@
       "image": "assets/images/products/DAA068.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 185
+      },
+      "description": ""
     },
     {
       "id": "CBF015",
@@ -1884,7 +2460,11 @@
       "image": "assets/images/products/CBF015.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 187
+      },
+      "description": ""
     },
     {
       "id": "CBF014",
@@ -1897,7 +2477,11 @@
       "image": "assets/images/products/CBF014.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 187
+      },
+      "description": ""
     },
     {
       "id": "CIA060",
@@ -1910,7 +2494,11 @@
       "image": "assets/images/products/CIA060.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 205
+      },
+      "description": ""
     },
     {
       "id": "CEA080",
@@ -1923,7 +2511,11 @@
       "image": "assets/images/products/CEA080.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 10
+      },
+      "description": ""
     },
     {
       "id": "LYA030",
@@ -1936,7 +2528,11 @@
       "image": "assets/images/products/LYA030.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "SBA087",
@@ -1949,7 +2545,11 @@
       "image": "assets/images/products/SBA087.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 136
+      },
+      "description": ""
     },
     {
       "id": "DAC057",
@@ -1962,7 +2562,11 @@
       "image": "assets/images/products/DAC057.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 7
+      },
+      "description": ""
     },
     {
       "id": "CBE032",
@@ -1975,7 +2579,11 @@
       "image": "assets/images/products/CBE032.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 11
+      },
+      "description": ""
     },
     {
       "id": "ASF049",
@@ -1988,7 +2596,11 @@
       "image": "assets/images/products/ASF049.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "ASF048",
@@ -2001,7 +2613,11 @@
       "image": "assets/images/products/ASF048.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 10
+      },
+      "description": ""
     },
     {
       "id": "DAB087",
@@ -2014,7 +2630,11 @@
       "image": "assets/images/products/DAB087.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 88
+      },
+      "description": ""
     },
     {
       "id": "DAA108",
@@ -2027,7 +2647,11 @@
       "image": "assets/images/products/DAA108.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 135
+      },
+      "description": ""
     },
     {
       "id": "DAC056",
@@ -2040,7 +2664,11 @@
       "image": "assets/images/products/DAC056.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 89
+      },
+      "description": ""
     },
     {
       "id": "DAA107",
@@ -2053,7 +2681,11 @@
       "image": "assets/images/products/DAA107.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 105
+      },
+      "description": ""
     },
     {
       "id": "DAA062",
@@ -2066,7 +2698,11 @@
       "image": "assets/images/products/DAA062.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 426
+      },
+      "description": ""
     },
     {
       "id": "CBE034",
@@ -2079,7 +2715,11 @@
       "image": "assets/images/products/CBE034.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 130
+      },
+      "description": ""
     },
     {
       "id": "CBB016",
@@ -2092,7 +2732,11 @@
       "image": "assets/images/products/CBB016.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 175
+      },
+      "description": ""
     },
     {
       "id": "ASF056",
@@ -2105,7 +2749,11 @@
       "image": "assets/images/products/ASF056.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 88
+      },
+      "description": ""
     },
     {
       "id": "ASF055",
@@ -2118,7 +2766,11 @@
       "image": "assets/images/products/ASF055.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 219
+      },
+      "description": ""
     },
     {
       "id": "ASF054",
@@ -2131,7 +2783,11 @@
       "image": "assets/images/products/ASF054.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 42
+      },
+      "description": ""
     },
     {
       "id": "ASF053",
@@ -2144,7 +2800,11 @@
       "image": "assets/images/products/ASF053.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 118
+      },
+      "description": ""
     },
     {
       "id": "ASB047",
@@ -2157,7 +2817,11 @@
       "image": "assets/images/products/ASB047.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 148
+      },
+      "description": ""
     },
     {
       "id": "ASB045",
@@ -2170,7 +2834,11 @@
       "image": "assets/images/products/ASB045.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 41
+      },
+      "description": ""
     },
     {
       "id": "ASB044",
@@ -2183,7 +2851,11 @@
       "image": "assets/images/products/ASB044.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 46
+      },
+      "description": ""
     },
     {
       "id": "ASB046",
@@ -2196,7 +2868,11 @@
       "image": "assets/images/products/ASB046.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 578
+      },
+      "description": ""
     },
     {
       "id": "CCC041",
@@ -2209,7 +2885,11 @@
       "image": "assets/images/products/CCC041.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 9
+      },
+      "description": ""
     },
     {
       "id": "CCC033",
@@ -2222,7 +2902,11 @@
       "image": "assets/images/products/CCC033.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 14
+      },
+      "description": ""
     },
     {
       "id": "CCC039",
@@ -2235,7 +2919,11 @@
       "image": "assets/images/products/CCC039.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "CCC038",
@@ -2248,7 +2936,11 @@
       "image": "assets/images/products/CCC038.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "CCC036",
@@ -2261,7 +2953,11 @@
       "image": "assets/images/products/CCC036.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "LPA048",
@@ -2274,7 +2970,11 @@
       "image": "assets/images/products/LPA048.jpeg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 5
+      },
+      "description": ""
     },
     {
       "id": "KLA131",
@@ -2287,7 +2987,11 @@
       "image": "assets/images/products/KLA131.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "ASF050",
@@ -2300,7 +3004,11 @@
       "image": "assets/images/products/ASF050.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "YZA007",
@@ -2313,7 +3021,11 @@
       "image": "assets/images/products/YZA007.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 41
+      },
+      "description": ""
     },
     {
       "id": "CBG004",
@@ -2326,7 +3038,11 @@
       "image": "assets/images/products/CBG004.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "KLA064",
@@ -2339,7 +3055,11 @@
       "image": "assets/images/products/KLA064.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "CCC035",
@@ -2352,7 +3072,11 @@
       "image": "assets/images/products/CCC035.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "ASF070",
@@ -2365,7 +3089,11 @@
       "image": "assets/images/products/ASF070.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 56
+      },
+      "description": ""
     },
     {
       "id": "CCC030",
@@ -2378,7 +3106,11 @@
       "image": "assets/images/products/CCC030.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 13
+      },
+      "description": ""
     },
     {
       "id": "LPA038",
@@ -2391,7 +3123,11 @@
       "image": "assets/images/products/LPA038.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "LGN008",
@@ -2404,7 +3140,11 @@
       "image": "assets/images/products/LGN008.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 13
+      },
+      "description": ""
     },
     {
       "id": "EAB004",
@@ -2417,7 +3157,11 @@
       "image": "assets/images/products/EAB004.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "KAC583",
@@ -2430,7 +3174,11 @@
       "image": "assets/images/products/KAC583.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 26
+      },
+      "description": ""
     },
     {
       "id": "EBB017",
@@ -2443,7 +3191,11 @@
       "image": "assets/images/products/EBB017.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "KLA132",
@@ -2456,7 +3208,11 @@
       "image": "assets/images/products/KLA132.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 30
+      },
+      "description": ""
     },
     {
       "id": "CBC002",
@@ -2469,7 +3225,11 @@
       "image": "assets/images/products/CBC002.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "LGI022",
@@ -2482,7 +3242,11 @@
       "image": "assets/images/products/LGI022.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 183
+      },
+      "description": ""
     },
     {
       "id": "KLA086",
@@ -2495,7 +3259,11 @@
       "image": "assets/images/products/KLA086.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 42
+      },
+      "description": ""
     },
     {
       "id": "NWA139",
@@ -2508,7 +3276,11 @@
       "image": "assets/images/products/NWA139.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 195
+      },
+      "description": ""
     },
     {
       "id": "KLA085",
@@ -2521,7 +3293,11 @@
       "image": "assets/images/products/KLA085.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 62
+      },
+      "description": ""
     },
     {
       "id": "KLA119",
@@ -2534,7 +3310,11 @@
       "image": "assets/images/products/KLA119.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 35
+      },
+      "description": ""
     },
     {
       "id": "NWA111",
@@ -2547,7 +3327,11 @@
       "image": "assets/images/products/NWA111.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 299
+      },
+      "description": ""
     },
     {
       "id": "NWA087",
@@ -2560,7 +3344,11 @@
       "image": "assets/images/products/NWA087.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 91
+      },
+      "description": ""
     },
     {
       "id": "KLA105",
@@ -2573,7 +3361,11 @@
       "image": "assets/images/products/KLA105.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 27
+      },
+      "description": ""
     },
     {
       "id": "LGE007",
@@ -2586,7 +3378,11 @@
       "image": "assets/images/products/LGE007.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "KLA104",
@@ -2599,7 +3395,11 @@
       "image": "assets/images/products/KLA104.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 11
+      },
+      "description": ""
     },
     {
       "id": "NWA062",
@@ -2612,7 +3412,11 @@
       "image": "assets/images/products/NWA062.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 337
+      },
+      "description": ""
     },
     {
       "id": "NWA048",
@@ -2625,7 +3429,11 @@
       "image": "assets/images/products/NWA048.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 58
+      },
+      "description": ""
     },
     {
       "id": "NWA015",
@@ -2638,7 +3446,11 @@
       "image": "assets/images/products/NWA015.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "CIA069",
@@ -2651,7 +3463,11 @@
       "image": "assets/images/products/CIA069.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 43
+      },
+      "description": ""
     },
     {
       "id": "NWA063",
@@ -2664,7 +3480,11 @@
       "image": "assets/images/products/NWA063.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 63
+      },
+      "description": ""
     },
     {
       "id": "CIA068",
@@ -2677,7 +3497,11 @@
       "image": "assets/images/products/CIA068.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 74
+      },
+      "description": ""
     },
     {
       "id": "CIA072",
@@ -2690,7 +3514,11 @@
       "image": "assets/images/products/CIA072.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 87
+      },
+      "description": ""
     },
     {
       "id": "CIA062",
@@ -2703,7 +3531,11 @@
       "image": "assets/images/products/CIA062.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 42
+      },
+      "description": ""
     },
     {
       "id": "SXA003",
@@ -2716,7 +3548,11 @@
       "image": "assets/images/products/SXA003.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 26
+      },
+      "description": ""
     },
     {
       "id": "NAZ472",
@@ -2729,7 +3565,11 @@
       "image": "assets/images/products/NAZ472.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 260
+      },
+      "description": ""
     },
     {
       "id": "CGA128",
@@ -2742,7 +3582,11 @@
       "image": "assets/images/products/CGA128.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 63
+      },
+      "description": ""
     },
     {
       "id": "CGA127",
@@ -2755,7 +3599,11 @@
       "image": "assets/images/products/CGA127.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 65
+      },
+      "description": ""
     },
     {
       "id": "NAF026",
@@ -2768,7 +3616,11 @@
       "image": "assets/images/products/NAF026.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 27
+      },
+      "description": ""
     },
     {
       "id": "NWA045",
@@ -2781,7 +3633,11 @@
       "image": "assets/images/products/NWA045.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 45
+      },
+      "description": ""
     },
     {
       "id": "NWA050",
@@ -2794,7 +3650,11 @@
       "image": "assets/images/products/NWA050.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 427
+      },
+      "description": ""
     },
     {
       "id": "NAC015",
@@ -2807,7 +3667,11 @@
       "image": "assets/images/products/NAC015.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "KLA053",
@@ -2820,7 +3684,11 @@
       "image": "assets/images/products/KLA053.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 39
+      },
+      "description": ""
     },
     {
       "id": "CIA064",
@@ -2833,7 +3701,11 @@
       "image": "assets/images/products/CIA064.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 27
+      },
+      "description": ""
     },
     {
       "id": "LGW571",
@@ -2846,7 +3718,11 @@
       "image": "assets/images/products/LGW571.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 23
+      },
+      "description": ""
     },
     {
       "id": "DAA026",
@@ -2859,7 +3735,11 @@
       "image": "assets/images/products/DAA026.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "LGK012",
@@ -2872,7 +3752,11 @@
       "image": "assets/images/products/LGK012.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "KLA118",
@@ -2885,7 +3769,11 @@
       "image": "assets/images/products/KLA118.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "YZA008",
@@ -2898,7 +3786,11 @@
       "image": "assets/images/products/YZA008.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "YZA013",
@@ -2911,7 +3803,11 @@
       "image": "assets/images/products/YZA013.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 22
+      },
+      "description": ""
     },
     {
       "id": "LGW572",
@@ -2924,7 +3820,11 @@
       "image": "assets/images/products/LGW572.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 19
+      },
+      "description": ""
     },
     {
       "id": "LYA079",
@@ -2937,7 +3837,11 @@
       "image": "assets/images/products/LYA079.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "LGW549",
@@ -2950,7 +3854,11 @@
       "image": "assets/images/products/LGW549.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 6
+      },
+      "description": ""
     },
     {
       "id": "KLA081",
@@ -2963,7 +3871,11 @@
       "image": "assets/images/products/KLA081.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 19
+      },
+      "description": ""
     },
     {
       "id": "KLA089",
@@ -2976,7 +3888,11 @@
       "image": "assets/images/products/KLA089.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 35
+      },
+      "description": ""
     },
     {
       "id": "LGW573",
@@ -2989,7 +3905,11 @@
       "image": "assets/images/products/LGW573.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 57
+      },
+      "description": ""
     },
     {
       "id": "LGW574",
@@ -3002,7 +3922,11 @@
       "image": "assets/images/products/LGW574.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 68
+      },
+      "description": ""
     },
     {
       "id": "LGJ026",
@@ -3015,7 +3939,11 @@
       "image": "assets/images/products/LGJ026.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 53
+      },
+      "description": ""
     },
     {
       "id": "ASA115",
@@ -3028,7 +3956,11 @@
       "image": "assets/images/products/ASA115.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 89
+      },
+      "description": ""
     },
     {
       "id": "CAA027",
@@ -3041,7 +3973,11 @@
       "image": "assets/images/products/CAA027.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 81
+      },
+      "description": ""
     },
     {
       "id": "LGJ029",
@@ -3054,7 +3990,11 @@
       "image": "assets/images/products/LGJ029.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 45
+      },
+      "description": ""
     },
     {
       "id": "LGJ028",
@@ -3067,7 +4007,11 @@
       "image": "assets/images/products/LGJ028.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 69
+      },
+      "description": ""
     },
     {
       "id": "LGJ027",
@@ -3080,7 +4024,11 @@
       "image": "assets/images/products/LGJ027.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 53
+      },
+      "description": ""
     },
     {
       "id": "KLA082",
@@ -3093,7 +4041,11 @@
       "image": "assets/images/products/KLA082.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 13
+      },
+      "description": ""
     },
     {
       "id": "CAA037",
@@ -3106,7 +4058,11 @@
       "image": "assets/images/products/CAA037.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 54
+      },
+      "description": ""
     },
     {
       "id": "CAA039",
@@ -3119,7 +4075,11 @@
       "image": "assets/images/products/CAA039.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 391
+      },
+      "description": ""
     },
     {
       "id": "XNA033",
@@ -3132,7 +4092,11 @@
       "image": "assets/images/products/XNA033.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "XNA025",
@@ -3145,7 +4109,11 @@
       "image": "assets/images/products/XNA025.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "CAB026",
@@ -3158,7 +4126,11 @@
       "image": "assets/images/products/CAB026.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 94
+      },
+      "description": ""
     },
     {
       "id": "KLA061",
@@ -3171,7 +4143,11 @@
       "image": "assets/images/products/KLA061.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 25
+      },
+      "description": ""
     },
     {
       "id": "YZA005",
@@ -3184,7 +4160,11 @@
       "image": "assets/images/products/YZA005.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 33
+      },
+      "description": ""
     },
     {
       "id": "XNA023",
@@ -3197,7 +4177,11 @@
       "image": "assets/images/products/XNA023.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 35
+      },
+      "description": ""
     },
     {
       "id": "CAB037",
@@ -3210,7 +4194,11 @@
       "image": "assets/images/products/CAB037.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "SAA067",
@@ -3223,7 +4211,11 @@
       "image": "assets/images/products/SAA067.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 7
+      },
+      "description": ""
     },
     {
       "id": "CBF016",
@@ -3236,7 +4228,11 @@
       "image": "assets/images/products/CBF016.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 59
+      },
+      "description": ""
     },
     {
       "id": "SBB115",
@@ -3249,7 +4245,11 @@
       "image": "assets/images/products/SBB115.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "SBA095",
@@ -3262,7 +4262,11 @@
       "image": "assets/images/products/SBA095.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 10
+      },
+      "description": ""
     },
     {
       "id": "SCA020",
@@ -3275,7 +4279,11 @@
       "image": "assets/images/products/SCA020.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "XNA081",
@@ -3288,7 +4296,11 @@
       "image": "assets/images/products/XNA081.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 146
+      },
+      "description": ""
     },
     {
       "id": "XNA044",
@@ -3301,7 +4313,11 @@
       "image": "assets/images/products/XNA044.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "LPA055",
@@ -3314,7 +4330,11 @@
       "image": "assets/images/products/LPA055.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 74
+      },
+      "description": ""
     },
     {
       "id": "CBA053",
@@ -3327,7 +4347,11 @@
       "image": "assets/images/products/CBA053.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 22
+      },
+      "description": ""
     },
     {
       "id": "XNA043",
@@ -3340,7 +4364,11 @@
       "image": "assets/images/products/XNA043.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 34
+      },
+      "description": ""
     },
     {
       "id": "FPA151",
@@ -3353,7 +4381,11 @@
       "image": "assets/images/products/FPA151.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 166
+      },
+      "description": ""
     },
     {
       "id": "SAA052",
@@ -3366,7 +4398,11 @@
       "image": "assets/images/products/SAA052.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "LGI020",
@@ -3379,7 +4415,11 @@
       "image": "assets/images/products/LGI020.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 52
+      },
+      "description": ""
     },
     {
       "id": "LYA069",
@@ -3392,7 +4432,11 @@
       "image": "assets/images/products/LYA069.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 5
+      },
+      "description": ""
     },
     {
       "id": "LGF010",
@@ -3405,7 +4449,11 @@
       "image": "assets/images/products/LGF010.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "LGL008",
@@ -3418,7 +4466,11 @@
       "image": "assets/images/products/LGL008.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 9
+      },
+      "description": ""
     },
     {
       "id": "LGL009",
@@ -3431,7 +4483,11 @@
       "image": "assets/images/products/LGL009.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "SAA068",
@@ -3444,7 +4500,11 @@
       "image": "assets/images/products/SAA068.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 102
+      },
+      "description": ""
     },
     {
       "id": "LPA024",
@@ -3457,7 +4517,11 @@
       "image": "assets/images/products/LPA024.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "CBA037",
@@ -3470,7 +4534,11 @@
       "image": "assets/images/products/CBA037.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 5
+      },
+      "description": ""
     },
     {
       "id": "ASB042",
@@ -3483,7 +4551,11 @@
       "image": "assets/images/products/ASB042.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 102
+      },
+      "description": ""
     },
     {
       "id": "DAB089",
@@ -3496,7 +4568,11 @@
       "image": "assets/images/products/DAB089.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 132
+      },
+      "description": ""
     },
     {
       "id": "SBE018",
@@ -3509,7 +4585,11 @@
       "image": "assets/images/products/SBE018.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "EBB019",
@@ -3522,7 +4602,11 @@
       "image": "assets/images/products/EBB019.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 37
+      },
+      "description": ""
     },
     {
       "id": "CBF012",
@@ -3535,7 +4619,11 @@
       "image": "assets/images/products/CBF012.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 10
+      },
+      "description": ""
     },
     {
       "id": "LGB011",
@@ -3548,7 +4636,11 @@
       "image": "assets/images/products/LGB011.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 32
+      },
+      "description": ""
     },
     {
       "id": "SBJ030",
@@ -3561,7 +4653,11 @@
       "image": "assets/images/products/SBJ030.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "CBA036",
@@ -3574,7 +4670,11 @@
       "image": "assets/images/products/CBA036.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 51
+      },
+      "description": ""
     },
     {
       "id": "CBA044",
@@ -3587,7 +4687,11 @@
       "image": "assets/images/products/CBA044.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 34
+      },
+      "description": ""
     },
     {
       "id": "SBB079",
@@ -3600,7 +4704,11 @@
       "image": "assets/images/products/SBB079.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 5
+      },
+      "description": ""
     },
     {
       "id": "CAB035",
@@ -3613,7 +4721,11 @@
       "image": "assets/images/products/CAB035.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "FPA137",
@@ -3626,7 +4738,11 @@
       "image": "assets/images/products/FPA137.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "FPA138",
@@ -3639,7 +4755,11 @@
       "image": "assets/images/products/FPA138.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 6
+      },
+      "description": ""
     },
     {
       "id": "KLA066",
@@ -3652,7 +4772,11 @@
       "image": "assets/images/products/KLA066.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 15
+      },
+      "description": ""
     },
     {
       "id": "XNA028",
@@ -3665,7 +4789,11 @@
       "image": "assets/images/products/XNA028.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 59
+      },
+      "description": ""
     },
     {
       "id": "YZA009",
@@ -3678,7 +4806,11 @@
       "image": "assets/images/products/YZA009.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 20
+      },
+      "description": ""
     },
     {
       "id": "ASF042",
@@ -3691,7 +4823,11 @@
       "image": "assets/images/products/ASF042.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 22
+      },
+      "description": ""
     },
     {
       "id": "ASF041",
@@ -3704,7 +4840,11 @@
       "image": "assets/images/products/ASF041.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 20
+      },
+      "description": ""
     },
     {
       "id": "DAA105",
@@ -3717,7 +4857,11 @@
       "image": "assets/images/products/DAA105.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "LGN006",
@@ -3730,7 +4874,11 @@
       "image": "assets/images/products/LGN006.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 5
+      },
+      "description": ""
     },
     {
       "id": "ASF036",
@@ -3743,7 +4891,11 @@
       "image": "assets/images/products/ASF036.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 53
+      },
+      "description": ""
     },
     {
       "id": "ASF024",
@@ -3756,7 +4908,11 @@
       "image": "assets/images/products/ASF024.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "ASF030",
@@ -3769,7 +4925,11 @@
       "image": "assets/images/products/ASF030.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 13
+      },
+      "description": ""
     },
     {
       "id": "MSA001",
@@ -3782,7 +4942,11 @@
       "image": "assets/images/products/MSA001.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 116
+      },
+      "description": ""
     },
     {
       "id": "KLA050",
@@ -3795,7 +4959,11 @@
       "image": "assets/images/products/KLA050.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 63
+      },
+      "description": ""
     },
     {
       "id": "LGR583",
@@ -3808,7 +4976,11 @@
       "image": "assets/images/products/LGR583.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "KLA265",
@@ -3821,7 +4993,11 @@
       "image": "assets/images/products/KLA265.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 45
+      },
+      "description": ""
     },
     {
       "id": "CGA104",
@@ -3834,7 +5010,11 @@
       "image": "assets/images/products/CGA104.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "DAA101",
@@ -3847,7 +5027,11 @@
       "image": "assets/images/products/DAA101.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 19
+      },
+      "description": ""
     },
     {
       "id": "ASA155",
@@ -3860,7 +5044,11 @@
       "image": "assets/images/products/ASA155.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 46
+      },
+      "description": ""
     },
     {
       "id": "KBA004",
@@ -3873,7 +5061,11 @@
       "image": "assets/images/products/KBA004.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "ASA158",
@@ -3886,7 +5078,11 @@
       "image": "assets/images/products/ASA158.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 47
+      },
+      "description": ""
     },
     {
       "id": "ASA112",
@@ -3899,7 +5095,11 @@
       "image": "assets/images/products/ASA112.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 58
+      },
+      "description": ""
     },
     {
       "id": "ASA088",
@@ -3912,7 +5112,11 @@
       "image": "assets/images/products/ASA088.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 57
+      },
+      "description": ""
     },
     {
       "id": "ASF068",
@@ -3925,7 +5129,11 @@
       "image": "assets/images/products/ASF068.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 289
+      },
+      "description": ""
     },
     {
       "id": "ASF062",
@@ -3938,7 +5146,11 @@
       "image": "assets/images/products/ASF062.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 56
+      },
+      "description": ""
     },
     {
       "id": "LGI019",
@@ -3951,7 +5163,11 @@
       "image": "assets/images/products/LGI019.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 85
+      },
+      "description": ""
     },
     {
       "id": "DAA096",
@@ -3964,7 +5180,11 @@
       "image": "assets/images/products/DAA096.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "DAA097",
@@ -3977,7 +5197,11 @@
       "image": "assets/images/products/DAA097.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "CGA112",
@@ -3990,7 +5214,11 @@
       "image": "assets/images/products/CGA112.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 10
+      },
+      "description": ""
     },
     {
       "id": "NWA031",
@@ -4003,7 +5231,11 @@
       "image": "assets/images/products/NWA031.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "NWA122",
@@ -4016,7 +5248,11 @@
       "image": "assets/images/products/NWA122.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 18
+      },
+      "description": ""
     },
     {
       "id": "EBB023",
@@ -4029,7 +5265,11 @@
       "image": "assets/images/products/EBB023.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 69
+      },
+      "description": ""
     },
     {
       "id": "KLA022",
@@ -4042,7 +5282,11 @@
       "image": "assets/images/products/KLA022.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "KLA024",
@@ -4055,7 +5299,11 @@
       "image": "assets/images/products/KLA024.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "KLA023",
@@ -4068,7 +5316,11 @@
       "image": "assets/images/products/KLA023.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 9
+      },
+      "description": ""
     },
     {
       "id": "CBE037",
@@ -4081,7 +5333,11 @@
       "image": "assets/images/products/CBE037.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 41
+      },
+      "description": ""
     },
     {
       "id": "KAC559",
@@ -4094,7 +5350,11 @@
       "image": "assets/images/products/KAC559.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "KAC862",
@@ -4107,7 +5367,11 @@
       "image": "assets/images/products/KAC862.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "KAC867",
@@ -4120,7 +5384,11 @@
       "image": "assets/images/products/KAC867.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "LGR592",
@@ -4133,7 +5401,11 @@
       "image": "assets/images/products/LGR592.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 11
+      },
+      "description": ""
     },
     {
       "id": "KAC854",
@@ -4146,7 +5418,11 @@
       "image": "assets/images/products/KAC854.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 7
+      },
+      "description": ""
     },
     {
       "id": "KAC858",
@@ -4159,7 +5435,11 @@
       "image": "assets/images/products/KAC858.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "KAC846",
@@ -4172,7 +5452,11 @@
       "image": "assets/images/products/KAC846.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "KAC639",
@@ -4185,7 +5469,11 @@
       "image": "assets/images/products/KAC639.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "KAC638",
@@ -4198,7 +5486,11 @@
       "image": "assets/images/products/KAC638.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 10
+      },
+      "description": ""
     },
     {
       "id": "LYA068",
@@ -4211,7 +5503,11 @@
       "image": "assets/images/products/LYA068.jpeg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 49
+      },
+      "description": ""
     },
     {
       "id": "ZBN061",
@@ -4224,7 +5520,11 @@
       "image": "assets/images/products/ZBN061.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 48
+      },
+      "description": ""
     },
     {
       "id": "XJA007",
@@ -4237,7 +5537,11 @@
       "image": "assets/images/products/XJA007.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 4
+      },
+      "description": ""
     },
     {
       "id": "SCB061",
@@ -4250,7 +5554,11 @@
       "image": "assets/images/products/SCB061.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 56
+      },
+      "description": ""
     },
     {
       "id": "SBA081",
@@ -4263,7 +5571,11 @@
       "image": "assets/images/products/SBA081.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 28
+      },
+      "description": ""
     },
     {
       "id": "SBA073",
@@ -4276,7 +5588,11 @@
       "image": "assets/images/products/SBA073.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 3
+      },
+      "description": ""
     },
     {
       "id": "NAZ475",
@@ -4289,7 +5605,11 @@
       "image": "assets/images/products/NAZ475.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 8
+      },
+      "description": ""
     },
     {
       "id": "NAZ469",
@@ -4302,7 +5622,11 @@
       "image": "assets/images/products/NAZ469.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 239
+      },
+      "description": ""
     },
     {
       "id": "NAC026",
@@ -4315,7 +5639,11 @@
       "image": "assets/images/products/NAC026.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 12
+      },
+      "description": ""
     },
     {
       "id": "SBJ063",
@@ -4328,7 +5656,11 @@
       "image": "assets/images/products/SBJ063.jpg",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 2
+      },
+      "description": ""
     },
     {
       "id": "NAG019",
@@ -4341,7 +5673,11 @@
       "image": "assets/images/products/NAG019.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 63
+      },
+      "description": ""
     },
     {
       "id": "MAF093",
@@ -4354,7 +5690,11 @@
       "image": "assets/images/products/MAF093.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 23
+      },
+      "description": ""
     },
     {
       "id": "MAF092",
@@ -4367,7 +5707,11 @@
       "image": "assets/images/products/MAF092.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 33
+      },
+      "description": ""
     },
     {
       "id": "SBJ064",
@@ -4380,7 +5724,11 @@
       "image": "assets/images/products/SBJ064.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 102
+      },
+      "description": ""
     },
     {
       "id": "MAF091",
@@ -4393,7 +5741,11 @@
       "image": "assets/images/products/MAF091.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 34
+      },
+      "description": ""
     },
     {
       "id": "CGA131",
@@ -4406,7 +5758,11 @@
       "image": "assets/images/products/CGA131.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 6
+      },
+      "description": ""
     },
     {
       "id": "CGA129",
@@ -4419,7 +5775,11 @@
       "image": "assets/images/products/CGA129.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 27
+      },
+      "description": ""
     },
     {
       "id": "MAF081",
@@ -4432,7 +5792,11 @@
       "image": "assets/images/products/MAF081.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 22
+      },
+      "description": ""
     },
     {
       "id": "CGA130",
@@ -4445,7 +5809,11 @@
       "image": "assets/images/products/CGA130.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 62
+      },
+      "description": ""
     },
     {
       "id": "LGK013",
@@ -4458,7 +5826,11 @@
       "image": "assets/images/products/LGK013.png",
       "status": "low",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 1
+      },
+      "description": ""
     },
     {
       "id": "LGR593",
@@ -4471,7 +5843,11 @@
       "image": "assets/images/products/LGR593.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 9
+      },
+      "description": ""
     },
     {
       "id": "EBB018",
@@ -4484,7 +5860,11 @@
       "image": "assets/images/products/EBB018.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 28
+      },
+      "description": ""
     },
     {
       "id": "CCA016",
@@ -4497,7 +5877,11 @@
       "image": "assets/images/products/CCA016.jpg",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 235
+      },
+      "description": ""
     },
     {
       "id": "CBA052",
@@ -4510,7 +5894,11 @@
       "image": "assets/images/products/CBA052.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 103
+      },
+      "description": ""
     },
     {
       "id": "ASF057",
@@ -4523,7 +5911,11 @@
       "image": "assets/images/products/ASF057.png",
       "status": "in_stock",
       "eta": null,
-      "incoming": null
+      "incoming": null,
+      "stock": {
+        "sc-astana": 59
+      },
+      "description": ""
     }
   ]
 }
