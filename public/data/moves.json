@@ -1,6 +1,78 @@
 {
-  "updated": "2026-08-10T05:03:16+03:00",
+  "updated": "2026-08-10T08:15:47+03:00",
   "moves": [
+    {
+      "number": "3307253",
+      "who": "s240534",
+      "time": "2026-08-10 10:42:30",
+      "date": "2026-08-10",
+      "sum": 80344.0,
+      "source": "Астана поставщик \"новый\"",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [
+        {
+          "sku": "KAC298",
+          "name": "KARDLI Губка для мытья посуды из древесной целлюлозы",
+          "qty": 88
+        }
+      ],
+      "itemsParsed": true
+    },
+    {
+      "number": "3307159",
+      "who": "s240534",
+      "time": "2026-08-10 10:40:58",
+      "date": "2026-08-10",
+      "sum": 1617040.0,
+      "source": "Астана поставщик \"новый\"",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [
+        {
+          "sku": "KAC298",
+          "name": "KARDLI Губка для мытья посуды из древесной целлюлозы",
+          "qty": 88
+        }
+      ],
+      "itemsParsed": true
+    },
+    {
+      "number": "3306485",
+      "who": "s240534",
+      "time": "2026-08-10 09:14:27",
+      "date": "2026-08-10",
+      "sum": 448200.0,
+      "source": "Астана поставщик \"новый\"",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [
+        {
+          "sku": "KAC298",
+          "name": "KARDLI Губка для мытья посуды из древесной целлюлозы",
+          "qty": 400
+        },
+        {
+          "sku": "SCB061",
+          "name": "SEALUXE lip glow - 2,8 г Оттеночный бальзам - помада для губ, (бледно-розовый).",
+          "qty": 144
+        },
+        {
+          "sku": "NAZ468",
+          "name": "Nilrich Грушевая паста с локвой от кашля",
+          "qty": 400
+        },
+        {
+          "sku": "DAC056",
+          "name": "iLiFE 500 мл Кухонное средство для удаления пятен масла",
+          "qty": 80
+        }
+      ],
+      "itemsParsed": true
+    },
     {
       "number": "3299532",
       "who": "s240534",
@@ -9,8 +81,8 @@
       "sum": 306000.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "ASA087",
@@ -28,16 +100,10 @@
       "sum": 448200.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
-      "items": [
-        {
-          "sku": "ASA156",
-          "name": "ILIFE Ароматизированное средство для чистки ванной /720g",
-          "qty": 300
-        }
-      ],
-      "itemsParsed": true
+      "status": "Отменен",
+      "statusCode": 9,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3289020",
@@ -339,32 +405,6 @@
       "itemsParsed": false
     },
     {
-      "number": "3201926",
-      "who": "yerkin",
-      "time": "2026-07-15 00:06:40",
-      "date": "2026-07-15",
-      "sum": 1443000.0,
-      "source": "Астана поставщик",
-      "recipient": "S240534",
-      "status": "Принят СЦ",
-      "statusCode": 7,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
-      "number": "3199063",
-      "who": "s240534",
-      "time": "2026-07-14 14:12:40",
-      "date": "2026-07-14",
-      "sum": 431600.0,
-      "source": "Алматы поставщик",
-      "recipient": "S240534",
-      "status": "Принят СЦ",
-      "statusCode": 7,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
       "number": "3198865",
       "who": "s240534",
       "time": "2026-07-14 14:06:25",
@@ -384,19 +424,6 @@
       "date": "2026-07-14",
       "sum": 360000.0,
       "source": "Астана поставщик \"новый\"",
-      "recipient": "S240534",
-      "status": "Принят СЦ",
-      "statusCode": 7,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
-      "number": "3196397",
-      "who": "s240534",
-      "time": "2026-07-14 11:10:42",
-      "date": "2026-07-14",
-      "sum": 1139200.0,
-      "source": "Астана поставщик",
       "recipient": "S240534",
       "status": "Принят СЦ",
       "statusCode": 7,
