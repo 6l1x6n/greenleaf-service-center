@@ -79,19 +79,6 @@
     });
   }
 
-  function applyStockOverrides() {
-    var saved = lsGet(KEYS.stock) || {};
-    Object.keys(saved).forEach(function (scId) {
-      var map = saved[scId] || {};
-      state.products.forEach(function (p) {
-        if (map[p.id] !== undefined) {
-          if (!p.stockByStore) p.stockByStore = {};
-          p.stockByStore[scId] = map[p.id];
-        }
-      });
-    });
-  }
-
   function applyProductOverrides() {
     var saved = lsGet(KEYS.products) || {};
     state.products.forEach(function (p) {
@@ -168,13 +155,13 @@
     var p2 = loadJSON('data/products.json').then(function (d) { return d.products || []; }).catch(function () { return []; });
     var p3 = loadJSON('data/deliveries.json').then(function (d) { return mergeDeliveries(d.deliveries || []); }).catch(function () { return mergeDeliveries([]); });
     var p4 = loadJSON('data/events.json').then(function (d) { return mergeEvents(d.events || []); }).catch(function () { return mergeEvents([]); });
-    return Promise.all([p1, p2, p3, p4]).then(function (res) {
+    var p5 = window.StoreStock ? StoreStock.load() : Promise.resolve();
+    return Promise.all([p1, p2, p3, p4, p5]).then(function (res) {
       state.stores = res[0];
       state.products = res[1];
       state.deliveries = res[2];
       state.events = res[3];
       applyStoreOverrides();
-      applyStockOverrides();
       applyProductOverrides();
     });
   }
@@ -396,6 +383,7 @@
     var visibleStores = isSuper() ? state.stores : state.stores.filter(function (s) { return s.id === state.user.id; });
 
     content.insertAdjacentHTML('beforeend',
+      '<div class="admin-note">📦 Остатки сохраняются на этом устройстве и видны в каталоге здесь. Чтобы посетители увидели остатки по филиалам: нажмите «Экспорт JSON», сохраните файл как <b>data/store-stock.json</b> и загрузите его в репозиторий (Decap CMS → GitHub) или через «Импорт JSON» ниже.</div>' +
       '<div class="admin-toolbar"><input class="search" id="stockSearch" type="search" placeholder="Поиск по названию или артикулу…" autocomplete="off"></div>' +
       '<div class="admin-card admin-table-wrap">' +
       '<table class="admin-table" id="stockTable">' +
@@ -403,7 +391,12 @@
       visibleStores.map(function (s) { return '<th>' + h(s.name) + '</th>'; }).join('') +
       '</tr></thead><tbody id="stockTbody"></tbody></table>' +
       '</div>' +
-      '<button class="btn btn-primary" id="stockSaveBtn">💾 Сохранить остатки</button>'
+      '<div class="admin-actions" style="flex-wrap:wrap;">' +
+      '<button class="btn btn-primary" id="stockSaveBtn">💾 Сохранить остатки</button>' +
+      '<button class="btn btn-outline" id="stockExportBtn">⬇️ Экспорт JSON (store-stock.json)</button>' +
+      '<button class="btn btn-outline" id="stockImportBtn">⬆️ Импорт JSON</button>' +
+      '<input type="file" id="stockImportFile" accept="application/json,.json" style="display:none;">' +
+      '</div>'
     );
 
     function drawRows(query) {
@@ -414,8 +407,8 @@
         return '<tr>' +
           '<td><strong>' + h(p.name) + '</strong><br><span class="muted-sku">' + h(p.sku) + '</span></td>' +
           visibleStores.map(function (s) {
-            var val = (p.stockByStore && p.stockByStore[s.id]) ? p.stockByStore[s.id] : '';
-            return '<td><input data-stock-sc="' + h(s.id) + '" data-stock-prod="' + h(p.id) + '" value="' + h(val) + '" placeholder="Например: В наличии (10 шт)"></td>';
+            var val = StoreStock.text(s.id, p.id);
+            return '<td><input data-stock-sc="' + h(s.id) + '" data-stock-prod="' + h(p.id) + '" value="' + h(val === undefined ? '' : val) + '" placeholder="Например: В наличии (10 шт)"></td>';
           }).join('') +
           '</tr>';
       }).join('');
@@ -435,6 +428,51 @@
       lsSet(KEYS.stock, saved);
       Utils.showToast('✅ Остатки сохранены');
       loadData().then(function () { openSection(state.section); });
+    });
+
+    content.querySelector('#stockExportBtn').addEventListener('click', function () {
+      var stock = {};
+      content.querySelectorAll('[data-stock-sc]').forEach(function (inp) {
+        var val = inp.value.trim();
+        if (!val) return;
+        var scId = inp.getAttribute('data-stock-sc');
+        if (!stock[scId]) stock[scId] = {};
+        stock[scId][inp.getAttribute('data-stock-prod')] = val;
+      });
+      var payload = JSON.stringify({ updated: new Date().toISOString(), stock: stock }, null, 1);
+      var blob = new Blob([payload], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'store-stock.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Utils.showToast('⬇️ Файл store-stock.json скачан — загрузите его в репозиторий');
+    });
+
+    content.querySelector('#stockImportBtn').addEventListener('click', function () {
+      content.querySelector('#stockImportFile').click();
+    });
+    content.querySelector('#stockImportFile').addEventListener('change', function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var parsed = JSON.parse(reader.result);
+          var stock = (parsed && parsed.stock) || parsed || {};
+          if (typeof stock !== 'object' || Array.isArray(stock)) throw new Error('bad format');
+          lsSet(KEYS.stock, stock);
+          Utils.showToast('⬆️ Остатки импортированы — применены на этом устройстве');
+          loadData().then(function () { openSection(state.section); });
+        } catch (err) {
+          Utils.showToast('Не удалось прочитать JSON');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
     });
   }
 
@@ -589,15 +627,22 @@
 
     function drawList() {
       var ul = listEl.querySelector('#eventList');
+      var bookings = (function () {
+        try { return JSON.parse(localStorage.getItem('greenleaf_event_bookings_v1') || '{}'); } catch (e) { return {}; }
+      })();
       ul.innerHTML = visible.map(function (ev) {
         var dt = Utils.fmtDate(ev.date + 'T00:00:00', { day: 'numeric', month: 'long', year: 'numeric' });
         var storeName = ev.storeId
           ? (function () { var s = state.stores.find(function (x) { return x.id === ev.storeId; }); return s ? s.name : ev.storeId; })()
           : '';
+        var booked = Number(bookings[String(ev.id)]) || 0;
+        var remaining = ev.slots != null ? Math.max(0, ev.slots - booked) : null;
+        var seatsTxt = 'Мест: ' + h(ev.slots != null ? ev.slots : '—');
+        if (remaining !== null) seatsTxt += ' · Записалось: ' + booked + ' · Осталось: ' + remaining;
         return '<li>' +
           '<div class="admin-list-main">' +
           '<strong>' + h(ev.title) + (storeName ? ' <span style="font-weight:500; color:var(--green); font-size:12.5px;">· ' + h(storeName) + '</span>' : '') + '</strong>' +
-          '<span>' + h(dt) + ' · ' + h(ev.time || '') + ' · ' + h(ev.place || '') + ' · Мест: ' + h(ev.slots != null ? ev.slots : '—') + '</span>' +
+          '<span>' + h(dt) + ' · ' + h(ev.time || '') + ' · ' + h(ev.place || '') + ' · ' + seatsTxt + '</span>' +
           '</div>' +
           '<div class="admin-actions">' +
           '<button class="btn btn-outline btn-sm" data-ev-edit="' + h(ev.id) + '">✏️ Изменить</button>' +

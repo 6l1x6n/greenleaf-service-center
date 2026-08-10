@@ -87,13 +87,11 @@
 
     // Заказы (корзина) — валидация своих полей
     if (data.type === 'order') {
-      var payPanel = form.querySelector('.pay-panel:not(.hidden)');
-      var isCash = payPanel && payPanel.getAttribute('data-pay-panel') === 'cash';
+      var isCash = data.payment === 'Наличные при получении';
       if (!data.name || !data.phone || (isCash && (!data.pickup_date || !data.pickup_time))) {
         markInvalid(form, isCash ? ['name', 'phone', 'pickup_date', 'pickup_time'] : ['name', 'phone']);
         return;
       }
-      data.payment = isCash ? 'Наличные при получении' : 'Kaspi';
     }
 
     if (!data.name || !data.phone) {
@@ -115,6 +113,14 @@
         markSuccess(form, data.type === 'order' ? '' : 'Заявка отправлена!', successTextFor(data));
         if (data.type === 'order') {
           window.dispatchEvent(new CustomEvent('order:sent', { detail: data }));
+        }
+        if (data.type === 'event' && data.event_id) {
+          try {
+            var bookings = JSON.parse(localStorage.getItem('greenleaf_event_bookings_v1') || '{}');
+            bookings[data.event_id] = (Number(bookings[data.event_id]) || 0) + 1;
+            localStorage.setItem('greenleaf_event_bookings_v1', JSON.stringify(bookings));
+          } catch (e) { }
+          window.dispatchEvent(new CustomEvent('event:booked', { detail: { id: data.event_id } }));
         }
         if (data.type === 'partner' && window.Partners) {
           window.Partners.addStoreFromForm(data);

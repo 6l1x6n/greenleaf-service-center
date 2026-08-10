@@ -2,7 +2,8 @@
   'use strict';
 
   var products = [];
-  var state = { payment: 'kaspi', partnerMode: false };
+  var stores = [];
+  var state = { payment: 'kaspi', partnerMode: false, storeId: null, showHiddenItems: false };
 
   var itemsEl = document.getElementById('cartItems');
   var viewEl = document.getElementById('cartView');
@@ -10,6 +11,9 @@
   var successEl = document.getElementById('cartSuccess');
   var summaryEl = document.querySelector('.cart-summary');
   var orderForm = document.getElementById('orderForm');
+  var clearBtn = document.getElementById('cartClearBtn');
+
+  var SELECTED_KEY = 'greenleaf_sc_selected_v1';
 
   function partnerModeValid(id) {
     return /^[a-z]{2}\d{8}$/i.test(String(id || '').trim());
@@ -35,12 +39,58 @@
     }).filter(Boolean);
   }
 
-  function totals() {
+  // Филиалы, где есть данные об остатках и есть хотя бы один товар из корзины
+  function candidateStores() {
     var lines = cartLines();
+    var good = {};
+    stores.forEach(function (s) {
+      if (!StoreStock.hasData(s.id)) return;
+      if (lines.some(function (l) { return StoreStock.available(l.p, s.id); })) {
+        good[s.id] = true;
+      }
+    });
+    return stores.filter(function (s) { return good[s.id]; });
+  }
+
+  function lineAvailable(l) {
+    if (!state.storeId) return true;
+    return StoreStock.available(l.p, state.storeId);
+  }
+
+  function savedStore() {
+    try {
+      return JSON.parse(localStorage.getItem(SELECTED_KEY) || 'null');
+    } catch (e) { return null; }
+  }
+
+  function selectedStoreObj() {
+    return stores.find(function (s) { return s.id === state.storeId; }) || null;
+  }
+
+  function syncStoreSelection() {
+    var cands = candidateStores();
+    if (!cands.length) {
+      var saved = savedStore();
+      state.storeId = (saved && saved.id) || null;
+      return;
+    }
+    if (!state.storeId || !cands.some(function (s) { return s.id === state.storeId; })) {
+      var saved = savedStore();
+      state.storeId = (saved && cands.some(function (s) { return s.id === saved.id; }))
+        ? saved.id
+        : cands[0].id;
+    }
+  }
+
+  function totals() {
+    var all = cartLines();
+    syncStoreSelection();
+    var lines = all.filter(lineAvailable);
+    var hidden = all.length - lines.length;
     var qtyTotal = lines.reduce(function (s, l) { return s + l.qty; }, 0);
     var goodsTotal = lines.reduce(function (s, l) { return s + l.total; }, 0);
     var pkg = lines.length ? packageFee(qtyTotal) : 0;
-    return { lines: lines, qtyTotal: qtyTotal, goodsTotal: goodsTotal, pkg: pkg, total: goodsTotal + pkg };
+    return { lines: lines, all: all, hidden: hidden, qtyTotal: qtyTotal, goodsTotal: goodsTotal, pkg: pkg, total: goodsTotal + pkg };
   }
 
   function setField(id, value) {
@@ -48,10 +98,53 @@
     if (el) el.value = value;
   }
 
+  function itemHtml(l, unavailable) {
+    return '<div class="cart-item' + (unavailable ? ' cart-item-unavailable' : '') + '">' +
+      '<button class="cart-item-x" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Удалить из корзины">✕</button>' +
+      '<div class="cart-item-media"><img src="' + Utils.esc(l.p.image || 'assets/images/products/placeholder.svg') + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
+      '<div class="cart-item-body">' +
+      '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
+      '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + '</div>' +
+      '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + '</div>' +
+      (unavailable ? '<div class="cart-item-unavailable-note">Нет в выбранном филиале — не войдёт в заказ</div>' : '') +
+      '</div>' +
+      '<div class="cart-item-ctrl">' +
+      '<div class="qty-stepper">' +
+      '<button class="qty-btn" data-cart-dec="' + Utils.esc(l.p.id) + '" aria-label="Уменьшить">−</button>' +
+      '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(l.p.id) + '" min="1" max="999" value="' + l.qty + '" aria-label="Количество">' +
+      '<button class="qty-btn" data-cart-inc="' + Utils.esc(l.p.id) + '" aria-label="Увеличить">+</button>' +
+      '</div>' +
+      '<button class="cart-item-trash" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Убрать из корзины">🗑</button>' +
+      '</div>' +
+      '<div class="cart-item-total">' + (unavailable ? '<span style="color:var(--muted);">—</span>' : Utils.fmtPrice(l.total)) + '</div>' +
+      '</div>';
+  }
+
+  function renderStoreSelect() {
+    var el = document.getElementById('cartStoreSelect');
+    if (!el) return;
+    var cands = candidateStores();
+    if (!cands.length) {
+      el.innerHTML = '';
+      return;
+    }
+    el.innerHTML =
+      '<div class="cart-store-select-title">🏬 Филиал, где заберёте заказ</div>' +
+      '<div class="cart-store-list">' +
+      cands.map(function (s) {
+        var checked = s.id === state.storeId;
+        return '<label class="cart-store-opt' + (checked ? ' checked' : '') + '">' +
+          '<input type="radio" name="cart-store" value="' + Utils.esc(s.id) + '"' + (checked ? ' checked' : '') + '>' +
+          '<span class="cart-store-name">' + Utils.esc(s.name) + '</span>' +
+          '</label>';
+      }).join('') +
+      '</div>';
+  }
+
   function render() {
     var t = totals();
 
-    if (!t.lines.length) {
+    if (!t.all.length) {
       emptyEl.classList.remove('hidden');
       viewEl.classList.add('hidden');
       successEl.classList.add('hidden');
@@ -61,24 +154,23 @@
     successEl.classList.add('hidden');
     viewEl.classList.remove('hidden');
 
-    itemsEl.innerHTML = t.lines.map(function (l) {
-      return '<div class="cart-item">' +
-        '<div class="cart-item-media"><img src="' + Utils.esc(l.p.image || 'assets/images/products/placeholder.svg') + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
-        '<div class="cart-item-body">' +
-        '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
-        '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + '</div>' +
-        '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + '</div>' +
-        '</div>' +
-        '<div class="cart-item-ctrl">' +
-        '<div class="qty-stepper">' +
-        '<button class="qty-btn" data-cart-dec="' + Utils.esc(l.p.id) + '" aria-label="Уменьшить">−</button>' +
-        '<span class="qty-val">' + l.qty + '</span>' +
-        '<button class="qty-btn" data-cart-inc="' + Utils.esc(l.p.id) + '" aria-label="Увеличить">+</button>' +
-        '</div>' +
-        '<button class="btn btn-light-outline btn-sm" data-cart-remove="' + Utils.esc(l.p.id) + '">Удалить</button>' +
-        '</div>' +
-        '<div class="cart-item-total">' + Utils.fmtPrice(l.total) + '</div>' +
-        '</div>';
+    renderStoreSelect();
+
+    var storeObj = selectedStoreObj();
+    var saved = savedStore();
+    var showUnavailable = state.showHiddenItems && t.hidden > 0;
+    var displayLines = showUnavailable ? t.all : t.lines;
+
+    var hideNote = '';
+    if (t.hidden > 0) {
+      var storeName = storeObj ? Utils.esc(storeObj.name) : 'выбранный филиал';
+      hideNote = showUnavailable
+        ? '<div class="cart-hide-note">Эти позиции недоступны в филиале <b>' + storeName + '</b> — они не войдут в заказ. <button class="btn btn-outline btn-sm" data-cart-hide-hidden="1">Скрыть</button></div>'
+        : '<div class="cart-hide-note">Скрыто <b>' + t.hidden + ' ' + (t.hidden === 1 ? 'позиция' : (t.hidden >= 2 && t.hidden <= 4 ? 'позиции' : 'позиций')) + '</b> — их нет в филиале <b>' + storeName + '</b>. <button class="btn btn-outline btn-sm" data-cart-show-hidden="1">Показать</button></div>';
+    }
+
+    itemsEl.innerHTML = hideNote + displayLines.map(function (l) {
+      return itemHtml(l, showUnavailable && !lineAvailable(l));
     }).join('');
 
     summaryEl.querySelector('.sum-goods').textContent = Utils.fmtPrice(t.goodsTotal);
@@ -89,32 +181,37 @@
       el.setAttribute('data-total', t.total);
     });
 
-    setField('orderItems', t.lines.map(function (l) {
+    var orderStoreTxt = 'Не выбран';
+    var pickupTxt = '🏬 Получение уточните у менеджера — подскажем ближайший Сервис-Центр.';
+    if (storeObj) {
+      orderStoreTxt = storeObj.name;
+      pickupTxt = '🏬 Получение: ' + storeObj.name + (storeObj.address ? ' — ' + storeObj.address : '');
+    } else if (saved && saved.name) {
+      orderStoreTxt = saved.name;
+      pickupTxt = '🏬 Получение: ' + saved.name + (saved.address ? ' — ' + saved.address : '') + ' — проверим наличие в этом филиале.';
+    }
+    var pickupEl = document.getElementById('cartPickup');
+    if (pickupEl) pickupEl.textContent = pickupTxt;
+    setField('orderStore', orderStoreTxt);
+
+    var orderItemsTxt = t.lines.map(function (l) {
       return l.p.name + ' (' + l.p.sku + ') × ' + l.qty + ' = ' + Utils.fmtPrice(l.total);
-    }).join('\n'));
+    }).join('\n');
+    if (t.hidden > 0) {
+      var hiddenNames = t.all.filter(function (l) { return !lineAvailable(l); })
+        .map(function (l) { return l.p.name + ' (' + l.p.sku + ')'; });
+      orderItemsTxt += '\n—\nНе вошло в заказ (нет в филиале): ' + hiddenNames.join(', ');
+    }
+    setField('orderItems', orderItemsTxt);
     setField('orderTotal', t.total);
     setField('orderPackage', t.pkg);
     setField('orderQtyTotal', t.qtyTotal);
     setField('orderPartnerMode', state.partnerMode ? '1' : '0');
   }
 
-  function renderPickup() {
-    var el = document.getElementById('cartPickup');
-    if (!el) return;
-    try {
-      var saved = JSON.parse(localStorage.getItem('greenleaf_sc_selected_v1') || 'null');
-      if (saved && saved.name) {
-        el.textContent = '🏬 Получение: ' + saved.name + (saved.address ? ' — ' + saved.address : '');
-        setField('orderStore', saved.name);
-      } else {
-        el.textContent = '🏬 Получение уточните у менеджера — подскажем ближайший Сервис-Центр.';
-        setField('orderStore', 'Не выбран');
-      }
-    } catch (e) { }
-  }
-
   function setPayment(method) {
     state.payment = method;
+    setField('orderPayment', method === 'cash' ? 'Наличные при получении' : 'Kaspi');
     document.querySelectorAll('.pay-tab').forEach(function (b) {
       b.classList.toggle('active', b.getAttribute('data-pay') === method);
     });
@@ -164,7 +261,6 @@
   }
 
   function payWithQr(total) {
-    var totalEl = summaryEl.querySelector('.sum-total');
     var totalTxt = Utils.fmtPrice(total);
     Utils.openModal(
       '<h3>💳 Оплата по Kaspi QR</h3>' +
@@ -218,6 +314,23 @@
       if (!win) Utils.showToast('Откройте приложение Kaspi и вставьте сумму');
       return;
     }
+    var storeOpt = e.target.closest('[name="cart-store"]');
+    if (storeOpt) {
+      state.storeId = storeOpt.value;
+      state.showHiddenItems = false;
+      var so = stores.find(function (s) { return s.id === state.storeId; });
+      if (so) {
+        try {
+          localStorage.setItem(SELECTED_KEY, JSON.stringify({ id: so.id, name: so.name, address: so.address || '' }));
+        } catch (err) { }
+      }
+      render();
+      return;
+    }
+    var showHidden = e.target.closest('[data-cart-show-hidden]');
+    if (showHidden) { state.showHiddenItems = true; render(); return; }
+    var hideHidden = e.target.closest('[data-cart-hide-hidden]');
+    if (hideHidden) { state.showHiddenItems = false; render(); return; }
     var add = e.target.closest('[data-cart-add]');
     if (add) { Cart.add(add.getAttribute('data-cart-add'), 1); return; }
     var inc = e.target.closest('[data-cart-inc]');
@@ -235,6 +348,14 @@
     var rm = e.target.closest('[data-cart-remove]');
     if (rm) { Cart.remove(rm.getAttribute('data-cart-remove')); }
   });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      if (!confirm('Очистить корзину?')) return;
+      Cart.clear();
+      Utils.showToast('🗑 Корзина очищена');
+    });
+  }
 
   var partnerInput = document.getElementById('partnerId');
   if (partnerInput) {
@@ -274,7 +395,17 @@
     } catch (e) {
       products = [];
     }
-    renderPickup();
+    try {
+      var sRes = await fetch('data/stores.json?t=' + Date.now());
+      stores = await sRes.json();
+    } catch (e) {
+      stores = [];
+    }
+    await StoreStock.load();
+
+    var saved = savedStore();
+    if (saved && saved.id) state.storeId = saved.id;
+
     render();
   }
 

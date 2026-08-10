@@ -122,4 +122,60 @@
 
   document.getElementById('year').textContent = new Date().getFullYear();
   loadStore();
+
+  // ---------------- Остатки по филиалам (store-stock.json + оверрайды админки) ----------------
+
+  var STOCK_KEY = 'greenleaf_sc_custom_products_v1';
+  var baseStock = {};
+  var baseStockUpdated = '';
+  var baseStockLoaded = null;
+
+  function loadBaseStock() {
+    if (baseStockLoaded) return baseStockLoaded;
+    baseStockLoaded = fetch('data/store-stock.json?t=' + Date.now())
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        baseStock = (d && d.stock) || {};
+        baseStockUpdated = (d && d.updated) || '';
+      })
+      .catch(function () {
+        baseStock = {};
+        baseStockUpdated = '';
+      });
+    return baseStockLoaded;
+  }
+
+  function stockOverrides() {
+    try { return JSON.parse(localStorage.getItem(STOCK_KEY) || '{}'); } catch (e) { return {}; }
+  }
+
+  function storeStockData(storeId) {
+    var ov = stockOverrides();
+    var fromOverride = ov[storeId] && Object.keys(ov[storeId]).length;
+    var fromBase = baseStock[storeId] && Object.keys(baseStock[storeId]).length;
+    return !!(fromOverride || fromBase);
+  }
+
+  function stockText(storeId, productId) {
+    var ov = stockOverrides();
+    if (ov[storeId] && ov[storeId][productId] !== undefined) return ov[storeId][productId];
+    if (baseStock[storeId] && baseStock[storeId][productId] !== undefined) return baseStock[storeId][productId];
+    return undefined;
+  }
+
+  function isAvailableInStore(p, storeId) {
+    if (!storeStockData(storeId)) return true;
+    var t = stockText(storeId, p && p.id);
+    if (t === undefined || t === null || String(t).trim() === '') return false;
+    t = String(t);
+    return t.indexOf('Нет') !== 0 && t.indexOf('Ожидается') === -1;
+  }
+
+  window.StoreStock = {
+    load: loadBaseStock,
+    hasData: storeStockData,
+    text: stockText,
+    available: isAvailableInStore,
+    updated: function () { return baseStockUpdated; }
+  };
 })();

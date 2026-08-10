@@ -526,8 +526,11 @@ a:hover { text-decoration: none; }
 
 /* ---------- Страница корзины ---------- */
 .cart-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+.cart-items-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.cart-items-head h3 { font-size: 18px; color: var(--green-dark); }
 .cart-items { display: flex; flex-direction: column; gap: 10px; }
 .cart-item {
+  position: relative;
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr) auto auto;
   gap: 10px 14px;
@@ -538,6 +541,76 @@ a:hover { text-decoration: none; }
   box-shadow: var(--shadow);
   padding: 10px 14px;
 }
+.cart-item-unavailable { opacity: 0.6; background: #fafafa; }
+.cart-item-unavailable-note {
+  font-size: 11.5px;
+  color: var(--danger);
+  font-weight: 700;
+  margin-top: 4px;
+}
+.cart-item-x {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.15s;
+  font-family: var(--font);
+}
+.cart-item-x:hover { border-color: var(--danger); color: var(--danger); background: #fdf0f0; }
+.cart-item-trash {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.15s;
+  font-family: var(--font);
+}
+.cart-item-trash:hover { border-color: var(--danger); color: var(--danger); background: #fdf0f0; }
+.cart-hide-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fdf0dd;
+  border: 1px solid #f7dfb5;
+  color: #8a5a00;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13.5px;
+  margin-bottom: 10px;
+}
+.cart-store-select { display: flex; flex-direction: column; gap: 8px; }
+.cart-store-select-title { font-size: 13.5px; font-weight: 800; color: var(--ink); }
+.cart-store-list { display: flex; flex-direction: column; gap: 6px; }
+.cart-store-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  font-size: 14px;
+}
+.cart-store-opt:hover { border-color: rgba(27, 107, 63, 0.5); }
+.cart-store-opt.checked { border-color: var(--green); background: var(--green-soft); }
+.cart-store-opt input { accent-color: var(--green); width: 16px; height: 16px; flex-shrink: 0; margin: 0; }
+.cart-store-name { flex: 1; font-weight: 700; color: var(--ink); line-height: 1.3; }
 .cart-item-media img { width: 56px; height: 56px; object-fit: contain; border-radius: 8px; background: var(--green-soft); display: block; }
 .cart-item-name { font-weight: 700; font-size: 14px; line-height: 1.3; }
 .cart-item-sku { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -665,12 +738,33 @@ a:hover { text-decoration: none; }
 }
 .qty-btn:hover { background: rgba(10, 53, 32, 0.08); }
 .qty-val { min-width: 26px; text-align: center; font-weight: 800; font-size: 14.5px; color: var(--green-dark); }
+.qty-input {
+  width: 46px;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--green-dark);
+  font-family: var(--font);
+  padding: 0;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty-input:focus { background: rgba(10, 53, 32, 0.07); }
 .row-remove {
   min-width: 0 !important;
   width: 30px;
   padding: 0 !important;
   font-size: 12px !important;
+  border-color: var(--line) !important;
+  background: #fff !important;
+  color: var(--muted) !important;
 }
+.row-remove:hover { border-color: var(--danger) !important; color: var(--danger) !important; background: #fdf0f0 !important; }
 
 @media (max-width: 900px) {
   .product-row {
@@ -874,7 +968,7 @@ a:hover { text-decoration: none; }
 .move-point-end { color: var(--green-dark); }
 .move-track { position: relative; height: 10px; border-radius: 999px; background: repeating-linear-gradient(90deg, #dfe5df 0 14px, #f4f7f4 14px 28px); }
 .move-progress { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--green); border-radius: 999px; transition: width 0.6s ease; }
-.move-truck { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 20px; z-index: 2; transition: left 0.6s ease; line-height: 1; }
+.move-truck { position: absolute; top: 50%; transform: translate(-50%, -50%) scaleX(-1); font-size: 20px; z-index: 2; transition: left 0.6s ease; line-height: 1; }
 .move-eta { font-size: 13px; font-weight: 700; color: var(--green-darker); margin-bottom: 4px; }
 
 /* ---------- Мероприятия ---------- */
@@ -912,6 +1006,34 @@ a:hover { text-decoration: none; }
 .event-desc { font-size: 14.5px; }
 .event-slots { font-size: 13px; color: var(--muted); }
 .event .btn { align-self: flex-start; margin-top: auto; }
+.event-when {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+.event-when-today { background: var(--amber); color: #3d2a00; }
+.event-when-tomorrow { background: var(--green-light); color: var(--green-darker); }
+.event-when-card-today {
+  border: 2px solid var(--amber);
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.18), var(--shadow);
+  animation: eventGlow 2s ease-in-out infinite;
+}
+.event-when-card-today .event-date { color: #b26a00; }
+.event-when-card-tomorrow {
+  border-color: rgba(27, 107, 63, 0.45);
+  box-shadow: 0 0 0 3px rgba(27, 107, 63, 0.1), var(--shadow);
+}
+@keyframes eventGlow {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.16), var(--shadow); }
+  50% { box-shadow: 0 0 0 7px rgba(245, 166, 35, 0.32), var(--shadow-lg); }
+}
 
 /* ---------- Партнёрам & форма ---------- */
 .partners-layout {

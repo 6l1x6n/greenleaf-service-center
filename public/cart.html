@@ -55,10 +55,18 @@
         </div>
 
         <div id="cartView" class="cart-layout hidden">
-          <div class="cart-items" id="cartItems"></div>
+          <div>
+            <div class="cart-items-head">
+              <h3>Товары в корзине</h3>
+              <button class="btn btn-outline btn-sm" type="button" id="cartClearBtn">🗑 Очистить корзину</button>
+            </div>
+            <div class="cart-items" id="cartItems"></div>
+          </div>
 
           <aside class="cart-summary">
             <h3>Ваш заказ</h3>
+
+            <div class="cart-store-select" id="cartStoreSelect"></div>
 
             <div class="cart-pickup" id="cartPickup">🏬 Товары можно забрать в выбранном Сервис-Центре или уточнить у менеджера.</div>
 
@@ -89,6 +97,7 @@
             </div>
 
             <form class="form" data-type="order" id="orderForm">
+              <input type="hidden" name="payment" id="orderPayment">
               <input type="hidden" name="order_items" id="orderItems">
               <input type="hidden" name="order_total" id="orderTotal">
               <input type="hidden" name="order_package" id="orderPackage">

@@ -63,6 +63,16 @@
     badge.style.display = n ? 'inline-flex' : 'none';
   }
 
+  document.addEventListener('change', function (e) {
+    var inp = e.target.closest('[data-cart-qty]');
+    if (!inp) return;
+    var id = inp.getAttribute('data-cart-qty');
+    var qty = parseInt(inp.value, 10);
+    if (isNaN(qty) || qty < 1) qty = 1;
+    if (qty > 999) qty = 999;
+    setQty(id, qty);
+  });
+
   window.Cart = {
     get: load,
     count: count,

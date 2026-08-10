@@ -116,7 +116,7 @@ function buildText(data) {
     ...(blocks[type] || ['✉️ Новая заявка']).filter(Boolean),
     '👤 Имя: ' + name,
     '📞 Телефон: ' + phone,
-    '🕐 ' + new Date().toLocaleString('ru-RU')
+    '🕐 ' + new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty', hour12: false })
   ];
 
   return lines.join('\n');

@@ -45,7 +45,7 @@
     if (item) {
       return '<div class="qty-stepper" data-cart-row="' + Utils.esc(p.id) + '">' +
         '<button class="qty-btn" data-cart-dec="' + Utils.esc(p.id) + '" aria-label="Уменьшить">−</button>' +
-        '<span class="qty-val">' + (Number(item.qty) || 1) + '</span>' +
+        '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(p.id) + '" min="1" max="999" value="' + (Number(item.qty) || 1) + '" aria-label="Количество">' +
         '<button class="qty-btn" data-cart-inc="' + Utils.esc(p.id) + '" aria-label="Увеличить">+</button>' +
         '</div>' +
         '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины">✕</button>';
@@ -61,9 +61,11 @@
       qtyHtml = '<div class="eta-line qty-line' + (p.status === 'low' ? ' qty-line-low' : '') + '">📦 Доступно: <b>' + p.quantity + ' шт.</b></div>';
     }
     var stockInSelectedStore = '';
-    if (state.selectedStoreId && state.selectedStoreId !== 'all' && p.stockByStore) {
-      var storeStock = p.stockByStore[state.selectedStoreId] || 'Нет данных';
-      stockInSelectedStore = '<div class="eta-line" style="color:var(--green-dark); font-weight:700; margin-top:2px;">📍 В выбранном СЦ: ' + Utils.esc(storeStock) + '</div>';
+    if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+      var storeStock = StoreStock.text(state.selectedStoreId, p.id);
+      if (storeStock !== undefined && String(storeStock).trim() !== '') {
+        stockInSelectedStore = '<div class="eta-line" style="color:var(--green-dark); font-weight:700; margin-top:2px;">📍 В выбранном СЦ: ' + Utils.esc(storeStock) + '</div>';
+      }
     }
 
     return '' +
@@ -199,7 +201,7 @@
     }
 
     var inStockHere = products.filter(function (p) {
-      return p.stockByStore && p.stockByStore[store.id] && p.stockByStore[store.id].indexOf('Нет') === -1;
+      return StoreStock.available(p, store.id);
     }).length;
 
     var filtered = !state.showAllCatalog;
@@ -241,7 +243,7 @@
     var hoursTxt = Array.isArray(s.hours)
       ? s.hours.map(function (h) { return h.days + ' ' + h.time; }).join('<br>')
       : (s.hours || '');
-    var title = sel ? 'Филиал: ' + s.name : 'Головной офис';
+    var title = sel ? 'Филиал: ' + s.name : 'Сервис-Центр';
 
     contactsEl.innerHTML =
       '<div class="row"><span class="lbl">Филиал</span><span><strong>' + Utils.esc(title) + '</strong></span></div>' +
@@ -277,12 +279,14 @@
       qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно на складе: <b>' + p.quantity + ' шт.</b></div>';
     }
     var stockRows = '';
-    if (p.stockByStore) {
-      stockRows = Object.keys(p.stockByStore).map(function (sId) {
-        var s = stores.find(function (x) { return x.id === sId; });
-        var storeName = s ? s.name : sId;
-        return '<div class="product-stock-item"><span>📍 <strong>' + Utils.esc(storeName) + ':</strong></span> <span>' + Utils.esc(p.stockByStore[sId]) + '</span></div>';
-      }).join('');
+    var storeStockLines = [];
+    stores.forEach(function (s) {
+      var txt = StoreStock.text(s.id, p.id);
+      if (txt === undefined || String(txt).trim() === '') return;
+      storeStockLines.push('<div class="product-stock-item"><span>📍 <strong>' + Utils.esc(s.name) + ':</strong></span> <span>' + Utils.esc(txt) + '</span></div>');
+    });
+    if (storeStockLines.length) {
+      stockRows = storeStockLines.join('');
     } else {
       stockRows = '<div class="product-stock-item">В наличии на центральном складе</div>';
     }
@@ -329,8 +333,7 @@
       var okQ = !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1;
       var okStore = true;
       if (state.selectedStoreId && state.selectedStoreId !== 'all' && !state.showAllCatalog) {
-        var stk = p.stockByStore && p.stockByStore[state.selectedStoreId];
-        okStore = !!(stk && stk.indexOf('Нет') !== 0 && stk.indexOf('Ожидается') === -1);
+        okStore = StoreStock.available(p, state.selectedStoreId);
       }
       return okCat && okStock && okQ && okStore;
     });
@@ -361,13 +364,11 @@
   }
 
   function availableStoresFor(p) {
-    if (!p.stockByStore) return [];
-    return Object.keys(p.stockByStore).map(function (sId) {
-      var s = stores.find(function (x) { return x.id === sId; });
-      if (!s) return null;
-      var stockTxt = p.stockByStore[sId] || '';
-      var low = stockTxt.indexOf('Нет') === 0 || stockTxt.indexOf('Ожидается') !== -1;
-      return { id: s.id, name: s.name, stock: stockTxt, available: !low };
+    return stores.map(function (s) {
+      var stockTxt = StoreStock.text(s.id, p.id);
+      if (stockTxt === undefined || String(stockTxt).trim() === '') return null;
+      var low = String(stockTxt).indexOf('Нет') === 0 || String(stockTxt).indexOf('Ожидается') !== -1;
+      return { id: s.id, name: s.name, stock: String(stockTxt), available: !low };
     }).filter(function (x) { return x && x.available; });
   }
 
@@ -799,38 +800,92 @@
     return result;
   }
 
+  var lastEvents = [];
+
+  function todayDateStr() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function eventBookings() {
+    try { return JSON.parse(localStorage.getItem('greenleaf_event_bookings_v1') || '{}'); } catch (e) { return {}; }
+  }
+
+  function eventRemaining(ev) {
+    if (ev.slots == null) return null;
+    var booked = Number(eventBookings()[String(ev.id)]) || 0;
+    return Math.max(0, ev.slots - booked);
+  }
+
+  function eventWhenLabel(dateStr) {
+    var today = todayDateStr();
+    if (dateStr === today) return { label: 'Сегодня', cls: 'today' };
+    var t = new Date(today + 'T00:00:00');
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(t.getTime()) || isNaN(d.getTime())) return null;
+    var diff = Math.round((d.getTime() - t.getTime()) / 86400000);
+    if (diff === 1) return { label: 'Завтра', cls: 'tomorrow' };
+    return null;
+  }
+
   function renderEvents(events) {
     var el = document.getElementById('eventsList');
     if (!el) return;
-    if (!events || !events.length) {
+    lastEvents = events || [];
+
+    var today = todayDateStr();
+    var list = lastEvents.filter(function (ev) { return String(ev.date || '') >= today; });
+    list.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+
+    if (!list.length) {
       el.innerHTML = '<p class="section-sub">Новых мероприятий пока нет — скоро анонсируем.</p>';
       return;
     }
-    el.innerHTML = events.map(function (ev) {
+    el.innerHTML = list.map(function (ev) {
+      var when = eventWhenLabel(String(ev.date));
       var dt = Utils.fmtDate(ev.date + 'T00:00:00', { day: 'numeric', month: 'long' });
+      var whenBadge = when
+        ? '<span class="event-when event-when-' + when.cls + '">' + when.label + '</span>'
+        : '';
       var storeTag = '';
       if (ev.storeId) {
         var s = stores.find(function (x) { return x.id === ev.storeId; });
         if (s) storeTag = '<span class="event-store-badge">' + Utils.esc(s.name) + '</span>';
       }
-      return '<article class="event">' +
-        '<div class="event-top"><div class="event-date">' + dt + ' · ' + Utils.esc(ev.time || '') + '</div>' + storeTag + '</div>' +
+      var remaining = eventRemaining(ev);
+      var slotsTxt = 'Мест: ' + Utils.esc(ev.slots != null ? ev.slots : '—');
+      if (remaining !== null) slotsTxt += ' · Осталось: ' + remaining;
+      var full = remaining !== null && remaining <= 0;
+      var btnHtml = full
+        ? '<button class="btn btn-outline" disabled>Мест нет</button>'
+        : '<button class="btn btn-primary" data-event="' + Utils.esc(ev.id) + '">Записаться</button>';
+      return '<article class="event' + (when ? ' event-when-card-' + when.cls : '') + '">' +
+        '<div class="event-top"><div class="event-date">' + whenBadge + dt + ' · ' + Utils.esc(ev.time || '') + '</div>' + storeTag + '</div>' +
         '<h3>' + Utils.esc(ev.title) + '</h3>' +
         '<div class="event-meta"><span>📍 ' + Utils.esc(ev.place || '') + '</span></div>' +
         '<p class="event-desc">' + Utils.esc(ev.description || '') + '</p>' +
-        '<span class="event-slots">Мест: ' + Utils.esc(ev.slots != null ? ev.slots : '—') + '</span>' +
-        '<button class="btn btn-primary" data-event="' + Utils.esc(ev.id) + '">Записаться</button>' +
+        '<span class="event-slots">' + slotsTxt + '</span>' +
+        btnHtml +
         '</article>';
     }).join('');
   }
 
+  window.addEventListener('event:booked', function () { renderEvents(lastEvents); });
+
   function eventModal(ev) {
+    if (eventRemaining(ev) === 0) {
+      Utils.showToast('К сожалению, места закончились');
+      return;
+    }
     Utils.openModal(
       '<h3>Запись на мероприятие</h3>' +
       '<p class="modal-product"><b>' + Utils.esc(ev.title) + '</b></p>' +
       '<p class="modal-price">' + Utils.fmtDate(ev.date + 'T00:00:00', { day: 'numeric', month: 'long' }) + ' · ' + Utils.esc(ev.time || '') + '</p>' +
       '<form class="form" data-type="event">' +
       '<input type="hidden" name="event" value="' + Utils.esc(ev.title + ' · ' + ev.date) + '">' +
+      '<input type="hidden" name="event_id" value="' + Utils.esc(ev.id) + '">' +
       '<input name="name" placeholder="Ваше имя" required>' +
       '<input name="phone" placeholder="Телефон" required>' +
       '<input class="hp" name="company" tabindex="-1" autocomplete="off">' +
@@ -876,15 +931,7 @@
 
     try {
       var savedProds = JSON.parse(localStorage.getItem(CUSTOM_PRODUCTS_KEY) || '{}');
-      Object.keys(savedProds).forEach(function (scId) {
-        var stockMap = savedProds[scId];
-        products.forEach(function (p) {
-          if (stockMap[p.id] !== undefined) {
-            if (!p.stockByStore) p.stockByStore = {};
-            p.stockByStore[scId] = stockMap[p.id];
-          }
-        });
-      });
+      void savedProds;
     } catch (e) { console.warn('applyLocalOverrides products error', e); }
 
     try {
@@ -1000,6 +1047,8 @@
     } catch (e) {
       console.warn('Could not load stores.json', e);
     }
+
+    await StoreStock.load();
 
     try {
       var res = await fetch('data/products.json?t=' + Date.now());
