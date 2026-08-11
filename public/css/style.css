@@ -148,7 +148,6 @@ a:hover { text-decoration: none; }
   .header-inner { gap: 12px; }
   .nav { gap: 2px; }
   .nav a { padding: 0 10px; font-size: 13px; }
-  #waHeader { padding: 8px 12px; font-size: 12.5px; }
   #scAuthBtn { padding: 8px 12px; font-size: 12.5px; }
 }
 
@@ -161,16 +160,6 @@ a:hover { text-decoration: none; }
 @media (min-width: 1201px) {
   .header-inner { gap: 20px; }
   .nav a { padding: 0 13px; }
-}
-
-@media (max-width: 1300px) and (min-width: 961px) {
-  #waHeader { font-size: 0; padding: 0; width: 40px; }
-  #waHeader::after { content: "💬"; font-size: 17px; }
-}
-
-@media (max-width: 960px) and (min-width: 641px) {
-  #waHeader { font-size: 0; padding: 0; width: 40px; }
-  #waHeader::after { content: "💬"; font-size: 17px; }
 }
 
 @media (max-width: 1200px) and (min-width: 961px) {
@@ -1781,7 +1770,6 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   .header-inner { gap: 10px; }
   .logo img { width: 34px; height: 34px; }
   .logo-text { font-size: 17px; }
-  #waHeader { display: none; }
   .admin-user-badge { display: none; }
   .delivery { flex-direction: column; }
   .delivery-date { width: 100%; min-width: 0; flex-direction: row; justify-content: center; gap: 8px; }

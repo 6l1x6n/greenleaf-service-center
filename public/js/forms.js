@@ -44,7 +44,6 @@
   function successTextFor(data) {
     switch (data.type) {
       case 'order': return 'Заказ ушёл менеджеру — подтвердим его в ближайшее время.';
-      case 'reservation': return 'Бронь зафиксирована — подготовим заказ к вашему приезду.';
       case 'subscription': return 'Заявка на подписку принята — менеджер свяжется с вами.';
       case 'event': return 'Вы записаны — подтвердим участие в ближайшее время.';
       case 'partner': return 'Заявка на партнёрство принята — рассмотрим её в ближайшее время.';
@@ -123,7 +122,18 @@
       body: JSON.stringify(data)
     })
       .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) {
+          if (data.type === 'order') {
+            return res.json().catch(function () { return null; }).then(function (errData) {
+              if (errData && errData.error === 'expired') {
+                if (window.Utils) Utils.showToast('⏳ ' + (errData.message || 'Время бронирования истекло — соберите корзину заново'));
+                window.dispatchEvent(new CustomEvent('order:expired'));
+              }
+              markError(form);
+            });
+          }
+          throw new Error('HTTP ' + res.status);
+        }
         markSuccess(form, data.type === 'order' ? '' : 'Заявка отправлена!', successTextFor(data));
         if (data.type === 'order') {
           window.dispatchEvent(new CustomEvent('order:sent', { detail: data }));

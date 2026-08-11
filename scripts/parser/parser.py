@@ -643,6 +643,10 @@ MOVE_STATUS_CODES = {
 # Статусы, по которым имеет смысл показывать «в пути» и парсить состав накладной
 ACTIVE_MOVE_CODES = (0, 1, 2, 3, 4, 6, 100)
 
+# Действующие поставщики: «Астана поставщик "новый"», «Астана поставщик», «Алматы поставщик».
+# Накладные с любым другим источником — это брак, на сайте не учитываются.
+VALID_MOVE_SOURCE_RE = re.compile(r"(Астана поставщик|Алматы поставщик)", re.IGNORECASE)
+
 
 def wait_move_rows(page, timeout=30):
     deadline = time.time() + timeout
@@ -744,6 +748,9 @@ def scrape_moves(page, config):
         try:
             mv = parse_move_row(row.inner_html())
             if not mv or mv["number"] in seen:
+                continue
+            # Накладные-брак (источник не из действующих поставщиков) не учитываем
+            if not VALID_MOVE_SOURCE_RE.search(mv["source"] or ""):
                 continue
             seen.add(mv["number"])
             moves.append(mv)

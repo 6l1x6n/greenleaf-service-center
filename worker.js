@@ -19,7 +19,8 @@
 //                   createdAt }}
 //   users        — {"<email>": { id, email, name, phone, password, role: 'client', createdAt }}
 //   reservations — {"<orderId>": { storeId, items: [{productId, qty}], createdAt, expiresAt }}
-//   sales        — {"<storeId>": { "<productId>": qty }} — постоянное списание по заказам
+//                  временная бронь на 2 минуты при оформлении заказа (как места в кино)
+//   sales        — {"<storeId>": { "<productId>": qty }} — постоянное списание по оплаченным заказам
 
 const TELEGRAM_API = 'https://api.telegram.org/bot';
 const TOKEN_TTL = 12 * 3600; // 12 часов
@@ -163,6 +164,34 @@ async function commitSalesFromOrder(env, data) {
   await kvPut(env, 'sales', sales);
   delete reservations[orderId];
   await kvPut(env, 'reservations', reservations);
+}
+
+// Проверка заказа перед отправкой: бронь на 2 минуты должна быть активной
+// и покрывать все позиции заказа. Иначе заказ не принимается (409) —
+// остатки могли уже уйти другим покупателям.
+async function validateOrderReservation(env, data) {
+  const orderId = String(data.order_id || data.orderId || '').trim();
+  if (!orderId) return { ok: false, res: jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409) };
+  const reservations = await activeReservations(env);
+  const res = reservations[orderId];
+  if (!res || !res.items || !res.items.length) {
+    return { ok: false, res: jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409) };
+  }
+  let items = [];
+  try {
+    items = JSON.parse(String(data.order_items_json || '[]'));
+  } catch (e) {
+    items = [];
+  }
+  if (!Array.isArray(items)) items = [];
+  const bad = items.find(function (i) {
+    const reserved = (res.items || []).find(function (r) { return r.productId === String(i.productId); });
+    return !reserved || (Number(i.qty) || 0) > (Number(reserved.qty) || 0);
+  });
+  if (bad) {
+    return { ok: false, res: jsonResponse({ ok: false, error: 'expired', message: 'Состав заказа изменился — соберите корзину заново' }, 409) };
+  }
+  return { ok: true };
 }
 
 // ---------------- Почта (Resend) ----------------
@@ -579,7 +608,7 @@ function buildText(data) {
   const name = (data.name || '').trim();
   const phone = (data.phone || '').trim();
   const type = data.type || 'other';
-  const isOrder = type === 'order' || type === 'reservation';
+  const isOrder = type === 'order';
   const head = isOrder ? '🛒 НОВЫЙ ЗАКАЗ' : '🔔 Новая заявка с сайта';
 
   const blocks = {
@@ -593,12 +622,6 @@ function buildText(data) {
       '🧾 Пакет-упаковка: ' + (data.order_package || 0) + ' ₸',
       '💰 ИТОГО: ' + (data.order_total || 0) + ' ₸' + (data.payment && data.payment.indexOf('Kaspi') !== -1 ? ' (оплачено)' : ''),
       data.pickup_date ? '📅 Дата приезда: ' + data.pickup_date + (data.pickup_time ? ' в ' + data.pickup_time : '') : null
-    ],
-    reservation: [
-      '📦 ' + (data.product || '—'),
-      data.store ? '🏬 Филиал: ' + data.store : null,
-      '🔢 Кол-во: ' + (data.quantity || 1),
-      data.comment ? '💬 ' + data.comment : null
     ],
     event: [
       '📅 Запись на мероприятие',
@@ -679,13 +702,16 @@ async function handleTelegram(request, env) {
     return new Response('ok', { status: 200 });
   }
 
-  // Оформленный заказ: бронь → постоянное списание остатков (до проверки токена)
+  // Оформленный заказ: бронь на 2 минуты должна быть активной, иначе 409.
+  // При успехе — конверсия брони в постоянное списание остатков (до проверки токена).
   if (data.type === 'order') {
+    const check = await validateOrderReservation(env, data);
+    if (!check.ok) return check.res;
     try { await commitSalesFromOrder(env, data); } catch (e) { console.error('commitSales error:', e); }
   }
 
-  // Заказы (корзина, бронь) — в группу заказов, остальное — в основной чат
-  const isOrder = data.type === 'order' || data.type === 'reservation';
+  // Заказы (корзина) — в группу заказов, остальное — в основной чат
+  const isOrder = data.type === 'order';
   const CHAT_ID = (isOrder ? env.TG_ORDERS_CHAT_ID : null) || env.TG_CHAT_ID;
 
   if (!BOT_TOKEN || !CHAT_ID) {

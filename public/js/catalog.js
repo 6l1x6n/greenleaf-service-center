@@ -277,14 +277,9 @@
 
   // ---------------- Товар: модалка, резерв ----------------
 
-  // СЦ, которому принадлежит склад s240534 (Толе Би 55) — источник остатков каталога
-  function centralStore() {
-    return stores.find(function (s) { return /толе\s*би/i.test(s.address || ''); }) || null;
-  }
+  // ---------------- Товар: модалка, корзина ----------------
 
   function openProductDetailModal(p) {
-    var central = centralStore();
-    var centralName = central ? central.name : 'СЦ Greenleaf Астана (Толе Би 55)';
     var qtyLine = '';
     var sel = selectedStore();
     if (sel && StoreStock.hasData(sel.id)) {
@@ -292,9 +287,6 @@
       if (selTxt !== undefined && String(selTxt).trim() !== '') {
         qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно в ' + Utils.esc(sel.name) + ': <b>' + Utils.esc(selTxt) + '</b></div>';
       }
-    }
-    if (!qtyLine && typeof p.quantity === 'number' && p.quantity > 0) {
-      qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно в ' + Utils.esc(centralName) + ': <b>' + p.quantity + ' шт.</b></div>';
     }
     var stockRows = '';
     var storeStockLines = [];
@@ -305,8 +297,10 @@
     });
     if (storeStockLines.length) {
       stockRows = storeStockLines.join('');
+    } else if (sel) {
+      stockRows = '<div class="product-stock-item"><span>📍 <strong>' + Utils.esc(sel.name) + ':</strong></span> <span>Каталог пока не подключён — товары появятся после подключения филиала</span></div>';
     } else {
-      stockRows = '<div class="product-stock-item"><span>📍 <strong>' + Utils.esc(centralName) + ':</strong></span> <span>В наличии — данные обновляются автоматически</span></div>';
+      stockRows = '<div class="product-stock-item"><span>📍 Наличие:</span> <span>В наличии — данные обновляются автоматически</span></div>';
     }
     Utils.openModal(
       '<div class="modal-product-detail">' +
@@ -333,8 +327,7 @@
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
       '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">' +
-      '<button class="btn btn-primary" style="flex:1;" data-reserve="' + Utils.esc(p.id) + '">🛒 Забронировать к приезду</button>' +
-      '<button class="btn btn-accent" style="flex:1;" data-cart-add="' + Utils.esc(p.id) + '">🛒 Добавить в корзину</button>' +
+      '<button class="btn btn-primary" style="flex:1;" data-cart-add="' + Utils.esc(p.id) + '">🛒 Добавить в корзину</button>' +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -394,90 +387,6 @@
       Utils.esc(c.label) + ' <span class="cnt">' + c.count + '</span></button>';
   }
 
-  function availableStoresFor(p) {
-    return stores.map(function (s) {
-      var stockTxt = StoreStock.text(s.id, p.id);
-      if (stockTxt === undefined || String(stockTxt).trim() === '') return null;
-      var low = String(stockTxt).indexOf('Нет') === 0 || String(stockTxt).indexOf('Ожидается') !== -1;
-      return { id: s.id, name: s.name, stock: String(stockTxt), available: !low };
-    }).filter(function (x) { return x && x.available; });
-  }
-
-  function storeOf(a) {
-    return stores.find(function (x) { return x.id === a.id; }) || null;
-  }
-
-  function storeRadioHtml(a, checked) {
-    return '<label class="reserve-store-opt' + (checked ? ' checked' : '') + '">' +
-      '<input type="radio" name="store" value="' + Utils.esc(a.name) + '"' + (checked ? ' checked' : '') + '>' +
-      '<span class="reserve-store-name">' + Utils.esc(a.name) + '</span>' +
-      '<span class="badge st-in">' + Utils.esc(a.stock) + '</span>' +
-      '</label>';
-  }
-
-  function reserveStoreField(avail, sel) {
-    if (avail.length === 1) {
-      return '<input type="hidden" name="store" value="' + Utils.esc(avail[0].name) + '">' +
-        '<div class="reserve-store-single">🏬 Товар есть в: <strong>' + Utils.esc(avail[0].name) + '</strong> <span class="badge st-in">' + Utils.esc(avail[0].stock) + '</span></div>';
-    }
-    var city = state.cityFilter;
-    var inCity = city === 'all' ? [] : avail.filter(function (a) {
-      var s = storeOf(a);
-      return s && s.cityKey === city;
-    });
-    var others = avail.filter(function (a) {
-      var s = storeOf(a);
-      return !(s && s.cityKey === city);
-    });
-    var defaultId = sel && avail.some(function (a) { return a.id === sel.id; })
-      ? sel.id
-      : (inCity.length ? inCity[0].id : avail[0].id);
-
-    function groupHtml(title, list) {
-      if (!list.length) return '';
-      return '<div class="reserve-store-group">' +
-        (title ? '<div class="reserve-store-group-title">' + title + '</div>' : '') +
-        list.map(function (a) { return storeRadioHtml(a, a.id === defaultId); }).join('') +
-        '</div>';
-    }
-    return '<div class="form-group"><label>Филиал, где заберёте товар *</label>' +
-      '<div class="reserve-store-list">' +
-      groupHtml(city === 'all' ? '' : '🏙 В вашем городе', inCity) +
-      groupHtml(city === 'all' ? '' : 'Другие города', others) +
-      '</div></div>';
-  }
-
-  function reserveModal(p) {
-    var sel = selectedStore();
-    var avail = availableStoresFor(p);
-    var st = statusInfo(p);
-
-    Utils.openModal(
-      '<h3>Бронирование продукции</h3>' +
-      '<p class="modal-product"><b>' + Utils.esc(p.name) + '</b></p>' +
-      '<p class="modal-price">Розничная цена: <b>' + Utils.fmtPrice(p.price) + '</b> · ' + Utils.esc(p.sku) + '</p>' +
-      '<p class="modal-partner-note">Для партнёров по подписке: <b>' + Utils.fmtPrice(partnerPrice(p)) + '</b> <a href="podpiska.html">Как стать партнёром →</a></p>' +
-      '<div style="margin-top:10px"><span class="badge ' + st.meta.cls + '">' + st.meta.icon + ' ' + st.meta.label + '</span></div>' +
-      '<form class="form" data-type="reservation">' +
-      '<input type="hidden" name="product" value="' + Utils.esc(p.name) + ' (' + Utils.esc(p.sku) + ')">' +
-      (avail.length === 0
-        ? '<div class="reserve-nostock">В выбранных филиалах товара пока нет. Напишите нам в WhatsApp — подскажем, где забрать или закажем к вашей поездке.</div>' +
-          '<a class="btn btn-whatsapp" href="' + Utils.waLink('Здравствуйте! Хочу узнать, где есть в наличии: ' + p.name + ' (' + p.sku + ')') + '" target="_blank" rel="noopener">📱 Написать в WhatsApp</a>'
-        : reserveStoreField(avail, sel) +
-          '<label for="qty">Количество</label>' +
-          '<input type="number" id="qty" name="quantity" min="1" max="99" value="1" required>' +
-          '<input name="name" placeholder="Ваше имя" required>' +
-          '<input name="phone" placeholder="Телефон для связи" required>' +
-          '<input class="hp" name="company" tabindex="-1" autocomplete="off">' +
-          '<textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>' +
-          '<button class="btn btn-primary" type="submit">Забронировать</button>' +
-          '<p class="form-note">Заявка отправится администратору выбранного филиала — подготовим заказ к вашему приезду.</p>' +
-          '<p class="form-success">Заявка отправлена! Подтвердим бронь в ближайшее время.</p>' +
-          '<p class="form-error">Что-то пошло не так. Попробуйте ещё раз или напишите нам в WhatsApp.</p>') +
-      '</form>'
-    );
-  }
-
   document.addEventListener('click', function (e) {
     var cartAdd = e.target.closest('[data-cart-add]');
     if (cartAdd) {
@@ -531,15 +440,6 @@
     if (cartRemove) {
       e.stopPropagation();
       Cart.remove(cartRemove.getAttribute('data-cart-remove'));
-      return;
-    }
-
-    var reserveBtn = e.target.closest('[data-reserve]');
-    if (reserveBtn) {
-      e.stopPropagation();
-      var pId = reserveBtn.getAttribute('data-reserve');
-      var p = products.find(function (x) { return x.id === pId; });
-      if (p) reserveModal(p);
       return;
     }
 
@@ -674,6 +574,10 @@
   var lastDeliveries = [];
   var moveSkuMap = {};
 
+  // Действующие поставщики: «Астана поставщик "новый"», «Астана поставщик», «Алматы поставщик».
+  // Накладные с любым другим источником — это брак, на сайте не учитываются.
+  var VALID_MOVE_SOURCE_RE = /(Астана поставщик|Алматы поставщик)/i;
+
   function applyDeliveriesOverrides(list) {
     var result = list;
     try {
@@ -787,6 +691,7 @@
     if (isMoves) {
       var cutoff = Date.now() - 21 * 86400000;
       list = list.filter(function (d) {
+        if (!VALID_MOVE_SOURCE_RE.test(d.source || '')) return false;
         var code = d.statusCode;
         if (code === 7 || code === 9 || code === -1) return false;
         if (!d.time) return true;
@@ -833,6 +738,7 @@
   function buildMoveSkuMap(moves) {
     moveSkuMap = {};
     moves.forEach(function (mv) {
+      if (!VALID_MOVE_SOURCE_RE.test(mv.source || '')) return;
       var code = mv.statusCode;
       if (code === 0 || code === 7 || code === 9 || code === -1) return;
       if (!mv.items) return;

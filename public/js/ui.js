@@ -95,7 +95,7 @@
   function bindStore(s) {
     document.title = 'Сервис-центры Greenleaf — каталог продукции и эко-товаров';
 
-    var waButtons = document.querySelectorAll('#waHeader, #waHero, #waContacts, #waFooter');
+    var waButtons = document.querySelectorAll('#waHero, #waContacts, #waFooter');
     waButtons.forEach(function (b) {
       b.href = waLink('Здравствуйте! Интересует наличие эко-продукции Greenleaf.');
     });

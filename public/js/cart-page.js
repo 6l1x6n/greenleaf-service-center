@@ -18,7 +18,7 @@
   // ---- Бронь товаров (2 минуты, как места в кинотеатре) ----
   var RESERVE_TTL = 120;
   var RESERVE_KEY = 'greenleaf_order_reservation_v1';
-  var reserve = { orderId: '', expiresAt: 0, interval: null, signature: '' };
+  var reserve = { orderId: '', expiresAt: 0, interval: null, signature: '', expired: false };
   var kaspiPaid = false;
   var paymentStarted = false;
   var submitBtn = document.getElementById('orderSubmitBtn');
@@ -50,6 +50,20 @@
     if (reserve.interval) { clearInterval(reserve.interval); reserve.interval = null; }
   }
 
+  // Истечение 2 минут: бронь снята, оплата на сайте технически невозможна,
+  // нужно собрать корзину заново (как места в кинотеатре).
+  function expiredState() {
+    reserve.expired = true;
+    reserve.expiresAt = 0;
+    if (reserve.interval) { clearInterval(reserve.interval); reserve.interval = null; }
+    if (reserveTimerEl) {
+      reserveTimerEl.innerHTML = '⏳ Время истекло — товары снова доступны другим покупателям, оформить заказ нельзя.<br>' +
+        '<button class="btn btn-outline btn-sm" type="button" data-cart-rebuild="1" style="margin-top:8px;">🔄 Собрать корзину заново</button>';
+      reserveTimerEl.classList.remove('hidden');
+    }
+    updateSubmitGate();
+  }
+
   function startTimer() {
     if (!reserveTimerEl) return;
     reserveTimerEl.classList.remove('hidden');
@@ -57,15 +71,13 @@
     function tick() {
       var left = reserve.expiresAt - Date.now();
       if (left <= 0) {
-        reserve.signature = '';
-        scheduleReserve();
-        if (window.Utils) Utils.showToast('⏳ Бронь истекла — продлеваем, не откладывайте оформление');
+        expiredState();
         return;
       }
       var s = Math.ceil(left / 1000);
       var mm = Math.floor(s / 60);
       var ss = s % 60;
-      reserveTimerEl.innerHTML = '⏳ Товары зарезервированы на <b>' + mm + ':' + (ss < 10 ? '0' : '') + ss + '</b> — успейте оформить заказ, иначе бронь снимется и товар снова станет доступен другим покупателям.';
+      reserveTimerEl.innerHTML = '⏳ Товары зарезервированы на <b>' + mm + ':' + (ss < 10 ? '0' : '') + ss + '</b> — успейте оплатить заказ, иначе бронь снимется и товар снова станет доступен другим покупателям.';
     }
     tick();
     reserve.interval = setInterval(tick, 1000);
@@ -74,9 +86,17 @@
   function scheduleReserve() {
     if (window.__stockReserveOff) return;
     var t = totals();
-    if (!state.storeId || !t.lines.length) { hideTimer(); return; }
+    if (!state.storeId || !t.lines.length) {
+      reserve.expired = false;
+      reserve.signature = '';
+      hideTimer();
+      return;
+    }
     var signature = state.storeId + '|' + t.lines.map(function (l) { return l.p.id + ':' + l.qty; }).join(',');
     if (signature === reserve.signature && reserve.expiresAt > Date.now()) return;
+    // После истечения бронь не продлевается сама собой — только при изменении корзины
+    if (reserve.expired && signature === reserve.signature) return;
+    reserve.expired = false;
     reserve.signature = signature;
     setField('orderId', orderId());
     setField('orderStoreId', state.storeId);
@@ -90,16 +110,22 @@
         ttlSeconds: RESERVE_TTL
       })
     }).then(function (r) { return r.json(); }).then(function (d) {
-      if (!d || !d.ok) { hideTimer(); return; }
+      if (!d || !d.ok) {
+        if (d && d.error === 'not enough' && window.Utils) {
+          Utils.showToast('⚠️ Товаров в этом количестве уже нет — измените состав корзины');
+        }
+        expiredState();
+        return;
+      }
       reserve.expiresAt = Number(d.expiresAt) || (Date.now() + RESERVE_TTL * 1000);
       startTimer();
-    }).catch(function () { hideTimer(); });
+    }).catch(function () { expiredState(); });
   }
 
   function updateSubmitGate() {
     if (!submitBtn) return;
     var needPay = state.payment === 'kaspi';
-    var ok = !needPay || (paymentStarted && kaspiPaid);
+    var ok = !reserve.expired && (!needPay || (paymentStarted && kaspiPaid));
     submitBtn.disabled = !ok;
     var note = document.getElementById('submitGateNote');
     if (note) note.style.display = needPay && !ok ? '' : 'none';
@@ -395,6 +421,12 @@
   }
 
   document.addEventListener('click', function (e) {
+    var rebuild = e.target.closest('[data-cart-rebuild]');
+    if (rebuild) {
+      Cart.clear();
+      Utils.showToast('🛒 Корзина очищена — соберите заново');
+      return;
+    }
     var payTab = e.target.closest('[data-pay]');
     if (payTab) {
       setPayment(payTab.getAttribute('data-pay'));
@@ -428,6 +460,7 @@
         } catch (err) { }
       }
       render();
+      scheduleReserve();
       return;
     }
     var showHidden = e.target.closest('[data-cart-show-hidden]');
@@ -553,12 +586,18 @@
   window.addEventListener('order:sent', function () {
     reserve.signature = '';
     reserve.expiresAt = 0;
+    reserve.expired = false;
     hideTimer();
     Cart.clear();
     emptyEl.classList.add('hidden');
     viewEl.classList.add('hidden');
     successEl.classList.remove('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // Бронь снята на сервере (409) — переводим страницу в заблокированное состояние
+  window.addEventListener('order:expired', function () {
+    expiredState();
   });
 
   Cart.onChange(function () {
