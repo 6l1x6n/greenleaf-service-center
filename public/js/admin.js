@@ -9,8 +9,7 @@
     events: 'greenleaf_admin_events_v1',
     scEvents: 'greenleaf_sc_events_v1',
     products: 'greenleaf_admin_products_v2',
-    notices: 'greenleaf_admin_notices_v1',
-    texts: 'greenleaf_admin_texts_v1'
+    notices: 'greenleaf_admin_notices_v1'
   };
 
   var STATUS_OPTIONS = [
@@ -45,8 +44,7 @@
     events: { label: '📅 Мероприятия', roles: ['superadmin', 'sc'] },
     applications: { label: '📋 Заявки', roles: ['superadmin'] },
     catalog: { label: '🛒 Каталог товаров', roles: ['superadmin'] },
-    notices: { label: '📢 Уведомления СЦ', roles: ['superadmin', 'sc'] },
-    texts: { label: '✏️ Тексты сайта', roles: ['superadmin'] }
+    notices: { label: '📢 Уведомления СЦ', roles: ['superadmin', 'sc'] }
   };
 
   function h(v) { return Utils.esc(v); }
@@ -214,8 +212,7 @@
       events: renderEvents,
       applications: renderApplications,
       catalog: renderCatalog,
-      notices: renderNotices,
-      texts: renderTexts
+      notices: renderNotices
     };
     var fn = renderers[state.section] || renderOverview;
     var content = document.getElementById('adminContent');
@@ -412,11 +409,52 @@
         return;
       }
 
-      var saved = lsGet(KEYS.stores) || {};
-      saved[store.id] = Object.assign({}, store);
-      lsSet(KEYS.stores, saved);
-      Utils.showToast('✅ Филиал сохранён');
-      loadData().then(function () { openSection(state.section); });
+      // Локальное сохранение (только этот браузер) — для партнёров и новых карточек без кредов
+      function saveLocal() {
+        var saved = lsGet(KEYS.stores) || {};
+        saved[store.id] = Object.assign({}, store);
+        lsSet(KEYS.stores, saved);
+        Utils.showToast('✅ Филиал сохранён');
+        loadData().then(function () { openSection(state.section); });
+      }
+
+      var isNewLocal = !store.id || String(store.id).indexOf('sc-new-') === 0;
+      if (isSuper() && !isNewLocal) {
+        // Статичная карточка из stores.json: пишем в Worker KV, чтобы
+        // правку увидели все посетители (KV-карточка перекрывает статику).
+        var payload = {
+          id: store.id,
+          officeCode: store.officeCode || '',
+          name: store.name,
+          city: store.city,
+          cityKey: store.cityKey,
+          address: store.address,
+          hours: store.hours,
+          phone: store.phone,
+          phoneRaw: store.phoneRaw,
+          whatsapp: store.whatsapp,
+          email: store.email,
+          image: store.image,
+          description: store.description,
+          partner: store.partner,
+          portalLogin: store.portalLogin || '',
+          portalPassword: store.portalPassword || '',
+          authLogin: store.authLogin || '',
+          authPassword: store.authPassword || ''
+        };
+        Auth.api('/api/sc-store', { method: 'POST', body: JSON.stringify(payload) }).then(function (data) {
+          if (data && data.ok) {
+            Utils.showToast('✅ Филиал сохранён — изменения видны всем посетителям');
+            loadData().then(function () { openSection(state.section); });
+          } else {
+            Utils.showToast('⚠️ Не удалось сохранить в Worker — сохранено локально');
+            saveLocal();
+          }
+        });
+        return;
+      }
+
+      saveLocal();
     });
 
     content.addEventListener('click', function (e) {
@@ -532,7 +570,7 @@
     var visibleStores = isSuper() ? state.stores : state.stores.filter(function (s) { return s.id === state.user.id; });
 
     content.insertAdjacentHTML('beforeend',
-      '<div class="admin-note">📦 Остатки сохраняются на этом устройстве и видны в каталоге здесь. Чтобы посетители увидели остатки по филиалам: нажмите «Экспорт JSON», сохраните файл как <b>data/store-stock.json</b> и загрузите его в репозиторий (Decap CMS → GitHub) или через «Импорт JSON» ниже.</div>' +
+      '<div class="admin-note">📦 Сайт показывает серверные остатки: <b>парсер − продажи − брони</b> (Worker). Таблица ниже — редактор для ручных правок и экспорта файла <b>data/store-stock.json</b> (загрузите его в репозиторий через Decap CMS → GitHub).</div>' +
       '<div class="admin-toolbar"><input class="search" id="stockSearch" type="search" placeholder="Поиск по названию или артикулу…" autocomplete="off"></div>' +
       '<div class="admin-card admin-table-wrap">' +
       '<table class="admin-table" id="stockTable">' +
@@ -540,9 +578,9 @@
       visibleStores.map(function (s) { return '<th>' + h(s.name) + '</th>'; }).join('') +
       '</tr></thead><tbody id="stockTbody"></tbody></table>' +
       '</div>' +
-      '<div class="admin-actions" style="flex-wrap:wrap;">' +
-      '<button class="btn btn-primary" id="stockSaveBtn">💾 Сохранить остатки</button>' +
-      '<button class="btn btn-outline" id="stockExportBtn">⬇️ Экспорт JSON (store-stock.json)</button>' +
+      '<div class="admin-actions stock-actions" style="flex-wrap:wrap;">' +
+      '<button class="btn btn-outline" id="stockResetBtn">🧹 Сбросить локальные правки</button>' +
+      '<button class="btn btn-primary" id="stockExportBtn">⬇️ Экспорт JSON (store-stock.json)</button>' +
       '<button class="btn btn-outline" id="stockImportBtn">⬆️ Импорт JSON</button>' +
       '<input type="file" id="stockImportFile" accept="application/json,.json" style="display:none;">' +
       '</div>'
@@ -567,15 +605,9 @@
     drawRows('');
     content.querySelector('#stockSearch').addEventListener('input', function (e) { drawRows(e.target.value); });
 
-    content.querySelector('#stockSaveBtn').addEventListener('click', function () {
-      var saved = lsGet(KEYS.stock) || {};
-      content.querySelectorAll('[data-stock-sc]').forEach(function (inp) {
-        var scId = inp.getAttribute('data-stock-sc');
-        if (!saved[scId]) saved[scId] = {};
-        saved[scId][inp.getAttribute('data-stock-prod')] = inp.value;
-      });
-      lsSet(KEYS.stock, saved);
-      Utils.showToast('✅ Остатки сохранены');
+    content.querySelector('#stockResetBtn').addEventListener('click', function () {
+      try { localStorage.removeItem(KEYS.stock); } catch (e) { }
+      Utils.showToast('🧹 Локальные правки сброшены — сайт показывает серверные остатки');
       loadData().then(function () { openSection(state.section); });
     });
 
@@ -613,9 +645,12 @@
           var parsed = JSON.parse(reader.result);
           var stock = (parsed && parsed.stock) || parsed || {};
           if (typeof stock !== 'object' || Array.isArray(stock)) throw new Error('bad format');
-          lsSet(KEYS.stock, stock);
-          Utils.showToast('⬆️ Остатки импортированы — применены на этом устройстве');
-          loadData().then(function () { openSection(state.section); });
+          content.querySelectorAll('[data-stock-sc]').forEach(function (inp) {
+            var scId = inp.getAttribute('data-stock-sc');
+            var pid = inp.getAttribute('data-stock-prod');
+            if (stock[scId] && stock[scId][pid] !== undefined) inp.value = stock[scId][pid];
+          });
+          Utils.showToast('⬆️ Файл загружен в таблицу — проверьте и нажмите «Экспорт JSON»');
         } catch (err) {
           Utils.showToast('Не удалось прочитать JSON');
         }
@@ -1045,52 +1080,6 @@
       var list = (lsGet(KEYS.notices) || []).filter(function (n) { return n.id !== id; });
       lsSet(KEYS.notices, list);
       openSection('notices');
-    });
-  }
-
-  // ---------------- Тексты сайта ----------------
-
-  function renderTexts(content) {
-    content.insertAdjacentHTML('beforeend',
-      '<div class="admin-note">✏️ Здесь можно менять тексты сайта. Альтернатива: на самом сайте при входе суперадмином кликните по любому тексту и редактируйте прямо на месте.</div>' +
-      '<div class="admin-card"><ul class="admin-list" id="textsList"></ul></div>' +
-      '<button class="btn btn-primary" id="textsSaveBtn">💾 Сохранить тексты</button>' +
-      '<p style="margin-top:10px; font-size:13px; color:var(--muted);">Тексты сохраняются в этом браузере и применяются при загрузке сайта на этом устройстве. Для правок «для всех посетителей» используйте админку /admin (Decap CMS → GitHub).</p>'
-    );
-
-    var overrides = lsGet(KEYS.texts) || {};
-
-    fetch('index.html')
-      .then(function (r) { return r.text(); })
-      .then(function (html) {
-        var doc = new DOMParser().parseFromString(html, 'text/html');
-        var els = doc.querySelectorAll('[data-edit-key]');
-        if (!els.length) {
-          document.getElementById('textsList').innerHTML = '<li style="color:var(--muted);">Не найдено редактируемых текстов.</li>';
-          return;
-        }
-        document.getElementById('textsList').innerHTML = Array.prototype.map.call(els, function (el) {
-          var key = el.getAttribute('data-edit-key');
-          var val = overrides[key] !== undefined ? overrides[key] : el.textContent.trim();
-          return '<li>' +
-            '<div class="admin-list-main">' +
-            '<strong>' + h(key) + '</strong>' +
-            '<input data-text-key="' + h(key) + '" value="' + h(val) + '">' +
-            '</div></li>';
-        }).join('');
-      })
-      .catch(function () {
-        document.getElementById('textsList').innerHTML = '<li style="color:var(--muted);">Не удалось загрузить index.html для чтения текущих текстов.</li>';
-      });
-
-    content.querySelector('#textsSaveBtn').addEventListener('click', function () {
-      var texts = {};
-      content.querySelectorAll('[data-text-key]').forEach(function (el) {
-        var v = el.value.trim();
-        if (v) texts[el.getAttribute('data-text-key')] = v;
-      });
-      lsSet(KEYS.texts, texts);
-      Utils.showToast('✅ Тексты сайта сохранены');
     });
   }
 

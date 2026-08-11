@@ -130,6 +130,16 @@ def get_stores(config):
     return stores
 
 
+def active_store_ids(config):
+    """Актуальные id сервис-центров — остатки сохраняются только для них.
+    Устаревшие ключи (например, sc-astana от старых прогонов) удаляются."""
+    ids = [s.get("id") for s in get_stores(config) if s.get("id")]
+    central = config.get("central_store_id")
+    if central and central not in ids:
+        ids.append(central)
+    return ids
+
+
 def build_store_config(config, store):
     cfg = dict(config)
     cfg["sc_id"] = store.get("id") or config.get("central_store_id", "s240534")
@@ -878,7 +888,12 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
     return list(by_code.values())
 
 
-def write_products(products):
+def write_products(products, active_ids=None):
+    if active_ids:
+        for p in products:
+            stock = p.get("stock")
+            if isinstance(stock, dict):
+                p["stock"] = {k: v for k, v in stock.items() if k in active_ids}
     payload = {
         "updated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S+03:00"),
         "products": products,
@@ -1072,10 +1087,12 @@ def scrape_descriptions(items, goods_map, config):
 # его читают фронт и админка; формат строк сохранён («В наличии (N шт)»/«Ожидается»).
 
 
-def write_store_stock(products, config):
+def write_store_stock(products, config, active_ids=None):
     stock_data = {}
     for p in products:
         for sc_id, qty in (p.get("stock") or {}).items():
+            if active_ids and sc_id not in active_ids:
+                continue
             qty = int(qty or 0)
             stock_data.setdefault(sc_id, {})[p["id"]] = (
                 f"В наличии ({qty} шт)" if qty > 0 else "Ожидается"
@@ -1149,6 +1166,7 @@ def main():
             page = context.new_page()
             stores = get_stores(config)
             central = config.get("central_store_id", "s240534")
+            active_ids = active_store_ids(config)
             base_products = load_base_products()
             print(f"База товаров: {len(base_products)} карточек, СЦ: {[s['id'] for s in stores]}")
             for store in stores:
@@ -1160,8 +1178,8 @@ def main():
                         write_moves(moves)
                     except Exception as e:
                         print(f"Перемещения товаров: не удалось ({e}) — продолжаем без них")
-            write_products(base_products)
-            write_store_stock(base_products, config)
+            write_products(base_products, active_ids)
+            write_store_stock(base_products, config, active_ids)
             browser.close()
     except FileNotFoundError as e:
         print(e)

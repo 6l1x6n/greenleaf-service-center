@@ -902,7 +902,6 @@
     var CUSTOM_STORES_KEY = 'greenleaf_sc_custom_stores_v1';
     var CUSTOM_PRODUCTS_KEY = 'greenleaf_sc_custom_products_v1';
     var ADMIN_PRODUCTS_KEY = 'greenleaf_admin_products_v2';
-    var TEXTS_KEY = 'greenleaf_admin_texts_v1';
 
     try {
       var savedStores = JSON.parse(localStorage.getItem(CUSTOM_STORES_KEY) || '{}');
@@ -935,56 +934,7 @@
           p[f] = o[f];
         });
       });
-    } catch (e) { console.warn('applyLocalOverrides admin products error', e); }
-
-    try {
-      var texts = JSON.parse(localStorage.getItem(TEXTS_KEY) || '{}');
-      document.querySelectorAll('[data-edit-key]').forEach(function (el) {
-        var k = el.getAttribute('data-edit-key');
-        if (texts[k]) el.textContent = texts[k];
-      });
-    } catch (e) { console.warn('applyLocalOverrides texts error', e); }
-  }
-
-  function setupTapEdit() {
-    if (!window.Auth || !window.Auth.isSuperadmin()) return;
-    var TEXTS_KEY = 'greenleaf_admin_texts_v1';
-
-    function saveText(key, val) {
-      try {
-        var texts = JSON.parse(localStorage.getItem(TEXTS_KEY) || '{}');
-        texts[key] = val;
-        localStorage.setItem(TEXTS_KEY, JSON.stringify(texts));
-        Utils.showToast('✓ Текст обновлён');
-      } catch (e) { }
-    }
-
-    document.querySelectorAll('[data-edit-key]').forEach(function (el) {
-      el.classList.add('tap-editable');
-      el.addEventListener('click', function () {
-        if (el.getAttribute('contenteditable') === 'true') return;
-        el.setAttribute('contenteditable', 'true');
-        el.classList.add('editing');
-        el.focus();
-        var range = document.createRange();
-        range.selectNodeContents(el);
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-      });
-      el.addEventListener('blur', function () {
-        if (el.getAttribute('contenteditable') !== 'true') return;
-        el.removeAttribute('contenteditable');
-        el.classList.remove('editing');
-        saveText(el.getAttribute('data-edit-key'), el.textContent.trim());
-      });
-      el.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          el.blur();
-        }
-      });
-    });
+      } catch (e) { console.warn('applyLocalOverrides admin products error', e); }
   }
 
   function plural(n, forms) {
@@ -1086,7 +1036,6 @@
     }
 
     applyLocalOverrides();
-    setupTapEdit();
     updateHeroMeta();
     restoreFilters();
 

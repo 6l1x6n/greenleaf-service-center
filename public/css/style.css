@@ -1660,6 +1660,16 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .admin-toolbar { margin-bottom: 14px; }
 .admin-toolbar .search { max-width: 480px; }
 
+/* Кнопки остатков всегда на виду при прокрутке таблицы */
+.stock-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: linear-gradient(to top, var(--bg, #fff) 70%, rgba(255, 255, 255, 0));
+  padding-top: 12px;
+  margin-top: 2px;
+}
+
 .admin-table-wrap { overflow-x: auto; padding: 0; }
 .admin-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .admin-table th,

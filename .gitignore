@@ -3,5 +3,6 @@ node_modules/
 __pycache__/
 *.pyc
 .wrangler/
+.deploy-lock/
 scripts/parser/config.json
 scripts/parser/diag/

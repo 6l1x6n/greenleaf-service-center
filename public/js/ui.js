@@ -149,9 +149,8 @@
   document.getElementById('year').textContent = new Date().getFullYear();
   loadStore();
 
-  // ---------------- Остатки по филиалам (store-stock.json + оверрайды админки) ----------------
+  // ---------------- Остатки по филиалам (store-stock.json + списания Worker) ----------------
 
-  var STOCK_KEY = 'greenleaf_sc_custom_products_v1';
   var baseStock = {};
   var baseStockUpdated = '';
   var baseStockLoaded = null;
@@ -185,20 +184,12 @@
     return baseStockLoaded;
   }
 
-  function stockOverrides() {
-    try { return JSON.parse(localStorage.getItem(STOCK_KEY) || '{}'); } catch (e) { return {}; }
-  }
-
   function storeStockData(storeId) {
-    var ov = stockOverrides();
-    var fromOverride = ov[storeId] && Object.keys(ov[storeId]).length;
     var fromBase = baseStock[storeId] && Object.keys(baseStock[storeId]).length;
-    return !!(fromOverride || fromBase);
+    return !!fromBase;
   }
 
   function stockText(storeId, productId) {
-    var ov = stockOverrides();
-    if (ov[storeId] && ov[storeId][productId] !== undefined) return ov[storeId][productId];
     if (baseStock[storeId] && baseStock[storeId][productId] !== undefined) return baseStock[storeId][productId];
     return undefined;
   }
