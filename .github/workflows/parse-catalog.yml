@@ -20,7 +20,7 @@ concurrency:
 jobs:
   parse:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -49,7 +49,7 @@ jobs:
 
       - name: Random delay (защита от блокировок портала)
         if: ${{ !inputs.skip_delay }}
-        run: sleep $((RANDOM % 900))
+        run: sleep $((RANDOM % 180))
 
       - name: Run parser
         env:
