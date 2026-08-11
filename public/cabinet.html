@@ -85,18 +85,13 @@
         <div id="authOwnerView" class="hidden">
           <div class="owner-reg-layout">
             <div class="owner-reg-form">
-              <h3 style="margin-bottom:6px;">🏬 Регистрация магазина</h3>
-              <p class="modal-product">Введите данные вашей торговой точки или проекта.</p>
+              <h3 style="margin-bottom:6px;">🏬 Заявка партнёра</h3>
+              <p class="modal-product">Введите данные вашей торговой точки или проекта — администратор свяжется с вами.</p>
 
-              <div class="auth-tabs">
-                <button class="auth-tab active" type="button" data-owner-tab="partner">Заявка партнёра</button>
-                <button class="auth-tab" type="button" data-owner-tab="sc">Стать Сервис-Центром</button>
-              </div>
-
-              <!-- Заявка партнёра -->
-              <form class="form" data-type="partner" data-owner-form="partner">
+              <form class="form" data-partner-register="1">
                 <input name="name" placeholder="ФИО / Имя представителя *" required>
                 <input name="phone" type="tel" placeholder="Телефон для связи *" required>
+                <input name="email" type="email" placeholder="Email (необязательно)" autocomplete="email">
                 <input name="storeName" placeholder="Название магазина / проекта *" required>
                 <select name="city" class="city-select" required>
                   <option value="" selected disabled>Город *</option>
@@ -107,32 +102,23 @@
                   <option value="opening">🌱 Только планирую открытие</option>
                 </select>
                 <textarea name="message" placeholder="Описание или комментарий"></textarea>
+
+                <label class="form-checkbox">
+                  <input type="checkbox" id="ownerCabinetToggle">
+                  <span>🔌 У меня есть кабинет поставщика — хочу автосинхронизацию остатков</span>
+                </label>
+                <div id="ownerCabinetBlock" class="hidden">
+                  <p class="form-note">🔐 Данные передаются только администратору и используются исключительно для автоматической синхронизации остатков. На сайте не публикуются.</p>
+                  <input name="officeCode" placeholder="Код личного кабинета (например: S240-534)">
+                  <input name="portalLogin" placeholder="Логин кабинета поставщика" autocomplete="off">
+                  <input name="portalPassword" type="password" placeholder="Пароль кабинета поставщика" autocomplete="new-password">
+                </div>
+
                 <input class="hp" name="company" tabindex="-1" autocomplete="off">
                 <button class="btn btn-primary btn-lg" type="submit">Подать заявку</button>
                 <p class="form-note">🔒 Отправка заявки ни к чему не обязывает.</p>
-                <p class="form-success">Заявка отправлена! Ваш магазин добавлен в список запросов со статусом «На рассмотрении».</p>
+                <p class="form-success">Заявка отправлена! Она появилась в «Моих запросах» — администратор рассмотрит её в ближайшее время.</p>
                 <p class="form-error">Проверьте обязательные поля.</p>
-              </form>
-
-              <!-- Регистрация Сервис-Центра -->
-              <form class="form" data-sc-register="1" data-owner-form="sc">
-                <input name="name" placeholder="ФИО владельца магазина *" required>
-                <input name="phone" type="tel" placeholder="Телефон для связи *" required>
-                <input name="email" type="email" placeholder="Email — на него придут логин и пароль кабинета *" required autocomplete="email">
-                <input name="storeName" placeholder="Название магазина / Сервис-Центра *" required>
-                <select name="city" class="city-select" required>
-                  <option value="" selected disabled>Город *</option>
-                </select>
-                <input name="address" placeholder="Точный адрес *" required>
-                <input name="officeCode" placeholder="Код личного кабинета (например: S240-534) *" required>
-                <input name="portalLogin" placeholder="Логин кабинета поставщика (для парсера) *" required autocomplete="off">
-                <input name="portalPassword" type="password" placeholder="Пароль кабинета поставщика (для парсера) *" required autocomplete="new-password">
-                <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
-                <input class="hp" name="company" tabindex="-1" autocomplete="off">
-                <button class="btn btn-primary btn-lg" type="submit">Отправить заявку</button>
-                <p class="form-note">🔐 Данные для авторизации передаются только главному администратору и используются исключительно для автоматической синхронизации остатков товаров. На сайте не публикуются. После подтверждения логин и пароль кабинета Сервис-Центра придут на указанную почту.</p>
-                <p class="form-success">Заявка отправлена! Администратор проверит данные — при подтверждении логин и пароль придут на вашу почту.</p>
-                <p class="form-error">Заполните все обязательные поля.</p>
               </form>
             </div>
 

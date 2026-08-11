@@ -87,20 +87,35 @@
     saveStores: saveStores
   };
 
-  // ---------------- Регистрация Сервис-Центра ----------------
-  // Заявка уходит в Worker (Cloudflare KV) + уведомление главному администратору.
+  // ---------------- Единая заявка партнёра / Сервис-Центра ----------------
+  // Отправляется в Worker (Cloudflare KV) + уведомление главному администратору.
+  // Поля кабинета (officeCode/portalLogin/portalPassword) необязательны:
+  // без них заявка считается партнёрской, с ними — на подключение СЦ с автоостатками.
 
-  function submitScRegistration(form) {
-    var data = { type: 'sc_registration' };
+  function submitPartnerRegistration(form) {
+    var data = {};
     form.querySelectorAll('input, select, textarea').forEach(function (el) {
       if (!el.name || el.type === 'radio' || el.type === 'checkbox') return;
       data[el.name] = el.value;
     });
-    if (!data.name || !data.phone || !data.email || !data.storeName || !data.officeCode || !data.portalLogin || !data.portalPassword) {
+    if (!data.name || !data.phone || !data.storeName || !data.city || !data.address) {
       form.classList.remove('show-success');
       form.classList.add('show-error');
       return;
     }
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      form.classList.remove('show-success');
+      form.classList.add('show-error');
+      return;
+    }
+    var hasCabinet = !!(data.officeCode || data.portalLogin || data.portalPassword);
+    data.type = hasCabinet ? 'sc_registration' : 'partner';
+    if (hasCabinet && (!data.officeCode || !data.portalLogin || !data.portalPassword)) {
+      form.classList.remove('show-success');
+      form.classList.add('show-error');
+      return;
+    }
+
     var btn = form.querySelector('button[type="submit"]');
     var prev = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Отправляем…'; }
@@ -110,15 +125,16 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
-    }).then(function () {
+    }).then(function (res) {
+      if (!res || !res.ok) throw new Error((res && res.error) || 'HTTP error');
       form.classList.add('show-success');
       addStoreFromForm(data);
-      if (window.Utils) Utils.showToast('Заявка отправлена администратору');
-    }).catch(function () {
+      if (window.Utils) Utils.showToast('✅ Заявка отправлена администратору');
+    }).catch(function (err) {
       form.classList.remove('show-success');
       form.classList.add('show-error');
+      if (window.Utils && err && err.message) Utils.showToast(err.message);
     }).then(function () {
       if (btn) { btn.disabled = false; btn.innerHTML = prev; }
     });
@@ -171,31 +187,20 @@
     });
   }
 
-  function bindOwnerTabs() {
-    var tabs = document.querySelectorAll('.auth-tab[data-owner-tab]');
-    var forms = document.querySelectorAll('[data-owner-form]');
-    if (!tabs.length || !forms.length) return;
-
-    function switchTo(name) {
-      tabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-owner-tab') === name); });
-      forms.forEach(function (f) {
-        f.classList.toggle('hidden', f.getAttribute('data-owner-form') !== name);
-        if (f.getAttribute('data-owner-form') !== name) {
-          f.classList.remove('show-success', 'show-error');
-        }
-      });
-    }
-    tabs.forEach(function (t) {
-      t.addEventListener('click', function () { switchTo(t.getAttribute('data-owner-tab')); });
+  function bindCabinetToggle() {
+    var toggle = document.getElementById('ownerCabinetToggle');
+    var block = document.getElementById('ownerCabinetBlock');
+    if (!toggle || !block) return;
+    toggle.addEventListener('change', function () {
+      block.classList.toggle('hidden', !toggle.checked);
     });
-    switchTo('partner');
   }
 
   document.addEventListener('submit', function (e) {
-    var scForm = e.target.closest('form[data-sc-register]');
-    if (scForm) {
+    var partnerForm = e.target.closest('form[data-partner-register]');
+    if (partnerForm) {
       e.preventDefault();
-      submitScRegistration(scForm);
+      submitPartnerRegistration(partnerForm);
       return;
     }
     var clientForm = e.target.closest('form[data-register-client]');
@@ -208,11 +213,11 @@
   document.addEventListener('DOMContentLoaded', function () {
     populateCitySelect();
     renderStores();
-    bindOwnerTabs();
+    bindCabinetToggle();
   });
   if (document.readyState === 'interactive' || document.readyState === 'complete') {
     populateCitySelect();
     renderStores();
-    bindOwnerTabs();
+    bindCabinetToggle();
   }
 })();

@@ -362,25 +362,37 @@ async function handleRegisterSc(request, env) {
   } catch (e) {
     return jsonResponse({ ok: false, error: 'invalid json' }, 400);
   }
+  const name = String(data.name || '').trim();
+  const phone = String(data.phone || '').trim();
+  const storeName = String(data.storeName || '').trim();
+  const city = String(data.city || '').trim();
+  const address = String(data.address || '').trim();
+  if (!name || !phone || !storeName || !city || !address) {
+    return jsonResponse({ ok: false, error: 'name, phone, storeName, city и address обязательны' }, 400);
+  }
   const officeCode = String(data.officeCode || '').trim();
   const portalLogin = String(data.portalLogin || '').trim();
   const portalPassword = String(data.portalPassword || '').trim();
-  if (!officeCode || !portalLogin || !portalPassword) {
-    return jsonResponse({ ok: false, error: 'officeCode, portalLogin и portalPassword обязательны' }, 400);
+  const hasCabinet = !!(officeCode || portalLogin || portalPassword);
+  if (hasCabinet && (!officeCode || !portalLogin || !portalPassword)) {
+    return jsonResponse({ ok: false, error: 'officeCode, portalLogin и portalPassword заполняются вместе' }, 400);
   }
   const app = {
     id: 'app_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-    name: String(data.name || '').trim(),
-    phone: String(data.phone || '').trim(),
+    type: data.type === 'sc_registration' ? 'sc_registration' : (hasCabinet ? 'sc_registration' : 'partner'),
+    name,
+    phone,
     email: String(data.email || '').trim(),
-    storeName: String(data.storeName || '').trim(),
-    city: String(data.city || '').trim(),
-    address: String(data.address || '').trim(),
+    storeName,
+    city,
+    address,
     officeCode,
-    officeId: normalizeOfficeCode(officeCode),
+    officeId: hasCabinet ? normalizeOfficeCode(officeCode) : '',
     portalLogin,
     portalPassword,
-    comment: String(data.comment || '').trim(),
+    hasCabinet,
+    comment: String(data.comment || data.message || '').trim(),
+    experience: String(data.experience || '').trim(),
     status: 'pending',
     createdAt: new Date().toISOString()
   };
@@ -389,7 +401,7 @@ async function handleRegisterSc(request, env) {
   await kvPut(env, 'applications', apps);
 
   // Уведомление главному администратору
-  const text = buildText(Object.assign({ type: 'sc_registration' }, data));
+  const text = buildText(Object.assign({ type: app.type }, data, { comment: app.comment, experience: app.experience }));
   await sendTelegram(env, text);
 
   return jsonResponse({ ok: true, id: app.id });
@@ -432,33 +444,38 @@ async function handleScApplicationAction(request, env) {
       // Однокликовое подтверждение: карточка СЦ создаётся из заявки
       if (body.create) {
         const stores = await kvGet(env, 'stores');
-        const storeId = app.officeId || normalizeOfficeCode(app.officeCode);
+        const storeId = app.hasCabinet
+          ? (app.officeId || normalizeOfficeCode(app.officeCode))
+          : ('sc-partner-' + app.id);
         const existing = stores[storeId] || {};
         const record = {
           id: storeId,
           officeCode: String(app.officeCode || '').trim(),
-          name: String(app.storeName || '').trim() || existing.name || 'СЦ Greenleaf',
+          name: String(app.storeName || '').trim() || existing.name || (app.hasCabinet ? 'СЦ Greenleaf' : 'Магазин-партнёр Greenleaf'),
           city: String(app.city || '').trim() || existing.city || '',
           cityKey: String(app.city || '').trim().toLowerCase() || existing.cityKey || '',
-          address: String(app.address || '').trim() || existing.address || '',
-          hours: existing.hours || '',
+          address: String(app.address || '').trim() || existing.address || 'Адрес уточняется',
+          hours: existing.hours || 'Пн–Вс 10:00 – 20:00',
           phone: String(app.phone || '').trim() || existing.phone || '',
           phoneRaw: String(app.phone || '').replace(/\D/g, '') || existing.phoneRaw || '',
           whatsapp: String(app.phone || '').replace(/\D/g, '') || existing.whatsapp || '',
-          image: existing.image || '',
-          description: existing.description || '',
+          image: existing.image || 'assets/images/products/placeholder.svg',
+          description: existing.description || (app.hasCabinet
+            ? ''
+            : (app.comment || 'Магазин-партнёр Greenleaf. Приходите за эко-продукцией!')),
           partner: existing.partner || '',
           portalLogin: String(app.portalLogin || '').trim() || existing.portalLogin || '',
           portalPassword: String(app.portalPassword || '').trim() || existing.portalPassword || '',
           authLogin: existing.authLogin || storeId.toLowerCase(),
           authPassword: existing.authPassword || randomPassword(10),
+          isPartner: app.hasCabinet ? false : true,
           status: 'active',
           createdAt: existing.createdAt || new Date().toISOString()
         };
         stores[storeId] = record;
         await kvPut(env, 'stores', stores);
         created = record;
-        if (app.email) await sendScCredsEmail(env, app.email, record);
+        if (app.hasCabinet && app.email) await sendScCredsEmail(env, app.email, record);
       }
       app.status = 'approved';
       app.resolvedAt = new Date().toISOString();
@@ -635,6 +652,7 @@ function buildText(data) {
     ],
     partner: [
       '🤝 Заявка на партнёрство',
+      data.storeName ? '🏪 Магазин: ' + data.storeName : null,
       data.city ? '🏙️ Город: ' + data.city : null,
       data.address ? '📍 Адрес: ' + data.address : null,
       data.experience ? '💼 Тип бизнеса: ' + data.experience : null,

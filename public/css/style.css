@@ -1716,9 +1716,33 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 }
 .admin-list-main input:focus { outline: 2px solid rgba(27, 107, 63, 0.3); border-color: var(--green); }
 
-.admin-actions { display: flex; gap: 8px; }
+.admin-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.admin-form .admin-actions { margin-top: 14px; }
 .danger-btn { color: var(--danger); border-color: rgba(214, 69, 69, 0.5); }
 .danger-btn:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* ---------- Чекбокс кабинета в форме заявки ---------- */
+.form-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--muted);
+  cursor: pointer;
+  margin: 4px 0 10px;
+  line-height: 1.45;
+}
+.form-checkbox input { margin-top: 3px; flex: 0 0 auto; }
+#ownerCabinetBlock {
+  background: var(--bg-soft, #f2f6f2);
+  border: 1px dashed var(--green);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+#ownerCabinetBlock input { margin-bottom: 8px; }
+#ownerCabinetBlock input:last-of-type { margin-bottom: 0; }
+#ownerCabinetBlock .form-note { margin-bottom: 8px; }
 
 .admin-stats {
   display: grid;

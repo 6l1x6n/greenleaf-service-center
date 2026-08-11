@@ -10,8 +10,7 @@
     scEvents: 'greenleaf_sc_events_v1',
     products: 'greenleaf_admin_products_v2',
     notices: 'greenleaf_admin_notices_v1',
-    texts: 'greenleaf_admin_texts_v1',
-    partners: 'greenleaf_partner_stores_v2'
+    texts: 'greenleaf_admin_texts_v1'
   };
 
   var STATUS_OPTIONS = [
@@ -33,7 +32,8 @@
     selectedScId: null,
     editingStoreId: null,
     newStoreFromApp: null,
-    lastAppId: null
+    lastAppId: null,
+    applications: []
   };
 
   var SECTIONS = {
@@ -43,8 +43,7 @@
     stock: { label: '📦 Остатки товаров', roles: ['superadmin', 'sc'] },
     deliveries: { label: '🚚 Поставки', roles: ['superadmin', 'sc'] },
     events: { label: '📅 Мероприятия', roles: ['superadmin', 'sc'] },
-    partners: { label: '🤝 Заявки магазинов', roles: ['superadmin'] },
-    scApps: { label: '🗂 Заявки СЦ', roles: ['superadmin'] },
+    applications: { label: '📋 Заявки', roles: ['superadmin'] },
     catalog: { label: '🛒 Каталог товаров', roles: ['superadmin'] },
     notices: { label: '📢 Уведомления СЦ', roles: ['superadmin', 'sc'] },
     texts: { label: '✏️ Тексты сайта', roles: ['superadmin'] }
@@ -176,11 +175,13 @@
     var p3 = loadJSON('data/deliveries.json').then(function (d) { return mergeDeliveries(d.deliveries || []); }).catch(function () { return mergeDeliveries([]); });
     var p4 = loadJSON('data/events.json').then(function (d) { return mergeEvents(d.events || []); }).catch(function () { return mergeEvents([]); });
     var p5 = window.StoreStock ? StoreStock.load() : Promise.resolve();
-    return Promise.all([p1, p2, p3, p4, p5]).then(function (res) {
+    var p6 = Auth.api('/api/sc-applications').then(function (d) { return (d && d.applications) || []; }).catch(function () { return []; });
+    return Promise.all([p1, p2, p3, p4, p5, p6]).then(function (res) {
       state.stores = res[0];
       state.products = res[1];
       state.deliveries = res[2];
       state.events = res[3];
+      state.applications = res[5];
       applyStoreOverrides();
       applyProductOverrides();
     });
@@ -211,8 +212,7 @@
       stock: renderStock,
       deliveries: renderDeliveries,
       events: renderEvents,
-      partners: renderPartners,
-      scApps: renderScApplications,
+      applications: renderApplications,
       catalog: renderCatalog,
       notices: renderNotices,
       texts: renderTexts
@@ -233,8 +233,7 @@
 
   function renderOverview(content) {
     var inStock = state.products.filter(function (p) { return p.status === 'in_stock' || p.status === 'low'; }).length;
-    var partnerStores = getPartnerStores();
-    var pending = partnerStores.filter(function (s) { return s.status === 'pending'; }).length;
+    var pending = (state.applications || []).filter(function (a) { return a.status === 'pending'; }).length;
 
     var html =
       '<div class="admin-stats">' +
@@ -250,14 +249,14 @@
       '<div class="admin-actions" style="flex-wrap:wrap;">' +
       '<button class="btn btn-primary btn-sm" data-go="deliveries">🚚 Управлять поставками</button>' +
       '<button class="btn btn-primary btn-sm" data-go="events">📅 Управлять мероприятиями</button>' +
-      '<button class="btn btn-primary btn-sm" data-go="partners">🤝 Заявки магазинов (' + pending + ')</button>' +
+      '<button class="btn btn-primary btn-sm" data-go="applications">📋 Заявки (' + pending + ')</button>' +
       '<button class="btn btn-primary btn-sm" data-go="stock">📦 Остатки товаров</button>' +
       '<button class="btn btn-primary btn-sm" data-go="catalog">🛒 Каталог</button>' +
       '</div>' +
       '</div>';
     content.insertAdjacentHTML('beforeend', html);
 
-    ['deliveries', 'events', 'partners', 'stock', 'catalog'].forEach(function (name) {
+    ['deliveries', 'events', 'applications', 'stock', 'catalog'].forEach(function (name) {
       var btn = content.querySelector('[data-go="' + name + '"]');
       if (btn) btn.addEventListener('click', function () { openSection(name); });
     });
@@ -849,123 +848,12 @@
     });
   }
 
-  // ---------------- Заявки магазинов ----------------
+  // ---------------- Заявки (суперадмин, Worker KV) ----------------
 
-  function getPartnerStores() {
-    var saved = lsGet(KEYS.partners);
-    if (saved && Array.isArray(saved)) return saved;
-    return [];
-  }
-
-  function savePartnerStores(list) {
-    lsSet(KEYS.partners, list);
-  }
-
-  function partnerStoreId(item) {
-    return 'sc-partner-' + item.id;
-  }
-
-  function deriveCityKey(cityName) {
-    var c = String(cityName || '').trim();
-    if (!c) return 'other';
-    var found = state.stores.find(function (s) {
-      return s.city && s.city.indexOf(c) !== -1;
-    });
-    if (found && found.cityKey) return found.cityKey;
-    return c.toLowerCase();
-  }
-
-  function createStoreCardFromRequest(item) {
-    var parts = String(item.city || '').split(',').map(function (p) { return p.trim(); });
-    var cityName = parts[0].replace(/^г\.\s*/i, '').trim();
-    var addrPart = parts.slice(1).join(', ').trim();
-    var saved = lsGet(KEYS.stores) || {};
-    var entry = {
-      name: item.storeName || 'Магазин-партнёр Greenleaf',
-      city: cityName ? 'г. ' + cityName : '',
-      cityKey: deriveCityKey(cityName),
-      address: addrPart || 'Адрес уточняется',
-      hours: 'Пн–Вс 10:00 – 20:00',
-      phone: item.phone || '',
-      phoneRaw: String(item.phone || '').replace(/[^\d+]/g, ''),
-      whatsapp: String(item.phone || '').replace(/[^\d]/g, ''),
-      image: 'assets/images/products/placeholder.svg',
-      description: item.message || 'Магазин-партнёр Greenleaf. Приходите за эко-продукцией!',
-      isPartner: true
-    };
-    saved[partnerStoreId(item)] = Object.assign({}, saved[partnerStoreId(item)], entry);
-    lsSet(KEYS.stores, saved);
-  }
-
-  function removeStoreCardFromRequest(item) {
-    var saved = lsGet(KEYS.stores) || {};
-    var id = partnerStoreId(item);
-    if (saved[id]) {
-      delete saved[id];
-      lsSet(KEYS.stores, saved);
-    }
-  }
-
-  function renderPartners(content) {
-    var list = getPartnerStores();
-
-    var html = '<div class="admin-card">' +
-      '<p style="color:var(--muted); font-size:13.5px; margin-bottom:12px;">Заявки с формы регистрации магазина (через «Войти» → «Регистрация» → «Я владелец магазина») появляются здесь со статусом «На рассмотрении». Одобренные заявки создают карточку филиала в секции «Сервис-Центры» на сайте.</p>' +
-      '<ul class="admin-list">' +
-      (list.length
-        ? list.map(function (s) {
-        var badge = s.status === 'pending' ? '⏳ На рассмотрении' : (s.status === 'rejected' ? '❌ Отклонена' : '🏬 Действующий');
-        return '<li>' +
-          '<div class="admin-list-main">' +
-          '<strong>' + h(s.storeName || 'Магазин') + ' <span style="font-weight:400; font-size:12.5px; color:var(--muted);">' + h(badge) + '</span></strong>' +
-          '<span>📍 ' + h(s.city || '') + ' · 👤 ' + h(s.name || '') + ' · 📞 ' + h(s.phone || '') + '</span>' +
-          (s.message ? '<span style="color:var(--muted);">«' + h(s.message) + '»</span>' : '') +
-          '</div>' +
-          '<div class="admin-actions" style="flex-wrap:wrap;">' +
-          (s.status !== 'active' ? '<button class="btn btn-primary btn-sm" data-pt-approve="' + h(s.id) + '">✅ Одобрить</button>' : '') +
-          (s.status !== 'rejected' ? '<button class="btn btn-outline btn-sm danger-btn" data-pt-reject="' + h(s.id) + '">🚫 Отклонить</button>' : '') +
-          '<button class="btn btn-outline btn-sm danger-btn" data-pt-remove="' + h(s.id) + '">' + Utils.iconTrash(14) + 'Удалить</button>' +
-          '</div></li>';
-      }).join('')
-        : '<li style="color:var(--muted);">Заявок пока нет. Новые заявки с формы «Регистрация магазина» появятся здесь.</li>') +
-      '</ul></div>';
-
-    content.insertAdjacentHTML('beforeend', html);
-
-    var ul = content.querySelector('.admin-list');
-    ul.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-pt-approve], [data-pt-reject], [data-pt-remove]');
-      if (!btn) return;
-      var id = btn.getAttribute('data-pt-approve') || btn.getAttribute('data-pt-reject') || btn.getAttribute('data-pt-remove');
-      var item = list.find(function (x) { return x.id === id; });
-      if (!item) return;
-      if (btn.hasAttribute('data-pt-approve')) {
-        item.status = 'active';
-        item.statusLabel = '🏬 Действующий магазин';
-        createStoreCardFromRequest(item);
-        Utils.showToast('✅ Заявка одобрена — карточка добавлена в «Сервис-Центры»');
-      } else if (btn.hasAttribute('data-pt-reject')) {
-        item.status = 'rejected';
-        item.statusLabel = '❌ Отклонена';
-        removeStoreCardFromRequest(item);
-        Utils.showToast('🚫 Заявка отклонена');
-      } else {
-        if (!confirm('Удалить заявку «' + item.storeName + '»?')) return;
-        removeStoreCardFromRequest(item);
-        list = list.filter(function (x) { return x.id !== id; });
-        Utils.showToast('Заявка удалена');
-      }
-      savePartnerStores(list);
-      openSection('partners');
-    });
-  }
-
-  // ---------------- Заявки Сервис-Центров (суперадмин, Worker KV) ----------------
-
-  function renderScApplications(content) {
+  function renderApplications(content) {
     content.insertAdjacentHTML('beforeend',
       '<div class="admin-card">' +
-      '<p style="color:var(--muted); font-size:13.5px; margin-bottom:12px;">Заявки на подключение Сервис-Центра приходят из формы регистрации («Войти» → «Регистрация» → «Я владелец магазина» → «Сервис-Центр»). Проверьте, что заявитель действительно владелец магазина, и создайте карточку — остатки этого СЦ начнут парситься автоматически.</p>' +
+      '<p style="color:var(--muted); font-size:13.5px; margin-bottom:12px;">Заявки приходят из формы «Войти» → «Регистрация» → «Я владелец магазина». Обычные заявки партнёров помечены 🤝, заявки с кабинетом поставщика — 🏬 (остатки будут парситься автоматически).</p>' +
       '<div id="scAppsList">Загружаем заявки…</div>' +
       '</div>'
     );
@@ -978,20 +866,22 @@
         return;
       }
       listEl.innerHTML = '<ul class="admin-list">' + apps.map(function (a) {
+        var isSc = a.type === 'sc_registration' || a.hasCabinet;
         var badge = a.status === 'pending' ? '⏳ На рассмотрении' : (a.status === 'rejected' ? '❌ Отклонена' : '✅ Одобрена');
+        var typeTag = isSc ? '🏬 Сервис-Центр' : '🤝 Магазин-партнёр';
         return '<li>' +
           '<div class="admin-list-main">' +
-          '<strong>' + h(a.storeName || 'Магазин') + ' <span style="font-weight:400; font-size:12.5px; color:var(--muted);">' + h(badge) + '</span></strong>' +
-          '<span>🔑 Код кабинета: <b>' + h(a.officeCode || '—') + '</b> · 👤 ' + h(a.name || '') + ' · 📞 ' + h(a.phone || '') + '</span>' +
-          (a.email ? '<span>📧 <b>' + h(a.email) + '</b> — сюда придут логин и пароль кабинета</span>' : '') +
+          '<strong>' + h(a.storeName || 'Магазин') + ' <span style="font-weight:400; font-size:12.5px; color:var(--muted);">' + h(badge) + ' · ' + typeTag + '</span></strong>' +
+          '<span>👤 ' + h(a.name || '') + ' · 📞 ' + h(a.phone || '') + (a.email ? ' · 📧 ' + h(a.email) : '') + '</span>' +
+          (isSc && a.officeCode ? '<span>🔑 Код кабинета: <b>' + h(a.officeCode) + '</b></span>' : '') +
           '<span>📍 ' + h(a.city || '') + (a.address ? ', ' + h(a.address) : '') + '</span>' +
-          '<span style="color:var(--muted);">👤 Логин поставщика: ' + h(a.portalLogin || '—') + ' · 🔒 Пароль: <b>' + h(a.portalPassword || '—') + '</b></span>' +
+          (isSc ? '<span style="color:var(--muted);">👤 Логин поставщика: ' + h(a.portalLogin || '—') + '</span>' : '') +
           (a.comment ? '<span style="color:var(--muted);">«' + h(a.comment) + '»</span>' : '') +
           '<span style="color:var(--muted); font-size:12px;">🕐 ' + h(new Date(a.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
           '</div>' +
           '<div class="admin-actions" style="flex-wrap:wrap;">' +
-          (a.status === 'pending' ? '<button class="btn btn-primary btn-sm" data-sc-app-approve="' + h(a.id) + '">✅ Подтвердить и создать СЦ</button>' : '') +
-          (a.status !== 'approved' ? '<button class="btn btn-outline btn-sm" data-sc-app-edit="' + h(a.id) + '">✏️ Редактировать перед созданием</button>' : '') +
+          (a.status === 'pending' ? '<button class="btn btn-primary btn-sm" data-sc-app-approve="' + h(a.id) + '">✅ Одобрить</button>' : '') +
+          (a.status === 'pending' ? '<button class="btn btn-outline btn-sm" data-sc-app-edit="' + h(a.id) + '">✏️ Редактировать перед созданием</button>' : '') +
           (a.status !== 'approved' && a.status !== 'rejected' ? '<button class="btn btn-outline btn-sm danger-btn" data-sc-app-reject="' + h(a.id) + '">🚫 Отклонить</button>' : '') +
           '</div></li>';
       }).join('') + '</ul>';
@@ -1001,14 +891,17 @@
         if (approveBtn) {
           var app = apps.find(function (x) { return x.id === approveBtn.getAttribute('data-sc-app-approve'); });
           if (!app) return;
-          if (!confirm('Создать карточку СЦ «' + app.storeName + '» из заявки? Логин и пароль кабинета уйдут на ' + (app.email || 'указанную почту') + '.')) return;
+          var isSc = app.type === 'sc_registration' || app.hasCabinet;
+          if (!confirm(isSc
+            ? 'Создать карточку СЦ «' + app.storeName + '» из заявки? ' + (app.email ? 'Логин и пароль кабинета уйдут на ' + app.email + '.' : '')
+            : 'Одобрить заявку партнёра «' + app.storeName + '»? Карточка магазина появится в «Сервис-Центрах».')) return;
           Auth.api('/api/sc-application', { method: 'POST', body: JSON.stringify({ id: app.id, action: 'approve', create: true }) }).then(function (res) {
             if (res && res.store) {
-              Utils.showToast('✅ СЦ создан: ' + res.store.name + ' — доступы отправлены на почту');
+              Utils.showToast(isSc ? '✅ СЦ создан: ' + res.store.name + (app.email ? ' — доступы отправлены на почту' : '') : '✅ Магазин-партнёр добавлен: ' + res.store.name);
             } else {
               Utils.showToast('✅ Заявка одобрена');
             }
-            openSection('scApps');
+            openSection('applications');
           });
           return;
         }
@@ -1029,7 +922,7 @@
           if (!confirm('Отклонить заявку «' + app2.storeName + '»?')) return;
           Auth.api('/api/sc-application', { method: 'POST', body: JSON.stringify({ id: app2.id, action: 'reject' }) }).then(function () {
             Utils.showToast('🚫 Заявка отклонена');
-            openSection('scApps');
+            openSection('applications');
           });
         }
       });
