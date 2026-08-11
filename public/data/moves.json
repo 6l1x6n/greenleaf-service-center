@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-11T04:55:48+03:00",
+  "updated": "2026-08-11T07:47:35+03:00",
   "moves": [
     {
       "number": "3311418",
@@ -11,14 +11,8 @@
       "recipient": "S240534",
       "status": "Принят",
       "statusCode": 6,
-      "items": [
-        {
-          "sku": "LGZ059",
-          "name": "Greenleaf, 100 упаковок оригинальных цветных салфеток для лица из бамбукового волокна, массовая распродажа (M)",
-          "qty": 3
-        }
-      ],
-      "itemsParsed": true
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3311416",
@@ -47,13 +41,13 @@
       "sum": 80344.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
-          "sku": "KAC298",
-          "name": "KARDLI Губка для мытья посуды из древесной целлюлозы",
-          "qty": 88
+          "sku": "LGZ059",
+          "name": "Greenleaf, 100 упаковок оригинальных цветных салфеток для лица из бамбукового волокна, массовая распродажа (M)",
+          "qty": 3
         }
       ],
       "itemsParsed": true
@@ -66,8 +60,8 @@
       "sum": 1617040.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KAC298",
@@ -85,8 +79,8 @@
       "sum": 448200.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "ASA156",
