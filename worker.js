@@ -198,21 +198,25 @@ async function handleStockSave(request, env) {
 // Каждая бронь — отдельный ключ res_<orderId> с expirationTtl (KV сам удаляет
 // истёкшие). Отдельные ключи исключают гонку «прочитать-изменить-записать»,
 // из-за которой при параллельных резервах с двух устройств терялась бронь.
+// Примечание: getMulti в Workers KV-binding недоступен — читаем по ключам по одному.
 async function activeReservations(env) {
   const now = Date.now();
   const out = {};
   const listed = await env.SC_STORES.list({ prefix: 'res_' });
   const keys = (listed.keys || []).map(function (k) { return k.name; });
-  if (!keys.length) return out;
-  const got = await env.SC_STORES.getMulti(keys);
-  (got || []).forEach(function (item) {
-    if (!item || !item.value) return;
+  for (let n = 0; n < keys.length; n++) {
+    const key = keys[n];
+    let raw = null;
     try {
-      const r = JSON.parse(item.value);
-      const id = String(item.key).slice(4);
+      raw = await env.SC_STORES.get(key);
+    } catch (e) { /* ключ мог истечь между list и get — пропускаем */ }
+    if (!raw) continue;
+    try {
+      const r = JSON.parse(raw);
+      const id = String(key).slice(4);
       if (r && r.expiresAt && r.expiresAt > now) out[id] = r;
     } catch (e) { /* повреждённая бронь — пропускаем */ }
-  });
+  }
   return out;
 }
 
