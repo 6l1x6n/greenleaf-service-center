@@ -818,10 +818,16 @@ def base_index(products):
     return {p["sku"]: p for p in products if p.get("sku")}
 
 
-def merge_sc_items(base_products, items, sc_id, config, images=None, descriptions=None):
-    """Вливает каталог одного сервис-центра в базу: по коду обновляет количество
-    и динамические характеристики, новые коды создают новые карточки.
-    Описание не перезаписывается (заполняется только при создании карточки)."""
+def merge_sc_items(base_products, items, sc_id, config, images=None, descriptions=None, full=True):
+    """Вливает каталог одного сервис-центра в базу: по коду обновляет количество,
+    новые коды создают новые карточки. Описание не перезаписывается (заполняется
+    только при создании карточки).
+
+    full=True  — полный режим (утренний запуск): обновляются название, категория,
+                 цена, фото существующих карточек (ловит утренние изменения).
+    full=False — инкрементальный (днём): существующие карточки обновляются ТОЛЬКО
+                 по количеству (по артикулу) — экономим запросы к порталу;
+                 новые товары всё равно создаются с полными данными."""
     categories = config.get("categories", [])
     low_threshold = config.get("low_threshold", 6)
     multiplier = config.get("price_multiplier", 2)
@@ -866,12 +872,14 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
             by_code[code] = card
             created += 1
         else:
-            card["name"] = it["name"]
-            card["category"] = category
-            card["price"] = price
-            card["partner_price"] = partner_price
-            if img:
-                card["image"] = img
+            # Инкрементальный режим: существующие карточки трогаем только по количеству
+            if full:
+                card["name"] = it["name"]
+                card["category"] = category
+                card["price"] = price
+                card["partner_price"] = partner_price
+                if img:
+                    card["image"] = img
             updated += 1
         card["stock"][sc_id] = it["quantity"]
 
@@ -1108,10 +1116,15 @@ def write_store_stock(products, config, active_ids=None):
     print(f"Остатки по филиалам: {list(stock_data)} ({total} позиций) -> {STORE_STOCK_PATH}")
 
 
-def run_parse_store(page, store_config, base_products):
-    """Парсит каталог одного сервис-центра и вливает его в единую базу."""
+def run_parse_store(page, store_config, base_products, full=True):
+    """Парсит каталог одного сервис-центра и вливает его в единую базу.
+
+    full=False (инкрементальный запуск): существующие карточки обновляются только
+    по количеству — без перезаписи названий/цен/фото. Описания и карта товаров
+    портала запрашиваются только для новых артикулов (их полные данные вносятся
+    один раз при создании карточки)."""
     sc_id = store_config["sc_id"]
-    print(f"--- Сервис-Центр: {sc_id} ---")
+    print(f"--- Сервис-Центр: {sc_id} (режим: {'full' if full else 'incr'}) ---")
     login(page, store_config)
     open_shop(page, store_config)
     items = scrape_goods(page, store_config)
@@ -1134,13 +1147,19 @@ def run_parse_store(page, store_config, base_products):
         descriptions = scrape_descriptions(new_items, goods_map, store_config)
     else:
         descriptions = {}
+        if not full:
+            print("Новых товаров нет — карта портала и описания не запрашиваются")
 
     images = download_images(items, store_config, page.request)
-    return merge_sc_items(base_products, items, sc_id, store_config, images, descriptions)
+    return merge_sc_items(base_products, items, sc_id, store_config, images, descriptions, full=full)
 
 
 def main():
     moves_only = "--moves-only" in sys.argv
+    # Режим: full (утренний запуск 11:00 Астаны) или incr (14:00/17:00/20:00).
+    # По умолчанию incr; GitHub Actions передаёт PARSER_MODE.
+    mode = os.environ.get("PARSER_MODE", "incr").strip().lower()
+    full = mode == "full"
     config = load_config()
     try:
         if moves_only:
@@ -1168,10 +1187,10 @@ def main():
             central = config.get("central_store_id", "s240534")
             active_ids = active_store_ids(config)
             base_products = load_base_products()
-            print(f"База товаров: {len(base_products)} карточек, СЦ: {[s['id'] for s in stores]}")
+            print(f"База товаров: {len(base_products)} карточек, режим: {'full' if full else 'incr'}, СЦ: {[s['id'] for s in stores]}")
             for store in stores:
                 store_config = build_store_config(config, store)
-                base_products = run_parse_store(page, store_config, base_products)
+                base_products = run_parse_store(page, store_config, base_products, full=full)
                 if store.get("id") == central:
                     try:
                         moves = scrape_moves(page, store_config)

@@ -8,8 +8,6 @@
 //                             {"<логин>": {"password": "...", "storeId": "...", "name": "...", "role": "sc|superadmin"}, ...}
 //   AUTH_HMAC_KEY           — секрет подписи токенов сессий админки
 //   PARSER_API_KEY          — ключ парсера для /api/parser-config
-//   RESEND_API_KEY          — ключ почтового сервиса Resend (письма с логинами/паролями)
-//   RESEND_FROM             — отправитель писем (опционально, по умолчанию onboarding@resend.dev)
 // KV namespace SC_STORES:
 //   stores       — {"<storeId>": { id, officeCode, name, city, cityKey, address, hours,
 //                   phone, phoneRaw, whatsapp, email, image, description, status, partner,
@@ -19,12 +17,15 @@
 //   applications — {"<appId>": { id, type: sc_registration|partner, name, phone, email,
 //                   storeName, city, address, officeCode, portalLogin, portalPassword, comment,
 //                   status: pending|approved|rejected|new, createdAt }}
-//   password_resets — {"requests": {"<reqId>": { id, email, kind: sc|superadmin, storeId,
-//                   status: new, createdAt }}, "lastSent": {"<email>": ts}} — заявки на
-//                   восстановление пароля (сбрасывает суперадмин в панели, без email-ссылок)
 //   reservations — {"<orderId>": { storeId, items: [{productId, qty}], createdAt, expiresAt }}
 //                  временная бронь на 2 минуты при оформлении заказа (как места в кино)
-//   sales        — {"<storeId>": { "<productId>": qty }} — постоянное списание по оплаченным заказам
+//   orders       — {"<orderId>": { id, storeId, items: [{productId, qty}], name, phone,
+//                  comment, total, payment, pickupDate, pickupTime, status: new|confirmed|cancelled,
+//                  createdAt, confirmedAt?, cancelledAt? }} — активные заказы сайта.
+//                  Доступно = факт(парсер) − 2-мин холды − Σ new − Σ confirmed после последнего
+//                  обновления базы. Подтверждённые заказы после синка парсера уходят в архив
+//                  и больше не влияют на остаток. Отмена возвращает зарезервированное.
+//   orders_history — архив подтверждённых заказов (виден только суперадмину)
 
 const TELEGRAM_API = 'https://api.telegram.org/bot';
 const TOKEN_TTL = 12 * 3600; // 12 часов
@@ -150,12 +151,14 @@ async function activeReservations(env) {
   return out;
 }
 
-// Эффективные остатки: строка «В наличии (N шт)» уменьшается на продажи и активные брони.
+// Эффективные остатки: факт(парсер) − 2-мин холды − активные заказы (new)
+// − подтверждённые заказы после последнего синка базы.
 // excludeOrderId — своя бронь при валидации новой.
 async function computeEffectiveStock(env, url, excludeOrderId) {
   const base = await loadBaseStock(env, url);
-  const sales = await kvGet(env, 'sales');
   const reservations = await activeReservations(env);
+  const orders = await loadOrders(env);
+  const baseUpdatedMs = base.updated ? new Date(base.updated).getTime() : 0;
   const stock = {};
   Object.keys(base.stock).forEach((scId) => {
     const src = base.stock[scId];
@@ -163,7 +166,6 @@ async function computeEffectiveStock(env, url, excludeOrderId) {
     Object.keys(src).forEach((pid) => {
       const baseCount = parseStockCount(src[pid]);
       if (baseCount === null) { stock[scId][pid] = src[pid]; return; }
-      let sold = (sales[scId] && sales[scId][pid]) || 0;
       let res = 0;
       Object.keys(reservations).forEach((oid) => {
         if (excludeOrderId && oid === excludeOrderId) return;
@@ -172,7 +174,19 @@ async function computeEffectiveStock(env, url, excludeOrderId) {
         const item = (r.items || []).find((i) => i.productId === pid && i.storeId === scId);
         if (item) res += Number(item.qty) || 0;
       });
-      const left = baseCount - sold - res;
+      let ord = 0;
+      Object.keys(orders).forEach((oid) => {
+        const o = orders[oid];
+        if (!o || String(o.storeId) !== String(scId) || o.status === 'cancelled') return;
+        if (o.status === 'confirmed') {
+          const confirmedMs = o.confirmedAt ? new Date(o.confirmedAt).getTime() : 0;
+          // Подтверждено до последнего синка — парсер уже учёл продажу в базе
+          if (!(confirmedMs > baseUpdatedMs)) return;
+        }
+        const item = (o.items || []).find((i) => String(i.productId) === String(pid));
+        if (item) ord += Number(item.qty) || 0;
+      });
+      const left = baseCount - res - ord;
       stock[scId][pid] = left > 0
         ? 'В наличии (' + left + ' шт)'
         : 'Нет в наличии';
@@ -277,21 +291,146 @@ async function handleEventsSave(request, env, auth) {
   return jsonResponse({ ok: true });
 }
 
-// Конверсия брони в продажу (постоянное списание) — при оформлении заказа
-async function commitSalesFromOrder(env, data) {  const orderId = String(data.order_id || data.orderId || '').trim();
-  if (!orderId) return;
+// ---------------- Заказы (резервирование + синхронизация) ----------------
+// Доступно онлайн = факт(парсер) − 2-мин холды корзины − Σ заказов status=new
+//   − Σ заказов status=confirmed, подтверждённых ПОСЛЕ последнего обновления базы
+//   (confirmedAt > base.updated). Подтверждённые до синка заказы парсер уже учёл —
+//   они не вычитаются и лениво архивируются в orders_history.
+
+async function loadOrders(env) {
+  return kvGet(env, 'orders');
+}
+
+// Подтверждённые заказы, по которым уже прошёл синк базы (base.updated > confirmedAt),
+// уходят в архив: суперадмин их видит в /api/orders?archive=1
+async function archiveConfirmedOrders(env, url) {
+  const base = await loadBaseStock(env, url);
+  const baseUpdatedMs = base.updated ? new Date(base.updated).getTime() : 0;
+  if (!baseUpdatedMs) return;
+  const orders = await loadOrders(env);
+  let changed = false;
+  const history = await kvGet(env, 'orders_history');
+  Object.keys(orders).forEach((oid) => {
+    const o = orders[oid];
+    if (!o || o.status !== 'confirmed') return;
+    const confirmedMs = o.confirmedAt ? new Date(o.confirmedAt).getTime() : 0;
+    if (confirmedMs && baseUpdatedMs > confirmedMs) {
+      o.archivedAt = new Date().toISOString();
+      history[oid] = o;
+      delete orders[oid];
+      changed = true;
+    }
+  });
+  if (changed) {
+    await kvPut(env, 'orders', orders);
+    await kvPut(env, 'orders_history', history);
+  }
+}
+
+// Создание заказа из оформленной корзины: 2-минутный холд конвертируется в заказ,
+// который и держит резерв до подтверждения/отмены.
+async function createOrder(env, data) {
+  const orderId = String(data.order_id || data.orderId || '').trim();
+  if (!orderId) return null;
   const reservations = await activeReservations(env);
   const res = reservations[orderId];
-  if (!res || !res.items || !res.items.length) return;
-  const sales = await kvGet(env, 'sales');
-  res.items.forEach((i) => {
-    if (!i || !i.storeId || !i.productId) return;
-    if (!sales[i.storeId]) sales[i.storeId] = {};
-    sales[i.storeId][i.productId] = (sales[i.storeId][i.productId] || 0) + (Number(i.qty) || 0);
-  });
-  await kvPut(env, 'sales', sales);
+  if (!res || !res.items || !res.items.length) return null;
+  let items = [];
+  try {
+    items = JSON.parse(String(data.order_items_json || '[]'));
+  } catch (e) {
+    items = [];
+  }
+  if (!Array.isArray(items)) items = [];
+  const order = {
+    id: orderId,
+    storeId: res.storeId,
+    items: items.map(function (i) {
+      return { productId: String(i.productId || ''), qty: Math.max(1, Number(i.qty) || 1) };
+    }),
+    name: String(data.name || '').trim(),
+    phone: String(data.phone || '').trim(),
+    comment: String(data.comment || data.order_comment || '').trim(),
+    total: Number(data.order_total) || 0,
+    payment: String(data.payment || ''),
+    pickupDate: String(data.pickup_date || data.pickupDate || ''),
+    pickupTime: String(data.pickup_time || data.pickupTime || ''),
+    status: 'new',
+    createdAt: new Date().toISOString()
+  };
+  const orders = await loadOrders(env);
+  orders[orderId] = order;
+  await kvPut(env, 'orders', orders);
+  // Холд на 2 минуты больше не нужен — резерв держит сам заказ
   delete reservations[orderId];
   await kvPut(env, 'reservations', reservations);
+  console.log('Заказ создан:', orderId, 'СЦ', res.storeId, order.items.length, 'поз.');
+  return order;
+}
+
+// GET /api/orders — СЦ видит свои заказы, суперадмин — все (и архив при ?archive=1)
+async function handleOrdersGet(request, env, auth) {
+  const url = new URL(request.url);
+  await archiveConfirmedOrders(env, url);
+  const history = url.searchParams.get('archive') === '1';
+  const source = history ? await kvGet(env, 'orders_history') : await loadOrders(env);
+  const list = Object.values(source)
+    .filter(function (o) { return auth.role === 'superadmin' || String(o.storeId) === String(auth.id); })
+    .sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+  return jsonResponse({ ok: true, orders: list, archive: history });
+}
+
+// POST /api/orders/action {id, action: confirm|cancel|delete}
+//   confirm — new → confirmed: резерв переходит в продажу, остаток не меняется.
+//   cancel  — new → cancelled: резерв снимается, товар возвращается в доступное.
+//   delete  — удаление из списка: для new возвращает резерв (как отмена),
+//             для confirmed НЕ возвращает товар (продажа уже состоялась).
+async function handleOrdersAction(request, env, auth) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const id = String(body.id || '').trim();
+  const action = String(body.action || '').trim();
+  const orders = await loadOrders(env);
+  const order = orders[id];
+  if (!order) return jsonResponse({ ok: false, error: 'Заказ не найден' }, 404);
+  if (auth.role !== 'superadmin' && String(order.storeId) !== String(auth.id)) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+  }
+
+  if (action === 'confirm') {
+    if (order.status !== 'new') {
+      return jsonResponse({ ok: false, error: 'Подтвердить можно только новый заказ' }, 400);
+    }
+    order.status = 'confirmed';
+    order.confirmedAt = new Date().toISOString();
+    await kvPut(env, 'orders', orders);
+    return jsonResponse({ ok: true, order });
+  }
+
+  if (action === 'cancel') {
+    if (order.status !== 'new') {
+      return jsonResponse({ ok: false, error: 'Отменить можно только новый заказ' }, 400);
+    }
+    order.status = 'cancelled';
+    order.cancelledAt = new Date().toISOString();
+    await kvPut(env, 'orders', orders);
+    return jsonResponse({ ok: true, order });
+  }
+
+  if (action === 'delete') {
+    const wasNew = order.status === 'new';
+    delete orders[id];
+    await kvPut(env, 'orders', orders);
+    // Удаление не меняет физический остаток: для new резерв снимается (заказа больше
+    // нет — товар снова доступен), для confirmed продажа остаётся продажей.
+    return jsonResponse({ ok: true, deleted: true, returned: wasNew });
+  }
+
+  return jsonResponse({ ok: false, error: 'unknown action' }, 400);
 }
 
 // Проверка заказа перед отправкой: бронь на 2 минуты должна быть активной
@@ -320,28 +459,6 @@ async function validateOrderReservation(env, data) {
     return { ok: false, res: jsonResponse({ ok: false, error: 'expired', message: 'Состав заказа изменился — соберите корзину заново' }, 409) };
   }
   return { ok: true };
-}
-
-// ---------------- Почта (Resend) ----------------
-
-async function sendEmail(env, to, subject, html) {
-  const key = env.RESEND_API_KEY;
-  if (!key) {
-    console.error('RESEND_API_KEY не задан — письмо пропущено');
-    return false;
-  }
-  const from = env.RESEND_FROM || 'Greenleaf <onboarding@resend.dev>';
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject, html })
-    });
-    return res.ok;
-  } catch (e) {
-    console.error('Resend error:', e);
-    return false;
-  }
 }
 
 // ---------------- Токены сессий (HMAC) ----------------
@@ -442,136 +559,6 @@ async function handleStoreAuth(request, env) {
   return jsonResponse({ ok: false });
 }
 
-// ---------------- Восстановление пароля (заявка администратору) ----------------
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const RESET_COOLDOWN_MS = 5 * 60 * 1000;   // 5 минут между заявками на один email
-
-// POST /api/forgot-password {email} — заявка администратору на восстановление пароля
-async function handleForgotPassword(request, env) {
-  let data;
-  try {
-    data = await request.json();
-  } catch (e) {
-    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
-  }
-  const email = String(data.email || '').trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) {
-    return jsonResponse({ ok: false, error: 'Укажите корректный email' }, 400);
-  }
-
-  // Ищем аккаунт: владельцы Сервис-Центров (KV stores по email)
-  // или суперадмин (KV admin_creds по привязанному email)
-  const stores = await kvGet(env, 'stores');
-  const adminCreds = await kvGet(env, 'admin_creds');
-  let kind = null;
-  let storeId = '';
-  if (adminCreds && adminCreds.email && String(adminCreds.email).trim().toLowerCase() === email) {
-    kind = 'superadmin';
-  } else {
-    const rec = Object.keys(stores).find(function (id) {
-      const s = stores[id];
-      return s && s.status === 'active' && s.email && String(s.email).trim().toLowerCase() === email;
-    });
-    if (rec) { kind = 'sc'; storeId = rec; }
-  }
-
-  const resets = await kvGet(env, 'password_resets');
-  const last = resets.lastSent && resets.lastSent[email];
-  if (last && Date.now() - last < RESET_COOLDOWN_MS) {
-    return jsonResponse({ ok: true }); // анти-спам, ответ всегда одинаковый
-  }
-
-  // Восстановление через администратора: без токена и писем с ссылками.
-  // Создаём заявку в панели суперадмина + дублируем в Telegram.
-  if (kind) {
-    if (!resets.requests) resets.requests = {};
-    const reqId = 'pwr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-    resets.requests[reqId] = {
-      id: reqId,
-      email,
-      kind,
-      storeId,
-      status: 'new',
-      createdAt: new Date().toISOString()
-    };
-    if (!resets.lastSent) resets.lastSent = {};
-    resets.lastSent[email] = Date.now();
-    await kvPut(env, 'password_resets', resets);
-
-    const rec = kind === 'sc' ? stores[storeId] : null;
-    await sendTelegram(env,
-      '🔑 Запрос восстановления пароля\n' +
-      (rec ? '🏬 ' + rec.name + '\n' : '') +
-      (rec && rec.phone ? '📞 ' + rec.phone + '\n' : '') +
-      '📧 ' + email + '\n' +
-      (rec ? '🔗 ID филиала: ' + storeId : '') +
-      '\nСбросить пароль: панель → «Заявки» → «Восстановление паролей»');
-  }
-
-  return jsonResponse({ ok: true });
-}
-
-// Заявки на восстановление пароля (суперадмин)
-async function handlePasswordRequests(env) {
-  const resets = await kvGet(env, 'password_resets');
-  const list = Object.values(resets.requests || {}).filter(function (r) { return r.status === 'new'; });
-  // Подмешиваем имя/телефон филиала для удобства
-  const stores = await kvGet(env, 'stores');
-  list.forEach(function (r) {
-    const s = r.kind === 'sc' && stores[r.storeId];
-    r.name = s ? s.name : '';
-    r.phone = s ? s.phone || s.phoneRaw || '' : '';
-    r.storeName = s ? s.name : 'Администратор';
-  });
-  list.sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
-  return jsonResponse({ ok: true, requests: list });
-}
-
-// POST /api/password-request/action {id, action: reset|delete}
-async function handlePasswordRequestAction(request, env) {
-  let data;
-  try {
-    data = await request.json();
-  } catch (e) {
-    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
-  }
-  const id = String(data.id || '').trim();
-  const action = String(data.action || '').trim();
-  const resets = await kvGet(env, 'password_resets');
-  const rec = resets.requests && resets.requests[id];
-  if (!rec) return jsonResponse({ ok: false, error: 'Заявка не найдена' }, 404);
-
-  if (action === 'delete') {
-    delete resets.requests[id];
-    await kvPut(env, 'password_resets', resets);
-    return jsonResponse({ ok: true, deleted: true });
-  }
-
-  if (action === 'reset') {
-    const password = randomPassword(10);
-    if (rec.kind === 'sc') {
-      const stores = await kvGet(env, 'stores');
-      const s = stores[rec.storeId];
-      if (!s) return jsonResponse({ ok: false, error: 'Сервис-Центр не найден' }, 404);
-      s.authPassword = password;
-      await kvPut(env, 'stores', stores);
-    } else if (rec.kind === 'superadmin') {
-      const adminCreds = await kvGet(env, 'admin_creds');
-      adminCreds.password = password;
-      await kvPut(env, 'admin_creds', adminCreds);
-    } else {
-      return jsonResponse({ ok: false, error: 'Неизвестный тип аккаунта' }, 400);
-    }
-    delete resets.requests[id];
-    await kvPut(env, 'password_resets', resets);
-    return jsonResponse({ ok: true, password, email: rec.email, kind: rec.kind, id: rec.storeId });
-  }
-
-  return jsonResponse({ ok: false, error: 'unknown action' }, 400);
-}
-
 // ---------------- Регистрация Сервис-Центра (публично) ----------------
 
 function normalizeOfficeCode(code) {
@@ -637,18 +624,8 @@ async function handleScApplications(env) {
   return jsonResponse({ ok: true, applications: list });
 }
 
-// Письмо с доступами владельцу Сервис-Центра (после подтверждения)
-async function sendScCredsEmail(env, to, rec) {
-  if (!to) return false;
-  return sendEmail(env, to, 'Сервис-Центр Greenleaf подключён',
-    '<p>Здравствуйте!</p>' +
-    '<p>Ваш Сервис-Центр <b>' + String(rec.name || '').replace(/[<>]/g, '') + '</b> подтверждён и подключён к каталогу Greenleaf.</p>' +
-    '<p>Данные для входа в кабинет Сервис-Центра:</p>' +
-    '<p><b>Логин:</b> ' + String(rec.authLogin || '').replace(/[<>]/g, '') + '<br>' +
-    '<b>Пароль:</b> ' + String(rec.authPassword || '').replace(/[<>]/g, '') + '</p>' +
-    '<p>Вход: сайт Greenleaf → «Войти».</p>' +
-    '<p>Остатки ваших товаров будут синхронизироваться автоматически.</p>');
-}
+// Доступы владельцу передаёт лично суперадмин (раздел «Сервис-Центры»);
+// письма и email владельца убраны.
 
 async function handleScApplicationAction(request, env) {
   let body;
@@ -698,7 +675,6 @@ async function handleScApplicationAction(request, env) {
         stores[storeId] = record;
         await kvPut(env, 'stores', stores);
         created = record;
-        if (app.hasCabinet && app.email) await sendScCredsEmail(env, app.email, record);
       }
       app.status = 'approved';
       app.resolvedAt = new Date().toISOString();
@@ -739,8 +715,9 @@ async function handleScStore(request, env, auth) {
   if (isScRole && String(data.id || '').trim() !== String(auth.id || '')) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403);
   }
-  // Обязательные поля карточки (форма суперадмина требует их все)
-  const required = ['name', 'city', 'address', 'hours', 'phone', 'email', 'image'];
+  // Обязательные поля карточки (форма суперадмина требует их все).
+  // Email владельца убран: доступы передаёт только суперадмин лично.
+  const required = ['name', 'city', 'address', 'hours', 'phone', 'image'];
   const missing = required.filter(function (f) { return !String(data[f] || '').trim(); });
   if (missing.length) {
     return jsonResponse({ ok: false, error: 'Не заполнены обязательные поля: ' + missing.join(', ') }, 400);
@@ -749,6 +726,10 @@ async function handleScStore(request, env, auth) {
   const officeId = normalizeOfficeCode(data.officeCode || '');
   const storeId = isScRole ? String(auth.id || '').trim() : (String(data.id || '').trim() || officeId || ('sc_' + Date.now()));
   const existing = stores[storeId] || {};
+  // Пароли: СЦ не видит текущие значения (portalPassword вырезается из ответа),
+  // но может задать новый: непустое поле = смена, пустое = оставить как было.
+  const submittedPortalPass = String(data.portalPassword || '').trim();
+  const submittedAuthPass = String(data.authPassword || '').trim();
   const record = {
     id: storeId,
     officeCode: String(data.officeCode || '').trim() || existing.officeCode || '',
@@ -761,34 +742,29 @@ async function handleScStore(request, env, auth) {
     phone: String(data.phone || '').trim() || existing.phone || '',
     phoneRaw: String(data.phoneRaw || '').trim() || existing.phoneRaw || '',
     whatsapp: String(data.whatsapp || '').trim() || existing.whatsapp || '',
-    email: String(data.email || '').trim().toLowerCase() || existing.email || '',
+    email: existing.email || '',
     image: String(data.image || '').trim() || existing.image || '',
     description: String(data.description || '').trim() || existing.description || '',
     // Логин партнёра для каталога универсален для всех СЦ
     partner: existing.partner || 'kz44326234',
     portalLogin: String(data.portalLogin || '').trim() || existing.portalLogin || '',
-    portalPassword: String(data.portalPassword || '').trim() || existing.portalPassword || '',
+    portalPassword: submittedPortalPass || existing.portalPassword || '',
     authLogin: isScRole
       ? (existing.authLogin || officeId || storeId.toLowerCase())
       : (String(data.authLogin || '').trim().toLowerCase() || existing.authLogin || officeId || storeId.toLowerCase()),
-    authPassword: isScRole
-      ? (existing.authPassword || randomPassword(10))
-      : (String(data.authPassword || '').trim() || existing.authPassword || randomPassword(10)),
+    authPassword: submittedAuthPass || existing.authPassword || randomPassword(10),
     status: isScRole ? (existing.status || 'active') : (data.status === 'inactive' ? 'inactive' : 'active'),
     createdAt: existing.createdAt || new Date().toISOString()
   };
   stores[storeId] = record;
   await kvPut(env, 'stores', stores);
-  // Письмо с доступами: при создании или при смене email владельца
-  if (record.email && (!existing.id || (existing.email && existing.email !== record.email))) {
-    await sendScCredsEmail(env, record.email, record);
-  }
-  // Без портальных паролей в ответ не отдаём — но панели они нужны; админ авторизован
-  return jsonResponse({ ok: true, store: record });
+  // Пароль парсера и кабинета СЦ не отдаём в ответе
+  const publicRecord = Object.assign({}, record, { portalPassword: undefined, authPassword: undefined });
+  return jsonResponse({ ok: true, store: publicRecord });
 }
 
-// Повторная отправка доступов владельцу СЦ на email
-async function handleScStoreResend(request, env) {
+// POST /api/sc-store/reset-password {id} — генерация нового пароля кабинета (суперадмин)
+async function handleScStoreResetPassword(request, env) {
   let body;
   try {
     body = await request.json();
@@ -799,19 +775,21 @@ async function handleScStoreResend(request, env) {
   const stores = await kvGet(env, 'stores');
   const rec = stores[id];
   if (!rec) return jsonResponse({ ok: false, error: 'not found' }, 404);
-  if (!rec.email) return jsonResponse({ ok: false, error: 'У филиала не указан email владельца' }, 400);
-  const ok = await sendScCredsEmail(env, rec.email, rec);
-  return jsonResponse({ ok, sent: ok });
+  const password = randomPassword(10);
+  rec.authPassword = password;
+  await kvPut(env, 'stores', stores);
+  return jsonResponse({ ok: true, id, login: rec.authLogin, password });
 }
 
-// Полные карточки СЦ для админки (email, креды, статус). Суперадмин — все,
-// СЦ — только свой филиал.
+// Полные карточки СЦ для админки (креды, статус). Суперадмин — все,
+// СЦ — только свой филиал; пароль портала (для парсера) виден только суперадмину.
 async function handleScStoresAdmin(env, auth) {
   const stores = await kvGet(env, 'stores');
   const list = Object.values(stores);
   if (auth.role !== 'superadmin') {
     const login = String(auth.login || '').toLowerCase();
-    const own = list.filter(function (s) { return String(s.authLogin || '').toLowerCase() === login; });
+    const own = list.filter(function (s) { return String(s.authLogin || '').toLowerCase() === login; })
+      .map(function (s) { return Object.assign({}, s, { portalPassword: undefined }); });
     return jsonResponse({ ok: true, stores: own });
   }
   list.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'ru'); });
@@ -958,7 +936,6 @@ async function handleAdminProductsGet(env) {
   const overrides = await kvGet(env, 'product_overrides');
   const scOverrides = await kvGet(env, 'sc_product_overrides');
   const settings = await kvGet(env, 'site_settings');
-  const adminCreds = await kvGet(env, 'admin_creds');
   return jsonResponse({
     ok: true,
     overrides,
@@ -966,27 +943,8 @@ async function handleAdminProductsGet(env) {
     settings: {
       showDiscountPrices: settings.showDiscountPrices !== false,
       categories: Array.isArray(settings.categories) ? settings.categories : []
-    },
-    adminEmail: (adminCreds && adminCreds.email) || ''
+    }
   });
-}
-
-// POST /api/admin/email — привязка email суперадмина для восстановления пароля
-async function handleAdminEmail(request, env) {
-  let body;
-  try {
-    body = await request.json();
-  } catch (e) {
-    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
-  }
-  const email = String(body.email || '').trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) {
-    return jsonResponse({ ok: false, error: 'Укажите корректный email' }, 400);
-  }
-  const adminCreds = await kvGet(env, 'admin_creds');
-  adminCreds.email = email;
-  await kvPut(env, 'admin_creds', adminCreds);
-  return jsonResponse({ ok: true, email });
 }
 
 // POST /api/admin/products — сохранение оверрайдов/настроек
@@ -1341,7 +1299,7 @@ async function handleTelegram(request, env) {
   if (data.type === 'order') {
     const check = await validateOrderReservation(env, data);
     if (!check.ok) return check.res;
-    try { await commitSalesFromOrder(env, data); } catch (e) { console.error('commitSales error:', e); }
+    try { await createOrder(env, data); } catch (e) { console.error('createOrder error:', e); }
   }
 
   // Заказы (корзина) — в группу заказов, остальное — в основной чат
@@ -1408,11 +1366,6 @@ export default {
       return handleRegisterSc(request, env);
     }
 
-    // 1.2.1 Восстановление пароля — заявка администратору (без email-ссылки)
-    if (path === '/api/forgot-password' && request.method === 'POST') {
-      return handleForgotPassword(request, env);
-    }
-
     // 1.3 Публичный список СЦ (карточки из KV, без паролей)
     if (path === '/api/stores' && request.method === 'GET') {
       return handleStores(env);
@@ -1463,27 +1416,34 @@ export default {
       return handleEventBook(request, env);
     }
 
-    // 1.5 Админские API (суперадмин по токену; /api/sc-stores — суперадмин или свой СЦ)
+    // 1.5 Админские API (суперадмин по токену; /api/sc-stores, /api/orders — суперадмин или свой СЦ)
     if (path === '/api/sc-applications' || path === '/api/sc-application' || path === '/api/sc-store' ||
-        path === '/api/sc-store/resend' || path === '/api/sc-stores' || path === '/api/admin/products' ||
-        path === '/api/admin/email' || path === '/api/password-requests' || path === '/api/password-request' ||
-        path === '/api/sc-archive' || path === '/api/sc-archive/action') {
+        path === '/api/sc-store/reset-password' || path === '/api/sc-stores' || path === '/api/admin/products' ||
+        path === '/api/sc-archive' || path === '/api/sc-archive/action' ||
+        path === '/api/orders' || path === '/api/orders/action') {
       const auth = await verifyToken(env, request.headers.get('Authorization'));
       if (!auth) {
         return jsonResponse({ ok: false, error: 'forbidden' }, 403);
       }
-      if (path === '/api/sc-stores') {
+      if (path === '/api/sc-stores' || path === '/api/orders') {
         if (auth.role !== 'superadmin' && auth.role !== 'sc') {
           return jsonResponse({ ok: false, error: 'forbidden' }, 403);
         }
-        if (request.method === 'GET') {
+        if (path === '/api/sc-stores' && request.method === 'GET') {
           return handleScStoresAdmin(env, auth);
+        }
+        if (path === '/api/orders' && request.method === 'GET') {
+          return handleOrdersGet(env, auth);
         }
         return jsonResponse({ ok: false, error: 'method not allowed' }, 405);
       }
       // Сервис-Центр может сохранять только свой филиал
       if (path === '/api/sc-store' && request.method === 'POST' && auth.role === 'sc') {
         return handleScStore(request, env, auth);
+      }
+      // Подтверждение/отмена/удаление заказов: СЦ — только свои, суперадмин — все
+      if (path === '/api/orders/action' && request.method === 'POST') {
+        return handleOrdersAction(request, env, auth);
       }
       if (auth.role !== 'superadmin') {
         return jsonResponse({ ok: false, error: 'forbidden' }, 403);
@@ -1500,23 +1460,14 @@ export default {
       if (path === '/api/sc-store' && request.method === 'DELETE') {
         return handleScStoreDelete(request, env);
       }
-      if (path === '/api/sc-store/resend' && request.method === 'POST') {
-        return handleScStoreResend(request, env);
+      if (path === '/api/sc-store/reset-password' && request.method === 'POST') {
+        return handleScStoreResetPassword(request, env);
       }
       if (path === '/api/admin/products' && request.method === 'GET') {
         return handleAdminProductsGet(env);
       }
       if (path === '/api/admin/products' && request.method === 'POST') {
         return handleAdminProducts(request, env);
-      }
-      if (path === '/api/admin/email' && request.method === 'POST') {
-        return handleAdminEmail(request, env);
-      }
-      if (path === '/api/password-requests' && request.method === 'GET') {
-        return handlePasswordRequests(env);
-      }
-      if (path === '/api/password-request' && request.method === 'POST') {
-        return handlePasswordRequestAction(request, env);
       }
       if (path === '/api/sc-archive' && request.method === 'GET') {
         return handleScArchiveGet(env);

@@ -47,29 +47,14 @@
               <input id="adminPass" name="password" type="password" placeholder="••••••" required autocomplete="current-password">
             </div>
 
-            <button type="button" id="forgotPassLink" class="auth-link" style="background:none;border:0;cursor:pointer;padding:0;text-align:left;font-family:var(--font);">Забыли пароль?</button>
-
             <button class="btn btn-primary btn-lg" type="submit" style="margin-top:8px; width:100%;">Войти в панель</button>
 
             <div class="form-error" id="adminLoginErr" style="margin-top:10px;">Неверный логин или пароль. Попробуйте еще раз.</div>
 
+            <p class="form-note" style="margin-top:10px;">Забыли пароль? Обратитесь к администратору Greenleaf — он восстановит доступ.</p>
+
             <button class="btn btn-outline btn-lg" type="button" id="authOwnerBtn" style="width:100%;">🏬 Регистрация Сервис-Центра</button>
           </form>
-        </div>
-
-        <!-- Восстановление пароля — заявка администратору -->
-        <div id="authForgotView" class="hidden">
-          <h3 style="margin-bottom:6px;">🔑 Восстановление пароля</h3>
-          <p class="modal-product">Укажите email кабинета — администратор восстановит доступ и свяжется с вами.</p>
-
-          <form class="form" id="forgotForm">
-            <input name="email" type="email" placeholder="Email кабинета *" required autocomplete="email">
-            <button class="btn btn-primary btn-lg" type="submit">Отправить заявку</button>
-            <p class="form-note" id="forgotMsg" style="margin-top:8px;"></p>
-            <p class="form-error">Проверьте email — он должен быть корректным.</p>
-          </form>
-
-          <button class="auth-switch-link" type="button" id="forgotBackBtn">← Назад ко входу</button>
         </div>
 
         <!-- Регистрация владельца магазина -->

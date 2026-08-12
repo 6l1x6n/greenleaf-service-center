@@ -54,6 +54,7 @@
     events: { label: '📅 Мероприятия', roles: ['superadmin', 'sc'] },
     products: { label: '🛒 Товары', roles: ['superadmin'] },
     catalog: { label: '📦 Наличие товаров в СЦ', roles: ['superadmin'] },
+    orders: { label: '🛒 Заказы', roles: ['superadmin', 'sc'] },
     applications: { label: '📋 Заявки', roles: ['superadmin'] },
     notices: { label: '📢 Уведомления СЦ', roles: ['superadmin', 'sc'] }
   };
@@ -209,11 +210,10 @@
         return {
           overrides: (d && d.overrides) || {},
           scOverrides: (d && d.scOverrides) || {},
-          settings: (d && d.settings) || { showDiscountPrices: true, categories: [] },
-          adminEmail: (d && d.adminEmail) || ''
+          settings: (d && d.settings) || { showDiscountPrices: true, categories: [] }
         };
-      }).catch(function () { return { overrides: {}, scOverrides: {}, settings: { showDiscountPrices: true, categories: [] }, adminEmail: '' }; })
-      : Promise.resolve({ overrides: {}, scOverrides: {}, settings: { showDiscountPrices: true, categories: [] }, adminEmail: '' });
+      }).catch(function () { return { overrides: {}, scOverrides: {}, settings: { showDiscountPrices: true, categories: [] } }; })
+      : Promise.resolve({ overrides: {}, scOverrides: {}, settings: { showDiscountPrices: true, categories: [] } });
     // Единый счётчик броней мест на мероприятия (Worker KV)
     var p9 = fetch('/api/event-bookings')
       .then(function (r) { return r.json(); })
@@ -236,7 +236,6 @@
       state.productOverrides = res[7].overrides || {};
       state.scProductOverrides = res[7].scOverrides || {};
       state.siteSettings = Object.assign({ showDiscountPrices: true, categories: [] }, res[7].settings || {});
-      state.adminEmail = res[7].adminEmail || '';
       state.pendingProductChanges = {};
       state.pendingScChanges = {};
       applyStoreOverrides();
@@ -280,6 +279,7 @@
       deliveries: renderDeliveries,
       events: renderEvents,
       applications: renderApplications,
+      orders: renderOrders,
       products: renderProducts,
       catalog: renderAvailability,
       notices: renderNotices
@@ -319,39 +319,14 @@
       '<button class="btn btn-primary btn-sm" data-go="applications">📋 Заявки (' + pending + ')</button>' +
       '<button class="btn btn-primary btn-sm" data-go="products">🛒 Товары</button>' +
       '<button class="btn btn-primary btn-sm" data-go="catalog">📦 Наличие товаров в СЦ</button>' +
+      '<button class="btn btn-primary btn-sm" data-go="orders">🛒 Заказы</button>' +
       '</div>' +
-      '</div>' +
-      '<div class="admin-card">' +
-      '<h4 style="margin-bottom:6px;">🔐 Восстановление пароля суперадмина</h4>' +
-      '<p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Привяжите email — на него будет приходить ссылка для сброса пароля, если вы его забудете.</p>' +
-      '<div class="admin-actions" style="flex-wrap:wrap;">' +
-      '<input type="email" id="adminRecoveryEmail" placeholder="email@example.com" style="min-width:240px;" value="' + h(state.adminEmail || '') + '">' +
-      '<button class="btn btn-outline btn-sm" id="adminRecoveryEmailBtn">Сохранить email</button>' +
-      '</div>' +
-      '<p class="form-success" id="adminRecoveryEmailMsg" style="display:none;">Email сохранён — восстановление пароля доступно по кнопке «Забыли пароль?»</p>' +
       '</div>';
     content.insertAdjacentHTML('beforeend', html);
 
-    ['deliveries', 'events', 'applications', 'products', 'catalog'].forEach(function (name) {
+    ['deliveries', 'events', 'applications', 'products', 'catalog', 'orders'].forEach(function (name) {
       var btn = content.querySelector('[data-go="' + name + '"]');
       if (btn) btn.addEventListener('click', function () { openSection(name); });
-    });
-
-    var emailBtn = content.querySelector('#adminRecoveryEmailBtn');
-    if (emailBtn) emailBtn.addEventListener('click', function () {
-      var email = (content.querySelector('#adminRecoveryEmail').value || '').trim();
-      Auth.api('/api/admin/email', { method: 'POST', body: JSON.stringify({ email: email }) })
-        .then(function (d) {
-          if (d && d.ok) {
-            state.adminEmail = email;
-            var msg = content.querySelector('#adminRecoveryEmailMsg');
-            if (msg) msg.style.display = 'block';
-            Utils.showToast('✅ Email для восстановления сохранён');
-          } else {
-            Utils.showToast('⚠️ Не удалось сохранить email: ' + ((d && d.error) || 'ошибка'));
-          }
-        })
-        .catch(function () { Utils.showToast('⚠️ Ошибка сети — попробуйте ещё раз'); });
     });
   }
 
@@ -392,23 +367,34 @@
       '<div class="form-group"><label>Точный адрес *</label><input name="address" value="' + h(store.address) + '" placeholder="ул. Абая 150" required></div>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
       '<div class="form-group"><label>Телефон *</label><input name="phone" value="' + h(store.phone) + '" placeholder="+7 (700) 000-00-00" required></div>' +
-      '<div class="form-group"><label>Email владельца * (сюда приходят логин и пароль кабинета)</label><input name="email" type="email" value="' + h(store.email || '') + '" placeholder="owner@mail.kz" required></div>' +
+      '<div class="form-group"><label>WhatsApp (только цифры, с 7)</label><input name="whatsapp" value="' + h(store.whatsapp) + '" placeholder="77001234567"></div>' +
       '</div>' +
             Utils.scheduleFormHtml(store) +
-      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
-      '<div class="form-group"><label>WhatsApp (только цифры, с 7)</label><input name="whatsapp" value="' + h(store.whatsapp) + '" placeholder="77001234567"></div>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
-      '</div>' +
       '<div class="form-group"><label>Фото (путь или ссылка) *</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..." required>' + imagePreview + '</div>' +
       '<div class="form-group"><label>Краткое описание филиала *</label><textarea name="description" required>' + h(store.description) + '</textarea></div>' +
       '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
+      '<strong style="font-size:14px;">🔐 Доступ к кабинету сайта</strong>' +
+      '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
+      '<div class="form-group"><label>Логин (для входа, менять нельзя)</label><input name="authLogin" value="' + h(store.authLogin || '') + '" readonly style="background:#f2f4f7;color:#555;"></div>' +
+      (isSuper()
+        ? '<div class="form-group"><label>Пароль кабинета</label><input name="authPassword" type="text" value="' + h(store.authPassword || '') + '" placeholder="••••••••"></div>'
+        : '<div class="form-group"><label>Новый пароль кабинета (пусто — не менять)</label><input name="authPassword" type="password" value="" placeholder="Новый пароль"></div>') +
+      '</div>' +
+      (isSuper()
+        ? '<div class="admin-actions" style="margin-top:6px;"><button class="btn btn-outline btn-sm" type="button" id="storeResetPasswordBtn">🔄 Сбросить пароль (сгенерировать)</button></div>'
+        : '<p class="form-note">🔑 Меняйте пароль кабинета здесь. Логин закреплён администратором — восстановление пароля только через него.</p>') +
+      '</div>' +
+      '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
       '<strong style="font-size:14px;">🔌 Подключение к порталу (автосинхронизация остатков)</strong>' +
-      (store.portalLogin && store.portalPassword
+      (store.portalLogin && (store.portalPassword || !isSuper())
         ? '<p class="form-note" style="color:var(--green-darker);">✅ Парсер подключён — остатки будут подтягиваться автоматически.</p>'
         : '<p class="form-note" style="color:#b54708; font-weight:600;">⚠️ Парсер ещё не подключён — укажите логин и пароль кабинета СЦ, чтобы остатки обновлялись автоматически.</p>') +
       '<div class="form-group"><label>Логин кабинета СЦ (для парсера)</label><input name="portalLogin" value="' + h(store.portalLogin || '') + '" placeholder="s240534"></div>' +
-      '<div class="form-group"><label>Пароль кабинета СЦ (для парсера)</label><input name="portalPassword" type="password" value="' + h(store.portalPassword || '') + '" placeholder="••••••••"></div>' +
-      '<p class="form-note">🔐 Бот заходит в кабинет Сервис-Центра по этим логину и паролю и автоматически подтягивает остатки. Пароль хранится только в Cloudflare KV, на сайте не публикуется.</p>' +
+      (isSuper()
+        ? '<div class="form-group"><label>Пароль кабинета СЦ (для парсера)</label><input name="portalPassword" type="text" value="' + h(store.portalPassword || '') + '" placeholder="••••••••"></div>'
+        : '<div class="form-group"><label>Новый пароль кабинета СЦ (для парсера, пусто — не менять)</label><input name="portalPassword" type="password" value="" placeholder="Новый пароль"></div>') +
+      '<p class="form-note">🔐 Бот заходит в кабинет Сервис-Центра по этим логину и паролю и автоматически подтягивает остатки. Текущий пароль видит только суперадмин.</p>' +
       '</div>' +
       '<div class="admin-actions">' +
       '<button class="btn btn-primary" type="submit">💾 Сохранить филиал</button>' +
@@ -428,10 +414,9 @@
     return '<div class="admin-card" style="border-color:var(--green); margin-top:12px;">' +
       '<strong style="color:var(--green-darker);">🔐 Доступ для Сервис-Центра</strong>' +
       '<p style="margin:6px 0;">Логин: <b>' + h(rec.authLogin) + '</b><br>Пароль: <b>' + h(rec.authPassword) + '</b></p>' +
-      '<p class="form-note">Письмо с доступом отправлено на email СЦ. Если не пришло — проверьте спам или отправьте письма ещё раз.</p>' +
+      '<p class="form-note">Доступы передаёт суперадмин лично — почтовые письма не используются.</p>' +
       '<div class="admin-actions">' +
       '<button class="btn btn-outline btn-sm" data-copy="' + h(rec.authLogin + ' / ' + rec.authPassword) + '">📋 Копировать</button>' +
-      '<button class="btn btn-outline btn-sm" type="button" data-resend-creds="' + h(rec.id) + '">📧 Отправить письма заново</button>' +
       (wa ? '<a class="btn btn-whatsapp btn-sm" href="' + wa + '" target="_blank" rel="noopener">📱 Отправить владельцу</a>' : '') +
       '</div></div>';
   }
@@ -449,7 +434,7 @@
       e.preventDefault();
       var errMsg = form.querySelector('.form-error');
       var errors = [];
-      ['storeName', 'city', 'address', 'hours', 'phone', 'image', 'description', 'email'].forEach(function (f) {
+      ['storeName', 'city', 'address', 'hours', 'phone', 'image', 'description'].forEach(function (f) {
         if (!form[f] || !String(form[f].value || '').trim()) errors.push(f);
       });
       if (errors.length) {
@@ -476,8 +461,12 @@
       store.image = form.image.value.trim();
       store.description = form.description.value.trim();
       store.portalLogin = form.portalLogin ? form.portalLogin.value.trim() : '';
-      store.portalPassword = form.portalPassword ? form.portalPassword.value : '';
-      store.email = form.email ? form.email.value.trim() : '';
+      // Пароль портала/кабинета: пустое значение = не менять (для СЦ значение скрыто)
+      var portalPass = form.portalPassword ? form.portalPassword.value : '';
+      var authPass = form.authPassword ? form.authPassword.value : '';
+      store.portalPassword = portalPass ? portalPass : store.portalPassword;
+      store.authLogin = form.authLogin ? form.authLogin.value.trim() : store.authLogin;
+      store.authPassword = authPass ? authPass : store.authPassword;
       store.phoneRaw = (store.phone || '').replace(/\D/g, '');
       if (store.phoneRaw && !store.whatsapp) store.whatsapp = store.phoneRaw;
 
@@ -494,13 +483,12 @@
         phone: store.phone,
         phoneRaw: store.phoneRaw,
         whatsapp: store.whatsapp,
-        email: store.email,
         image: store.image,
         description: store.description,
         portalLogin: store.portalLogin,
-        portalPassword: store.portalPassword,
+        portalPassword: portalPass,
         authLogin: store.authLogin || '',
-        authPassword: store.authPassword || ''
+        authPassword: authPass
       };
       Auth.api('/api/sc-store', { method: 'POST', body: JSON.stringify(payload) }).then(function (data) {
         if (!data || !data.ok) {
@@ -552,14 +540,26 @@
       }
     });
 
-    content.addEventListener('click', function (e) {
-      var resendBtn = e.target.closest('[data-resend-creds]');
-      if (!resendBtn) return;
-      var sid = resendBtn.getAttribute('data-resend-creds');
-      Auth.api('/api/sc-store/resend', { method: 'POST', body: JSON.stringify({ id: sid }) }).then(function (res) {
-        Utils.showToast(res && res.ok ? '📧 Письма с доступом отправлены заново' : '⚠️ Не удалось отправить письма. Войдите заново.');
+    var resetPassBtn = content.querySelector('#storeResetPasswordBtn');
+    if (resetPassBtn) {
+      resetPassBtn.addEventListener('click', function () {
+        if (!confirm('Сгенерировать новый пароль кабинета для «' + store.name + '»? Текущий пароль перестанет работать.')) return;
+        Auth.api('/api/sc-store/reset-password', { method: 'POST', body: JSON.stringify({ id: store.id }) }).then(function (res) {
+          if (res && res.ok) {
+            Utils.showToast('✅ Новый пароль: ' + res.password);
+            var credsPanel = content.querySelector('#issuedCreds');
+            if (!credsPanel) {
+              credsPanel = document.createElement('div');
+              credsPanel.id = 'issuedCreds';
+              content.appendChild(credsPanel);
+            }
+            credsPanel.innerHTML = issuedCredsHtml({ id: store.id, authLogin: res.login, authPassword: res.password }, store.phoneRaw || store.phone);
+          } else {
+            Utils.showToast('⚠️ Не удалось сбросить пароль. Войдите заново (сессия истекла).');
+          }
+        });
       });
-    });
+    }
 
     var delBtn = content.querySelector('#storeDeleteBtn');
     if (delBtn) {
@@ -1280,11 +1280,6 @@
       '<div class="admin-card">' +
       '<p style="color:var(--muted); font-size:13.5px; margin-bottom:12px;">Заявки приходят из формы «Войти» → «Регистрация Сервис-Центра». Обычные заявки партнёров помечены 🤝, заявки с кабинетом поставщика — 🏬 (остатки будут парситься автоматически).</p>' +
       '<div id="scAppsList">Загружаем заявки…</div>' +
-      '</div>' +
-      '<div class="admin-card" style="margin-top:12px;">' +
-      '<strong>🔑 Восстановление паролей</strong>' +
-      '<p style="color:var(--muted); font-size:13px; margin:6px 0 10px;">Запросы «Забыли пароль» с кабинета. Кнопка «Сбросить» генерирует новый пароль — покажите его владельцу или отправьте в WhatsApp.</p>' +
-      '<div id="pwdReqList">Загружаем…</div>' +
       '</div>'
     );
 
@@ -1324,11 +1319,11 @@
           if (!app) return;
           var isSc = app.type === 'sc_registration' || app.hasCabinet;
           if (!confirm(isSc
-            ? 'Создать карточку СЦ «' + app.storeName + '» из заявки? ' + (app.email ? 'Логин и пароль кабинета уйдут на ' + app.email + '.' : '')
+            ? 'Создать карточку СЦ «' + app.storeName + '» из заявки? Доступы к кабинету сгенерируются — передайте их владельцу лично.'
             : 'Одобрить заявку партнёра «' + app.storeName + '»? Карточка магазина появится в «Сервис-Центрах».')) return;
           Auth.api('/api/sc-application', { method: 'POST', body: JSON.stringify({ id: app.id, action: 'approve', create: true }) }).then(function (res) {
             if (res && res.store) {
-              Utils.showToast(isSc ? '✅ СЦ создан: ' + res.store.name + (app.email ? ' — доступы отправлены на почту' : '') : '✅ Магазин-партнёр добавлен: ' + res.store.name);
+              Utils.showToast(isSc ? '✅ СЦ создан: ' + res.store.name : '✅ Магазин-партнёр добавлен: ' + res.store.name);
             } else {
               Utils.showToast('✅ Заявка одобрена');
             }
@@ -1358,78 +1353,101 @@
         }
       });
     });
+  }
 
-    // Запросы на восстановление пароля
-    Auth.api('/api/password-requests').then(function (data) {
-      var reqs = (data && data.requests) || [];
-      var listEl = content.querySelector('#pwdReqList');
-      if (!reqs.length) {
-        listEl.innerHTML = '<div class="owner-req-empty">Запросов на восстановление пароля нет.</div>';
-        return;
-      }
-      listEl.innerHTML = '<ul class="admin-list">' + reqs.map(function (r) {
-        var wa = (r.phone || '').replace(/\D/g, '');
-        return '<li>' +
-          '<div class="admin-list-main">' +
-          '<strong>' + h(r.storeName || 'Администратор') + '</strong>' +
-          '<span>' + (r.kind === 'sc' ? '🏬 Сервис-Центр' : '👑 Суперадмин') + ' · 📧 ' + h(r.email) + (r.phone ? ' · 📞 ' + h(r.phone) : '') + '</span>' +
-          '<span style="color:var(--muted); font-size:12px;">🕐 ' + h(new Date(r.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
-          '</div>' +
-          '<div class="admin-actions" style="flex-wrap:wrap;">' +
-          '<button class="btn btn-primary btn-sm" data-pwd-reset="' + h(r.id) + '">🔄 Сбросить пароль</button>' +
-          '<button class="btn btn-outline btn-sm danger-btn" data-pwd-delete="' + h(r.id) + '">🗑 Удалить запрос</button>' +
-          (wa ? '<a class="btn btn-whatsapp btn-sm" href="https://wa.me/' + wa + '" target="_blank" rel="noopener">📱 Владельцу</a>' : '') +
-          '</div>' +
-          '<div class="pwd-new" id="pwdNew-' + h(r.id) + '"></div>' +
-          '</li>';
-      }).join('') + '</ul>';
+  // ---------------- Заказы (СЦ и суперадмин) ----------------
+  // Остаток = факт(парсер) − активные заказы. Подтверждение = резерв переходит в
+  // продажу (после синка парсера заказ уходит в архив), отмена возвращает товар.
 
-      listEl.addEventListener('click', function (e) {
-        var resetBtn = e.target.closest('[data-pwd-reset]');
-        if (resetBtn) {
-          var rid = resetBtn.getAttribute('data-pwd-reset');
-          var req = reqs.find(function (x) { return x.id === rid; });
-          if (!req) return;
-          if (!confirm('Сбросить пароль для ' + (req.storeName || req.email) + '? Новый пароль сгенерируется автоматически.')) return;
-          resetBtn.disabled = true;
-          resetBtn.textContent = '⏳ Сбрасываем…';
-          Auth.api('/api/password-request', { method: 'POST', body: JSON.stringify({ id: rid, action: 'reset' }) }).then(function (res) {
-            var box = content.querySelector('#pwdNew-' + rid);
-            if (res && res.ok) {
-              var wa = (req.phone || '').replace(/\D/g, '');
-              var waLink = wa ? '<a class="btn btn-whatsapp btn-sm" target="_blank" rel="noopener" href="https://wa.me/' + wa + '?text=' + encodeURIComponent('Здравствуйте! Новый пароль от кабинета Greenleaf: ' + res.password) + '">📱 Отправить в WhatsApp</a>' : '';
-              if (box) {
-                box.innerHTML = '<div class="admin-card" style="border-color:var(--green); margin-top:12px;">' +
-                  '<strong style="color:var(--green-darker);">🔐 Новый пароль: <b>' + h(res.password) + '</b></strong>' +
-                  '<p class="form-note">Пароль показан один раз. Сообщите его владельцу (WhatsApp/звонок/почта).</p>' +
-                  '<div class="admin-actions">' +
-                  '<button class="btn btn-outline btn-sm" data-copy="' + h(res.password) + '">📋 Копировать</button>' +
-                  waLink +
-                  '</div></div>';
-              }
-              resetBtn.disabled = false;
-              resetBtn.textContent = '🔄 Сбросить пароль';
-              resetBtn.closest('li').querySelector('.admin-actions').querySelectorAll('[data-pwd-reset],[data-pwd-delete]').forEach(function (b) { b.style.display = 'none'; });
-              Utils.showToast('✅ Пароль сброшен: ' + res.password);
-            } else {
-              resetBtn.disabled = false;
-              resetBtn.textContent = '🔄 Сбросить пароль';
-              Utils.showToast((res && res.error) || '⚠️ Не удалось сбросить пароль');
-            }
-          });
+  function renderOrders(content) {
+    var orderStoreFilter = state.orderStoreFilter || 'all';
+    var showArchive = isSuper() && !!state.orderShowArchive;
+    var storeOptions = '<option value="all">Все филиалы</option>' + state.stores.map(function (s) {
+      return '<option value="' + h(s.id) + '"' + (orderStoreFilter === s.id ? ' selected' : '') + '>' + h(s.name) + '</option>';
+    }).join('');
+
+    content.insertAdjacentHTML('beforeend',
+      '<div class="admin-note">🛒 Активные заказы сайта: <b>новые</b> держат резерв товара, <b>подтверждённые</b> — состоявшиеся продажи (после синка парсера уходят в архив и на остаток не влияют), <b>отменённые</b> возвращают товар. Удаление подтверждённого заказа <b>не</b> возвращает товар.</div>' +
+      '<div class="admin-toolbar" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">' +
+      (isSuper() ? '<label style="font-weight:600; font-size:13.5px;">Филиал:</label><select id="orderStoreFilter">' + storeOptions + '</select>' : '') +
+      (isSuper() ? '<label class="form-checkbox" style="margin:0;"><input type="checkbox" id="orderArchiveToggle"' + (showArchive ? ' checked' : '') + '> Архив подтверждённых</label>' : '') +
+      '</div>' +
+      '<div class="admin-card"><div id="ordersList">Загружаем заказы…</div></div>'
+    );
+
+    var load = function () {
+      var url = '/api/orders' + (showArchive ? '?archive=1' : '');
+      Auth.api(url).then(function (d) {
+        var orders = (d && d.orders) || [];
+        var listEl = content.querySelector('#ordersList');
+        if (!orders.length) {
+          listEl.innerHTML = '<div class="owner-req-empty">' + (showArchive ? 'Архив пуст.' : 'Заказов пока нет.') + '</div>';
           return;
         }
-        var delBtn = e.target.closest('[data-pwd-delete]');
-        if (delBtn) {
-          var did = delBtn.getAttribute('data-pwd-delete');
-          if (!confirm('Удалить запрос на восстановление пароля?')) return;
-          Auth.api('/api/password-request', { method: 'POST', body: JSON.stringify({ id: did, action: 'delete' }) }).then(function () {
-            Utils.showToast('🗑 Запрос удалён');
-            openSection('applications');
+        var byId = {};
+        (state.products || []).forEach(function (p) { byId[p.id] = p; });
+        var storeName = {};
+        state.stores.forEach(function (s) { storeName[s.id] = s.name; });
+        listEl.innerHTML = '<ul class="admin-list">' + orders.map(function (o) {
+          var statusBadge = o.status === 'new' ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">⏳ Новый</span>'
+            : (o.status === 'confirmed' ? '<span class="badge" style="background:#d4edda;color:#155724;">✅ Подтверждён</span>'
+              : '<span class="badge" style="background:#f8d7da;color:#721c24;">🚫 Отменён</span>');
+          var itemsHtml = (o.items || []).map(function (i) {
+            var p = byId[i.productId];
+            return '<li><span>' + h(i.productId) + (p ? ' · ' + h(p.name) : '') + '</span><b>× ' + h(i.qty) + '</b></li>';
+          }).join('');
+          var totalTxt = o.total ? '<span>💰 ' + h(o.total) + ' ₸</span>' : '';
+          var payTxt = o.payment ? '<span>💳 ' + h(o.payment) + '</span>' : '';
+          var pickupTxt = o.pickupDate ? '<span>📅 ' + h(o.pickupDate) + (o.pickupTime ? ' в ' + h(o.pickupTime) : '') + '</span>' : '';
+          return '<li>' +
+            '<div class="admin-list-main">' +
+            '<strong>' + h(o.id) + ' ' + statusBadge + '</strong>' +
+            '<span>👤 ' + h(o.name || '—') + (o.phone ? ' · 📞 ' + h(o.phone) : '') + '</span>' +
+            '<span>🏬 ' + h(storeName[o.storeId] || o.storeId || '—') + ' · 🕐 ' + h(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
+            '<ul style="margin:6px 0 0 18px;">' + itemsHtml + '</ul>' +
+            (totalTxt || payTxt || pickupTxt ? '<span>' + [totalTxt, payTxt, pickupTxt].filter(Boolean).join(' · ') + '</span>' : '') +
+            (o.comment ? '<span style="color:var(--muted);">💬 ' + h(o.comment) + '</span>' : '') +
+            '</div>' +
+            '<div class="admin-actions" style="flex-wrap:wrap;">' +
+            (o.status === 'new' ? '<button class="btn btn-primary btn-sm" data-order-confirm="' + h(o.id) + '">✅ Подтвердить</button>' : '') +
+            (o.status === 'new' ? '<button class="btn btn-outline btn-sm" data-order-cancel="' + h(o.id) + '">🚫 Отменить</button>' : '') +
+            '<button class="btn btn-outline btn-sm danger-btn" data-order-delete="' + h(o.id) + '">🗑 Удалить</button>' +
+            '</div></li>';
+        }).join('') + '</ul>';
+
+        listEl.addEventListener('click', function (e) {
+          var btn = e.target.closest('[data-order-confirm],[data-order-cancel],[data-order-delete]');
+          if (!btn) return;
+          var oid = btn.getAttribute('data-order-' + (btn.hasAttribute('data-order-confirm') ? 'confirm' : (btn.hasAttribute('data-order-cancel') ? 'cancel' : 'delete')));
+          var action = btn.hasAttribute('data-order-confirm') ? 'confirm' : (btn.hasAttribute('data-order-cancel') ? 'cancel' : 'delete');
+          var label = action === 'confirm' ? 'Подтвердить заказ «' + oid + '»? Товар считается проданным и не вернётся в остаток.' :
+            (action === 'cancel' ? 'Отменить заказ «' + oid + '»? Зарезервированный товар вернётся в доступное.' : 'Удалить заказ «' + oid + '»? Подтверждённый заказ удаляется без возврата товара.');
+          if (!confirm(label)) return;
+          Auth.api('/api/orders/action', { method: 'POST', body: JSON.stringify({ id: oid, action: action }) }).then(function (res) {
+            if (res && res.ok) {
+              Utils.showToast(action === 'confirm' ? '✅ Заказ подтверждён' : (action === 'cancel' ? '🚫 Заказ отменён' : '🗑 Заказ удалён'));
+            } else {
+              Utils.showToast((res && res.error) || '⚠️ Не удалось выполнить. Войдите заново (сессия истекла).');
+            }
+            load();
           });
-        }
+        });
+      }).catch(function () {
+        content.querySelector('#ordersList').innerHTML = '<div class="owner-req-empty">Не удалось загрузить заказы. Войдите заново.</div>';
       });
+    };
+
+    var filterEl = content.querySelector('#orderStoreFilter');
+    if (filterEl) filterEl.addEventListener('change', function () {
+      state.orderStoreFilter = filterEl.value;
+      load();
     });
+    var archiveToggle = content.querySelector('#orderArchiveToggle');
+    if (archiveToggle) archiveToggle.addEventListener('change', function () {
+      state.orderShowArchive = archiveToggle.checked;
+      load();
+    });
+    load();
   }
 
   // ---------------- Товары (суперадмин) ----------------
@@ -2092,12 +2110,10 @@
   function bindAuthSwitchers() {
     var loginView = document.getElementById('authLoginView');
     var ownerView = document.getElementById('authOwnerView');
-    var forgotView = document.getElementById('authForgotView');
     var card = document.querySelector('.admin-login-card');
     if (!loginView || !ownerView) return;
     function show(view) {
       loginView.classList.add('hidden');
-      if (forgotView) forgotView.classList.add('hidden');
       ownerView.classList.add('hidden');
       view.classList.remove('hidden');
       if (card) {
@@ -2107,43 +2123,8 @@
     }
     var ownerBtn = document.getElementById('authOwnerBtn');
     if (ownerBtn) ownerBtn.addEventListener('click', function () { show(ownerView); });
-    var forgotBtn = document.getElementById('forgotPassLink');
-    if (forgotBtn) forgotBtn.addEventListener('click', function () { show(forgotView); });
-    var forgotBack = document.getElementById('forgotBackBtn');
-    if (forgotBack) forgotBack.addEventListener('click', function () { show(loginView); });
     var back2 = document.getElementById('authOwnerBackBtn');
     if (back2) back2.addEventListener('click', function () { show(loginView); });
-
-    // Форма «Забыли пароль» — заявка администратору (без email-ссылки)
-    var forgotForm = document.getElementById('forgotForm');
-    if (forgotForm) {
-      forgotForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-        var msg = document.getElementById('forgotMsg');
-        var btn = forgotForm.querySelector('button[type="submit"]');
-        var email = forgotForm.email.value.trim();
-        if (!email) {
-          forgotForm.querySelector('.form-error').style.display = 'block';
-          return;
-        }
-        if (btn) { btn.disabled = true; btn.textContent = '⏳ Отправляем…'; }
-        fetch('/api/forgot-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email })
-        }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (data) {
-          if (data && data.ok) {
-            msg.textContent = '📨 Если кабинет с таким email существует — заявка отправлена администратору. Он восстановит доступ и свяжется с вами.';
-          } else {
-            msg.textContent = (data && data.error) || 'Что-то пошло не так — попробуйте позже.';
-          }
-          if (btn) { btn.disabled = false; btn.textContent = 'Отправить заявку'; }
-        }).catch(function () {
-          msg.textContent = 'Нет связи с сервером — попробуйте позже.';
-          if (btn) { btn.disabled = false; btn.textContent = 'Отправить заявку'; }
-        });
-      });
-    }
   }
 
   function bindLogin() {

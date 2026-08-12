@@ -243,6 +243,9 @@
       parts.push(range + ' ' + cur.open + ' – ' + cur.close);
       i = j + 1;
     }
+    // Явно перечисляем выходные дни, чтобы «выходной» не терялся между рабочими
+    var offDays = WEEK_DAYS.filter(function (d) { return !sch[d[0]]; }).map(function (d) { return d[1]; });
+    if (offDays.length) parts.push('Выходной: ' + offDays.join(', '));
     return parts.length ? parts.join(', ') : 'Выходной';
   }
 
