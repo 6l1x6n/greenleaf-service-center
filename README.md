@@ -1,29 +1,34 @@
 # Сайт сервис-центра Greenleaf
 
-Одностраничный сайт на статике + Cloudflare Pages: каталог с наличием в реальном времени, бронирование товаров, даты поставок, презентации и заявки на партнёрство. Все формы отправляются в ваш Telegram-бот.
+Одностраничный сайт на статике + Cloudflare Worker: каталог с наличием в реальном времени,
+заказы с резервированием, бронирование товаров, даты поставок, презентации и заявки на
+партнёрство. Все формы отправляются в ваш Telegram-бот.
 
 ## Структура
 
 ```
-index.html            — страница (все секции)
-css/style.css         — стили
-js/                   — ui.js (модалки/тосты), catalog.js (каталог), forms.js (отправка заявок)
-data/                 — JSON-данные (правятся через кабинет cabinet.html или парсером)
-admin/                — Decap CMS (админка по адресу /admin)
-functions/telegram.js — Pages Function: формы → Telegram (маршрут /telegram)
-_redirects            — редиректы (в т.ч. /admin/* → /admin/index.html)
-_headers              — заголовки кеширования (data/* без кеша)
-scripts/parser/       — парсер каталога из портала поставщика (Python)
+worker.js              — Cloudflare Worker (формы → Telegram, заказы, остатки, админка)
+index.html             — страница (все секции)
+css/style.css          — стили
+js/                    — ui.js (модалки/тосты), catalog.js (каталог), forms.js (отправка заявок)
+data/                  — JSON-данные (правятся парсером или суперадмином)
+admin/                 — Decap CMS (админка по адресу /admin)
+scripts/parser/        — парсер каталога из портала поставщика (Python)
+_redirects             — редиректы (в т.ч. /admin/* → /admin/index.html)
+_headers               — заголовки кеширования (data/* без долгого кеша)
+.github/workflows/     — deploy.yml (push → деплой), parse-catalog.yml (парсер)
 ```
 
-## 1. Деплой на Cloudflare Pages
+## Деплой (только через git push)
 
-1. Создайте репозиторий на GitHub и загрузите туда эту папку.
-2. На сайте [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages → Create → Pages → Connect to Git** → выберите репозиторий.
-3. Настройки сборки: **build command** — оставьте пустым, **Build output directory** — `/`.
-4. Нажмите **Save and Deploy**. Через ~1 минуту сайт будет жить на `https://ваш-проект.pages.dev`.
+1. Запушьте изменения в `main` — GitHub Actions (`deploy.yml`) развернёт ровно git HEAD.
+2. Один раз добавьте в секреты репозитория **`CF_API_TOKEN`** (Cloudflare → My Profile →
+   API Tokens → Create Token → «Edit Cloudflare Workers» → Account: ваш, Workers Scripts: Edit).
+3. Проверка после деплоя: `bash scripts/verify.sh` (сверяет `/version.json` на сайте с git HEAD).
 
-Дальше каждый `git push` в ветку `main` автоматически обновляет сайт.
+⚠️ Ручной `wrangler deploy` из рабочей копии **не** рекомендуется: авто-деплой по пушам
+(в т.ч. от парсера) перезальёт origin/main поверх. `scripts/deploy.sh` откажет, если копия
+отстаёт от origin/main.
 
 ## 2. Telegram-бот (приём заявок)
 
@@ -65,7 +70,23 @@ Decap CMS — [https://ваш-проект.pages.dev/admin](https://ваш-пр�
 перебор страниц «Показать еще...» → разбор строк (`код ABC123`, название, кол-во
 «Доступно для продажи», скидочная цена × 2).
 
-Сайт читает каталог из `data/products.json`:
+### Расписание — 4 запуска в день (Астана)
+
+| Время (Астана) | UTC | Режим |
+|---|---|---|
+| 11:00 | 06:00 | **full** — полный: новые товары (утренние поступления) + все остатки |
+| 14:00 | 09:00 | **incr** — только количества по артикулам |
+| 17:00 | 12:00 | **incr** — только количества по артикулам |
+| 20:00 | 15:00 | **incr** — только количества по артикулам |
+
+- После 21:00 — посадка PV (актуализация остатков), до утра парсер не запускается.
+- **full**: описания и карта товаров портала запрашиваются только для новых артикулов;
+  существующие карточки обновляются полностью (название/цена/фото).
+- **incr**: существующие карточки обновляются только по количеству — без перезаписи
+  данных; полные данные новых товаров по-прежнему вносятся один раз.
+
+Сайт читает каталог из `data/products.base.json` (виртуальный `/data/products.json`
+с оверрайдами суперадмина отдаёт воркер):
 
 ```json
 {
@@ -91,9 +112,10 @@ Decap CMS — [https://ваш-проект.pages.dev/admin](https://ваш-пр�
 
 ### Автозапуск (GitHub Actions, раз в 3 часа)
 
-Workflow `.github/workflows/parse-catalog.yml`: парсит каталог, при изменениях
-коммитит `data/products.json` и пушит → Cloudflare Pages передеплоит сайт автоматически.
-Вручную можно запустить в любой момент: **Actions → Parse catalog → Run workflow**.
+Workflow `.github/workflows/parse-catalog.yml`: парсит каталог по расписанию, при
+изменениях коммитит и пушит → авто-деплой обновит сайт автоматически.
+Вручную можно запустить в любой момент: **Actions → Parse catalog → Run workflow**
+(параметр `mode`: auto/full/incr).
 
 Один раз добавьте учётные данные в секреты репозитория
 (Settings → Secrets and variables → Actions → New repository secret):
@@ -102,6 +124,7 @@ Workflow `.github/workflows/parse-catalog.yml`: парсит каталог, п�
 |---|---|
 | `SC_LOGIN` | логин кабинета СЦ |
 | `SC_PASSWORD` | пароль кабинета СЦ |
+| `CF_API_TOKEN` | токен Cloudflare для деплоя (deploy.yml) |
 
 ### Локальный запуск (по желанию)
 
@@ -110,14 +133,25 @@ cd scripts/parser
 cp config.example.json config.json   # впишите логин/пароль
 pip install -r requirements.txt
 python -m playwright install chromium
-python parser.py                     # обновит data/products.json
+PARSER_MODE=full python parser.py    # full/incr (по умолчанию incr)
 ```
 
 `config.json` в `.gitignore` — секреты в репозиторий не попадут.
 
-## 5. Данные
+## 5. Заказы и остатки
 
-- `data/store.json` — адрес, часы, телефон, WhatsApp (правьте через админку `/admin`)
-- `data/products.json` — каталог, обновляется парсером автоматически (или через админку)
-- `data/deliveries.json`, `data/events.json` — поставки и мероприятия (через админку)
+- **Фактический остаток** — что последний раз сообщил парсер (`store-stock.json`).
+- **Зарезервировано онлайн** — товары в заказах `new` (и 2-минутные холды корзины).
+- **Доступно онлайн** = факт − холды − Σ `new` − Σ `confirmed` после последнего синка.
+- Подтверждение заказа: резерв → продажа (остаток не меняется). После следующего
+  синка парсера заказ уходит в архив и больше не влияет на остаток.
+- Отмена заказа возвращает товар; удаление подтверждённого заказа НЕ возвращает товар.
+- Раздел «🛒 Заказы» в кабинете: у СЦ — свои заказы, у суперадмина — все + архив.
+
+## 6. Данные
+
+- `data/store.json` — адрес, часы, телефон, WhatsApp (правьте через кабинет)
+- `data/products.base.json` — каталог, обновляется парсером автоматически
+- `data/store-stock.json` — остатки по филиалам (парсер)
+- `data/deliveries.json`, `data/events.json` — поставки и мероприятия (через кабинет)
 - `assets/images/products/` — фото товаров (можно заменить SVG-плейсхолдеры на реальные)
