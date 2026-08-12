@@ -301,6 +301,18 @@ async function loadOrders(env) {
   return kvGet(env, 'orders');
 }
 
+// Свой филиал Сервис-Центра: токен сессии несёт login, а не id —
+// ищем карточку по логину кабинета (authLogin)
+async function scOwnStoreId(env, auth) {
+  if (auth.id) return String(auth.id);
+  const stores = await kvGet(env, 'stores');
+  const login = String(auth.login || '').toLowerCase();
+  const rec = Object.values(stores).find(function (s) {
+    return s && String(s.authLogin || '').toLowerCase() === login;
+  });
+  return rec ? rec.id : null;
+}
+
 // Подтверждённые заказы, по которым уже прошёл синк базы (base.updated > confirmedAt),
 // уходят в архив: суперадмин их видит в /api/orders?archive=1
 async function archiveConfirmedOrders(env, url) {
@@ -374,8 +386,11 @@ async function handleOrdersGet(request, env, auth) {
   await archiveConfirmedOrders(env, url);
   const history = url.searchParams.get('archive') === '1' && auth.role === 'superadmin';
   const source = history ? await kvGet(env, 'orders_history') : await loadOrders(env);
+  const ownId = auth.role === 'superadmin' ? null : await scOwnStoreId(env, auth);
   const list = Object.values(source)
-    .filter(function (o) { return auth.role === 'superadmin' || String(o.storeId) === String(auth.id); })
+    .filter(function (o) {
+      return auth.role === 'superadmin' || (ownId && String(o.storeId) === String(ownId));
+    })
     .sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
   return jsonResponse({ ok: true, orders: list, archive: history });
 }
@@ -397,7 +412,8 @@ async function handleOrdersAction(request, env, auth) {
   const orders = await loadOrders(env);
   const order = orders[id];
   if (!order) return jsonResponse({ ok: false, error: 'Заказ не найден' }, 404);
-  if (auth.role !== 'superadmin' && String(order.storeId) !== String(auth.id)) {
+  const ownId = auth.role === 'superadmin' ? null : await scOwnStoreId(env, auth);
+  if (auth.role !== 'superadmin' && (!ownId || String(order.storeId) !== String(ownId))) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403);
   }
 
@@ -723,6 +739,12 @@ async function handleScStore(request, env, auth) {
   if (isScRole && String(data.id || '').trim() !== String(auth.id || '')) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403);
   }
+  // Сервис-Центр может сохранять только свой филиал (по логину кабинета)
+  const stores = await kvGet(env, 'stores');
+  const scOwnId = isScRole ? await scOwnStoreId(env, auth) : null;
+  if (isScRole && (!scOwnId || String(data.id || '').trim() !== String(scOwnId))) {
+    return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+  }
   // Обязательные поля карточки (форма суперадмина требует их все).
   // Email владельца убран: доступы передаёт только суперадмин лично.
   const required = ['name', 'city', 'address', 'hours', 'phone', 'image'];
@@ -730,9 +752,8 @@ async function handleScStore(request, env, auth) {
   if (missing.length) {
     return jsonResponse({ ok: false, error: 'Не заполнены обязательные поля: ' + missing.join(', ') }, 400);
   }
-  const stores = await kvGet(env, 'stores');
   const officeId = normalizeOfficeCode(data.officeCode || '');
-  const storeId = isScRole ? String(auth.id || '').trim() : (String(data.id || '').trim() || officeId || ('sc_' + Date.now()));
+  const storeId = isScRole ? scOwnId : (String(data.id || '').trim() || officeId || ('sc_' + Date.now()));
   const existing = stores[storeId] || {};
   // Пароли: СЦ не видит текущие значения (portalPassword вырезается из ответа),
   // но может задать новый: непустое поле = смена, пустое = оставить как было.
