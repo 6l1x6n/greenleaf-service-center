@@ -157,6 +157,27 @@
 
   // ---------------- «Мои заказы» клиента (без кабинетов) ----------------
 
+  // Единый набор контурных SVG-иконок (стиль интерфейса, без системных эмодзи)
+  var SVG_ICONS = {
+    box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+    info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    store: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    money: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    card: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+    refresh: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+    check: '<polyline points="20 6 9 17 4 12"/>',
+    x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+    package: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>',
+    arrowUp: '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'
+  };
+
+  function icon(name, size) {
+    return '<svg class="ico" width="' + (size || 16) + '" height="' + (size || 16) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (SVG_ICONS[name] || '') + '</svg>';
+  }
+
   var CLIENT_TOKEN_KEY = 'greenleaf_client_token_v1';
 
   // Токен устройства: привязывает заказы к этому браузеру (localStorage)
@@ -172,11 +193,11 @@
   }
 
   function orderStatusMeta(status) {
-    if (status === 'new') return { label: '⏳ Новый — ждём подтверждения', cls: 'badge' };
-    if (status === 'ready') return { label: '🟦 Готов к выдаче — можно забирать', cls: 'badge' };
-    if (status === 'confirmed') return { label: '✅ Подтверждён — выдан', cls: 'badge' };
-    if (status === 'cancelled') return { label: '🚫 Отменён', cls: 'badge' };
-    return { label: '—', cls: 'badge' };
+    if (status === 'new') return { label: 'Новый', sub: 'ждём подтверждения', icon: 'clock', cls: 'badge badge-st-new' };
+    if (status === 'ready') return { label: 'Готов к выдаче', sub: 'можно забирать', icon: 'package', cls: 'badge badge-st-ready' };
+    if (status === 'confirmed') return { label: 'Подтверждён', sub: 'заказ выдан', icon: 'check', cls: 'badge badge-st-confirmed' };
+    if (status === 'cancelled') return { label: 'Отменён', sub: '', icon: 'x', cls: 'badge badge-st-cancelled' };
+    return { label: '—', sub: '', icon: 'info', cls: 'badge' };
   }
 
   // Модалка со списком заказов этого устройства. Данные грузятся только при открытии
@@ -185,8 +206,11 @@
     var token = clientToken();
     if (!token) { showToast('Не удалось определить устройство'); return; }
     openModal(
-      '<h3>📦 Мои заказы</h3>' +
-      '<div class="my-orders-info">ℹ️ Заказы, оформленные с этого устройства. Когда статус «Готов к выдаче» — товары можно забирать.</div>' +
+      '<div class="my-orders-head">' +
+      '<h3 style="margin:0;">' + icon('box', 20) + ' Мои заказы</h3>' +
+      '<a href="#" class="my-orders-refresh" id="myOrdersRefreshBtn">' + icon('refresh', 14) + ' Обновить</a>' +
+      '</div>' +
+      '<div class="my-orders-info">' + icon('info', 16) + '<span>Заказы, оформленные с этого устройства. Когда статус «Готов к выдаче» — товары можно забирать.</span></div>' +
       '<div id="myOrdersList">Загружаем…</div>',
       true
     );
@@ -205,10 +229,10 @@
           (window.CatalogProducts || []).forEach(function (p) { byId[p.id] = p; });
           listEl.innerHTML = '<ul class="admin-list my-orders-list">' + orders.map(function (o) {
             var st = orderStatusMeta(o.status);
-            // Номер заказа: короткие GL-XXXXXX показываем целиком, старые o_… — компактно
+            // Номер: #N (новые заказы), иначе — читаемый хвост id без «…»
             var oid = String(o.id || '');
             var isShort = /^GL-[A-Z0-9]{6}$/.test(oid);
-            var oidShow = isShort ? oid : ('№ …' + oid.slice(-6));
+            var oidShow = o.number ? ('#' + o.number) : (isShort ? oid : oid.slice(-8).toUpperCase());
             var itemsHtml = (o.items || []).map(function (i) {
               var p = byId[i.productId];
               var img = p ? (p.thumb || p.image) : '';
@@ -216,63 +240,58 @@
               var unit = Number(i.price) || 0;
               var subtotal = unit ? (unit * (Number(i.qty) || 1)) : 0;
               return '<div class="order-receipt-row">' +
-                (img ? '<img class="order-receipt-img" src="' + esc(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' : '<span class="order-receipt-img delivery-item-clock">⏳</span>') +
+                (img ? '<img class="order-receipt-img" src="' + esc(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' : '<span class="order-receipt-img delivery-item-clock">' + icon('clock', 18) + '</span>') +
                 '<span class="order-receipt-name" title="' + esc(name) + '">' + esc(name) + '</span>' +
                 '<span class="order-receipt-qty">× ' + esc(i.qty) + '</span>' +
                 (unit ? '<span class="order-receipt-sum">' + fmtPrice(subtotal) + '</span>' : '') +
                 '</div>';
             }).join('');
-            var totalTxt = o.total ? '<b>' + fmtPrice(o.total) + '</b>' : '';
-            var payTxt = o.payment ? esc(o.payment) : '';
-            var discTxt = o.partnerMode ? '<span class="order-disc-badge">🎫 Партнёрские цены −50%</span>' : '';
-            var pickupTxt = o.pickupDate ? '<span class="order-pickup-chip">📅 Забрать: ' + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' })) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : '') + '</span>' : '';
-            var noteTxt = o.managerNote ? '<div class="order-manager-note"><b>💬 Менеджер:</b> ' + esc(o.managerNote) + '</div>' : '';
-            return '<li>' +
+            var summaryParts = [];
+            if (o.total) summaryParts.push(icon('money', 15) + '<b>' + fmtPrice(o.total) + '</b>');
+            if (o.payment) summaryParts.push(icon('card', 15) + esc(o.payment));
+            if (o.pickupDate) summaryParts.push(icon('calendar', 15) + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' })) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : ''));
+            var noteTxt = o.managerNote ? '<div class="order-manager-note">' + icon('info', 14) + '<span><b>Сообщение менеджера:</b> ' + esc(o.managerNote) + '</span></div>' : '';
+            return '<li class="order-card">' +
               '<div class="order-card-head">' +
               '<span class="order-id-chip" title="' + esc(oid) + '">Заказ ' + esc(oidShow) +
-              '<button class="btn btn-outline btn-sm" type="button" data-copy-order="' + esc(oid) + '" title="Скопировать номер заказа">📋</button></span>' +
-              '<span class="' + st.cls + '">' + st.label + '</span>' +
+              '<button class="btn btn-outline btn-sm" type="button" data-copy-order="' + esc(oid) + '" title="Скопировать номер">' + icon('copy', 14) + '</button></span>' +
+              '<span class="' + st.cls + '">' + icon(st.icon, 14) + ' ' + st.label + (st.sub ? '<small> · ' + st.sub + '</small>' : '') + '</span>' +
               '</div>' +
               '<div class="admin-list-main">' +
-              '<span class="order-meta">🏬 ' + esc(o.storeName || '—') + ' · 🕐 ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Almaty' })) + '</span>' +
+              '<span class="order-meta">' + icon('store', 14) + ' ' + esc(o.storeName || '—') + ' · ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Almaty' })) + '</span>' +
               '<div class="order-receipt">' + itemsHtml + '</div>' +
-              '<div class="order-summary">' +
-              (totalTxt ? '<span class="order-total">💰 Итого: ' + totalTxt + '</span>' : '') +
-              (payTxt ? '<span class="order-pay">💳 ' + payTxt + '</span>' : '') +
-              discTxt +
-              pickupTxt +
-              '</div>' +
+              '<div class="order-summary">' + summaryParts.map(function (s) { return '<span>' + s + '</span>'; }).join('') + '</div>' +
               noteTxt +
               '</div>' +
-              (o.status === 'new' ? '<div class="admin-actions"><button class="btn btn-outline btn-sm danger-btn" data-my-cancel="' + esc(o.id) + '">🚫 Отменить заказ</button></div>' : '') +
+              (o.status === 'new' ? '<div class="order-card-footer"><a href="#" class="order-cancel-link" data-my-cancel="' + esc(o.id) + '">Отменить заказ</a></div>' : '') +
               '</li>';
-          }).join('') + '</ul>' +
-          '<div class="admin-actions" style="margin-top:12px;"><button class="btn btn-outline btn-sm" type="button" id="myOrdersRefreshBtn">🔄 Обновить</button></div>';
+          }).join('') + '</ul>';
 
           listEl.addEventListener('click', function (e) {
             var copyBtn = e.target.closest('[data-copy-order]');
             if (copyBtn) {
               var txt = copyBtn.getAttribute('data-copy-order');
               if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(txt).then(function () { showToast('📋 Номер заказа скопирован: ' + txt); });
+                navigator.clipboard.writeText(txt).then(function () { showToast('Номер заказа скопирован'); });
               }
               return;
             }
             var btn = e.target.closest('[data-my-cancel]');
             if (!btn) return;
+            e.preventDefault();
             var oid = btn.getAttribute('data-my-cancel');
-            if (!confirm('Отменить заказ «' + oid + '»? Зарезервированный товар вернётся в наличие. Отменить можно только пока заказ ещё «Новый».')) return;
+            if (!confirm('Отменить заказ? Зарезервированный товар вернётся в наличие. Отменить можно только пока заказ ещё «Новый».')) return;
             fetch('/api/my-orders/action', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: oid, token: token, action: 'cancel' })
             }).then(function (r) { return r.json(); }).then(function (res) {
-              showToast(res && res.ok ? '🚫 Заказ отменён' : ((res && res.error) || '⚠️ Не удалось отменить заказ'));
+              showToast(res && res.ok ? 'Заказ отменён' : ((res && res.error) || 'Не удалось отменить заказ'));
               render();
-            }).catch(function () { showToast('⚠️ Нет связи — попробуйте ещё раз'); });
+            }).catch(function () { showToast('Нет связи — попробуйте ещё раз'); });
           });
           var ref = document.getElementById('myOrdersRefreshBtn');
-          if (ref) ref.addEventListener('click', render);
+          if (ref) ref.addEventListener('click', function (e) { e.preventDefault(); render(); });
         })
         .catch(function () {
           listEl.innerHTML = '<div class="owner-req-empty">Не удалось загрузить заказы. Проверьте соединение и попробуйте ещё раз.</div>';

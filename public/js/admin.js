@@ -1023,6 +1023,11 @@
       : state.deliveries.filter(function (d) { return d.storeId === state.user.id; });
 
     content.insertAdjacentHTML('beforeend',
+      '<div class="admin-toolbar" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">' +
+      '<label class="del-tab-toggle"><input type="radio" name="delTab" value="manual" checked> Ручные поставки</label>' +
+      '<label class="del-tab-toggle"><input type="radio" name="delTab" value="moves"> Накладные (парсер)</label>' +
+      '</div>');
+    content.insertAdjacentHTML('beforeend',
       '<div class="admin-card">' +
       '<ul class="admin-list" id="deliveryList"></ul>' +
       '<div class="admin-list-footer">' +
@@ -1030,11 +1035,72 @@
       '</div>' +
       '</div>');
     content.insertAdjacentHTML('beforeend',
+      '<div class="admin-card hidden" id="movesListCard">' +
+      '<p style="color:var(--muted); font-size:13px; margin-bottom:10px;">Накладные поставщика — собираются парсером автоматически, только просмотр. Обновляются по расписанию (11:00/14:00/17:00/20:00).</p>' +
+      '<div id="movesList">Загружаем…</div>' +
+      '</div>');
+    content.insertAdjacentHTML('beforeend',
       '<div class="admin-card' + (editing ? '' : ' hidden') + '" id="deliveryFormCard">' +
       deliveryFormHtml(editing, editingId) +
       '</div>');
 
     var listEl = content.querySelector('#deliveryList');
+    var movesCard = content.querySelector('#movesListCard');
+    var movesListEl = content.querySelector('#movesList');
+
+    // Переключатель «Ручные / Накладные»
+    function renderMovesTab() {
+      movesListEl.innerHTML = 'Загружаем…';
+      fetch('data/moves.json').then(function (r) { return r.json(); }).then(function (d) {
+        var moves = (d && d.moves) || [];
+        var st = {
+          0: { t: '🏭 Оформлена · ждёт отгрузки', c: '#b26a00', b: '#fff3cd' },
+          4: { t: '🚚 В пути', c: '#004085', b: '#cce5ff' },
+          7: { t: '✅ Прибыла', c: '#155724', b: '#d4edda' }
+        };
+        if (!moves.length) {
+          movesListEl.innerHTML = '<div class="owner-req-empty">Накладных пока нет.</div>';
+          return;
+        }
+        movesListEl.innerHTML = '<ul class="admin-list">' + moves.slice(0, 25).map(function (m) {
+          var s = st[m.statusCode] || { t: 'Готовится к отправке', c: '#6b5410', b: '#fff8e6' };
+          var itemsHtml = (m.items || []).map(function (it) {
+            var p = state.products.find(function (x) { return x.id === it.sku; });
+            var img = p ? (p.thumb || p.image) : '';
+            return '<span class="delivery-item-chip">' +
+              (img ? '<img class="delivery-item-img" src="' + h(img) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+              h(it.sku) + ' · ' + h(String(it.name || '').slice(0, 40)) + (it.qty ? ' · ' + h(it.qty) + ' шт' : '') +
+              '</span>';
+          }).join('');
+          return '<li>' +
+            '<div class="admin-list-main">' +
+            '<strong>№' + h(m.number || '') + ' <span class="badge" style="background:' + s.b + ';color:' + s.c + ';">' + s.t + '</span></strong>' +
+            '<span>📅 ' + h(m.date || '') + (m.time ? ' · ' + h(String(m.time).slice(11, 16)) : '') + (m.sum ? ' · 💰 ' + h(m.sum) + ' ₸' : '') + '</span>' +
+            (itemsHtml ? '<div class="delivery-items-list" style="margin-top:6px;">' + itemsHtml + '</div>' : '<span class="muted-sku">Состав уточняется</span>') +
+            '</div></li>';
+        }).join('') + '</ul>';
+      }).catch(function () {
+        movesListEl.innerHTML = '<div class="owner-req-empty">Не удалось загрузить накладные.</div>';
+      });
+    }
+
+    content.querySelectorAll('[name="delTab"]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        var mode = radio.value;
+        var manualBlock = content.querySelector('#deliveryList').closest('.admin-card');
+        var formCard = content.querySelector('#deliveryFormCard');
+        if (mode === 'moves') {
+          manualBlock.classList.add('hidden');
+          formCard.classList.add('hidden');
+          movesCard.classList.remove('hidden');
+          renderMovesTab();
+        } else {
+          movesCard.classList.add('hidden');
+          manualBlock.classList.remove('hidden');
+          if (editing) formCard.classList.remove('hidden');
+        }
+      });
+    });
 
     function drawList() {
       listEl.innerHTML = visible.map(function (d) {
@@ -1471,7 +1537,7 @@
           var canResolve = o.status === 'new' || o.status === 'ready';
           return '<li>' +
             '<div class="admin-list-main">' +
-            '<strong>' + h(o.id) + ' ' + statusBadge + '</strong>' +
+            '<strong>' + (o.number ? 'Заказ #' + h(o.number) + ' ' : 'Заказ ') + '<small class="muted-sku">' + h(o.id) + '</small> ' + statusBadge + '</strong>' +
             '<span>👤 ' + h(o.name || '—') + (o.phone ? ' · 📞 ' + h(o.phone) : '') + '</span>' +
             '<span>🏬 ' + h(storeName[o.storeId] || o.storeId || '—') + ' · 🕐 ' + h(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
             '<div class="delivery-items order-receipt" style="margin:6px 0 0; display:flex; flex-direction:column; align-items:flex-start; gap:4px;">' + itemsHtml + '</div>' +

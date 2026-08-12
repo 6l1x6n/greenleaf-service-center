@@ -433,6 +433,15 @@ async function archiveConfirmedOrders(env, url) {
   }
 }
 
+// Последовательный номер заказа (#10001, #10002, …) — красивый номер для клиента;
+// внутренний id (o_…/GL-…) остаётся для техники и связи.
+async function nextOrderNumber(env) {
+  const counter = await kvGet(env, 'order_counter');
+  const next = Math.max(10000, (Number(counter) || 9999) + 1);
+  await kvPut(env, 'order_counter', next);
+  return next;
+}
+
 // Создание заказа из оформленной корзины: 2-минутный холд конвертируется в заказ,
 // который и держит резерв до подтверждения/отмены.
 // Бронь читаем напрямую по ключу (как в validateOrderReservation): обход списка
@@ -459,6 +468,7 @@ async function createOrder(env, data) {
   if (!Array.isArray(items)) items = [];
   const order = {
     id: orderId,
+    number: await nextOrderNumber(env),
     storeId: res.storeId,
     // Полный снимок позиций на момент оформления (имя/цена для «чека»)
     items: items.map(function (i) {
@@ -1581,11 +1591,12 @@ async function handleTelegram(request, env) {
   }
 
   // Оформленный заказ: бронь на 2 минуты должна быть активной, иначе 409.
-  // При успехе — конверсия брони в постоянное списание остатков (до проверки токена).
+  // При успехе — конверсия брони в заказ (до проверки токена).
+  let createdOrder = null;
   if (data.type === 'order') {
     const check = await validateOrderReservation(env, data);
     if (!check.ok) return check.res;
-    try { await createOrder(env, data); } catch (e) { console.error('createOrder error:', e); }
+    try { createdOrder = await createOrder(env, data); } catch (e) { console.error('createOrder error:', e); }
   }
 
   // Заказы (корзина) — в группу заказов, остальное — в основной чат
@@ -1611,6 +1622,13 @@ async function handleTelegram(request, env) {
     return new Response('Telegram error', { status: 502 });
   }
 
+  // Заказам возвращаем номер (#N) — экран успеха показывает его сразу
+  if (isOrder) {
+    return new Response(JSON.stringify({ ok: true, number: createdOrder ? createdOrder.number : null }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
   return new Response('ok', { status: 200 });
 }
 

@@ -52,13 +52,15 @@
 
         <div id="cartSuccess" class="cart-success hidden">
           <div class="form-success-panel cart-success-panel">
-            <div class="fsp-icon">✅</div>
+            <div class="fsp-icon">
+              <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="16 9 10.5 15 8 12.5"/></svg>
+            </div>
             <div class="fsp-title">Заказ отправлен!</div>
             <p class="cart-success-order">Номер заказа: <b id="successOrderId">—</b>
               <button class="btn btn-outline btn-sm" type="button" id="successCopyBtn" title="Скопировать номер">📋</button>
             </p>
             <p class="fsp-text" id="successPayText">Менеджер подтвердит заказ и свяжется с вами.</p>
-            <p class="fsp-text" id="successTrackHint" style="font-size:13px;">Отслеживать заказ можно в разделе «📦 Мои заказы» — там же видно его статус.</p>
+            <p class="fsp-text" id="successTrackHint" style="font-size:13px;">Отслеживать заказ можно в разделе «Мои заказы» — там же видно его статус.</p>
             <div class="admin-actions" style="justify-content:center; margin-top:14px; flex-wrap:wrap;">
               <a class="btn btn-outline" href="#" id="successMyOrdersBtn">📦 Мои заказы</a>
               <a class="btn btn-primary" href="index.html#catalog">Вернуться в каталог</a>

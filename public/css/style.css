@@ -2287,3 +2287,72 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 @media (max-width: 640px) {
   .cart-fab { right: 14px; bottom: 18px; width: 54px; height: 54px; font-size: 22px; }
 }
+
+/* «Мои заказы» — собранный вид (SVG-иконки, спокойная иерархия) */
+.ico { vertical-align: -3px; margin-right: 4px; flex: none; }
+.my-orders-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.my-orders-head h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.my-orders-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.my-orders-refresh:hover { color: var(--green); background: var(--green-soft); }
+.my-orders-info { display: flex; align-items: flex-start; gap: 8px; }
+.my-orders-info .ico { margin-top: 2px; }
+.order-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 12px; margin-bottom: 12px; background: #fff; }
+.order-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.order-id-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+  background: #f2f6f2;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px 4px 4px 12px;
+}
+.order-id-chip .btn { padding: 2px 7px; font-size: 13px; border: none; background: transparent; }
+.order-id-chip .btn:hover { background: #e5eee7; }
+.order-meta { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); }
+.order-receipt { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
+.order-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; border-top: 1px dashed var(--line); padding-top: 10px; font-size: 13.5px; color: var(--muted); }
+.order-summary span { display: inline-flex; align-items: center; gap: 4px; }
+.order-summary .ico { margin-right: 0; }
+.order-summary b { color: var(--ink); }
+.order-card-footer { display: flex; justify-content: flex-end; padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--line); }
+.order-cancel-link { font-size: 13px; font-weight: 600; color: var(--danger); text-decoration: none; opacity: 0.8; }
+.order-cancel-link:hover { opacity: 1; text-decoration: underline; }
+.badge-st-new { background: #fff3cd; color: #8a6d00; }
+.badge-st-ready { background: #cce5ff; color: #004085; }
+.badge-st-confirmed { background: #d4edda; color: #155724; }
+.badge-st-cancelled { background: #f8d7da; color: #721c24; }
+.badge small { font-weight: 500; }
+.order-manager-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; background: #fff8e6; border: 1px solid #f0dfae; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; color: #6b5410; line-height: 1.45; }
+.order-manager-note .ico { margin-top: 2px; }
+.order-manager-note b { display: block; margin-bottom: 2px; }
+.cart-success-panel .fsp-icon svg { display: inline-block; }
+
+/* Переключатель «Ручные поставки / Накладные» в админке */
+.del-tab-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  background: #fff;
+}
+.del-tab-toggle:has(input:checked) { background: var(--green-soft); border-color: #bcdcc3; color: var(--green-dark); }

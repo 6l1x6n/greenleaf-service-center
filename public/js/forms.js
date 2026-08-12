@@ -145,7 +145,13 @@
           }
           markSuccess(form, data.type === 'order' ? '' : 'Заявка отправлена!', successTextFor(data));
           if (data.type === 'order') {
-            window.dispatchEvent(new CustomEvent('order:sent', { detail: data }));
+            // Читаем номер заказа (#N) из ответа воркера и передаём в событие
+            return res.json().catch(function () { return null; }).then(function (body) {
+              window.dispatchEvent(new CustomEvent('order:sent', {
+                detail: Object.assign({}, data, { orderNumber: body && body.number })
+              }));
+              return null;
+            });
           }
           if (data.type === 'event' && data.event_id) {
             // Бронь места в единой БД (Worker KV) + защита от дублей на этом устройстве

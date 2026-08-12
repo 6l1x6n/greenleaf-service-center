@@ -790,7 +790,7 @@
     });
   }
 
-  window.addEventListener('order:sent', function () {
+  window.addEventListener('order:sent', function (e) {
     reserve.signature = '';
     reserve.expiresAt = 0;
     reserve.expired = false;
@@ -800,9 +800,13 @@
     viewEl.classList.add('hidden');
     successEl.classList.remove('hidden');
 
-    // Номер заказа + текст в зависимости от способа оплаты
+    // Номер заказа (#N из воркера или внутренний id как запасной) + текст по оплате
+    var detail = (e && e.detail) || {};
+    var orderNumber = detail.orderNumber || '';
+    var oid = orderId();
+    var displayNumber = orderNumber ? ('#' + orderNumber) : oid;
     var oidEl = document.getElementById('successOrderId');
-    if (oidEl) oidEl.textContent = orderId();
+    if (oidEl) oidEl.textContent = displayNumber;
     var payEl = document.getElementById('successPayText');
     if (payEl) {
       payEl.textContent = state.payment === 'cash'
@@ -813,14 +817,14 @@
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(orderId()).then(function () { Utils.showToast('📋 Номер заказа скопирован'); });
+          navigator.clipboard.writeText(displayNumber).then(function () { Utils.showToast('Номер заказа скопирован'); });
         }
       });
     }
     var myBtn = document.getElementById('successMyOrdersBtn');
     if (myBtn) {
-      myBtn.addEventListener('click', function (e) {
-        e.preventDefault();
+      myBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
         if (window.Utils) Utils.openMyOrdersModal();
       });
     }
