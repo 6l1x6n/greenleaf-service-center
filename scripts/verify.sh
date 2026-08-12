@@ -10,8 +10,8 @@ FAIL=0
 echo "🔎 Проверка: $SITE"
 
 # 1. Маркер нового билда на любом API-ответе
-HDR=$(curl -sI -o /dev/null -w '%{header_json}' "$SITE/api/stores" 2>/dev/null)
-if echo "$HDR" | grep -q '"x-greenleaf-build"' && echo "$HDR" | grep -q 'v2'; then
+HDR=$(curl -s -D - -o /dev/null "$SITE/api/stores" | tr -d '\r' | grep -i '^x-greenleaf-build:' | awk '{print $2}' | tr -d ' ')
+if [ "$HDR" = "v2" ]; then
   echo "✅ Воркер: новый билд (x-greenleaf-build: v2)"
 else
   echo "❌ Воркер: СТАРЫЙ билд — деплой зашёл из устаревшей копии, бейджи не показываются." >&2
@@ -45,7 +45,7 @@ else
 fi
 
 # 4. Кеширование каталога
-CC=$(curl -sI "$SITE/data/products.json" | tr -d '\r' | grep -i '^cache-control:' | head -1)
+CC=$(curl -sI "$SITE/data/products.json" | tr -d '\r' | grep -i '^cache-control:' | head -1 | sed 's/^[Cc]ache-[Cc]ontrol: *//')
 echo "$CC" | grep -q 'max-age=60' && echo "✅ Кеш каталога: $CC" || { echo "⚠️ Кеш каталога не установлен: ${CC:-нет}"; }
 
 if [ "$FAIL" -ne 0 ]; then
