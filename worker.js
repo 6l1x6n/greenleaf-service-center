@@ -81,6 +81,62 @@ async function kvPut(env, key, obj) {
   await env.SC_STORES.put(key, JSON.stringify(obj));
 }
 
+// ---------------- Шифрование секретов (AES-GCM, ключ DATA_ENC_KEY) ----------------
+// Пароли (портала и кабинетов) в KV хранятся зашифрованными.
+// Формат: enc:v1:<base64(iv)>:<base64(ciphertext||authTag)>
+const ENC_PREFIX = 'enc:v1:';
+
+function b64encode(buf) {
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(s);
+}
+
+function b64decode(str) {
+  const bin = atob(String(str || ''));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function encKey(env) {
+  const raw = new TextEncoder().encode(String(env.DATA_ENC_KEY || ''));
+  const digest = await crypto.subtle.digest('SHA-256', raw);
+  return crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+async function encryptSecret(env, plain) {
+  const s = String(plain == null ? '' : plain);
+  if (!s) return s;
+  if (!env.DATA_ENC_KEY) return s; // ключ не задан — режим совместимости
+  const key = await encKey(env);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(s));
+  return ENC_PREFIX + b64encode(iv) + ':' + b64encode(ct);
+}
+
+async function decryptSecret(env, value) {
+  const v = String(value == null ? '' : value);
+  if (!v.startsWith(ENC_PREFIX) || !env.DATA_ENC_KEY) return v;
+  try {
+    const rest = v.slice(ENC_PREFIX.length);
+    const sep = rest.indexOf(':');
+    const key = await encKey(env);
+    const pt = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: b64decode(rest.slice(0, sep)) },
+      key,
+      b64decode(rest.slice(sep + 1))
+    );
+    return new TextDecoder().decode(pt);
+  } catch (e) {
+    console.error('decryptSecret error:', e);
+    return '';
+  }
+}
+
 // ---------------- Остатки: база − продажи − активные брони ----------------
 
 const RESERVE_TTL_MS = 120 * 1000; // 2 минуты
@@ -531,11 +587,10 @@ async function handleStoreAuth(request, env) {
   const pass = String(body.password || '');
   let user = null;
 
-  // 0. Суперадмин из KV admin_creds (независимо от секрета): задаётся при восстановлении
-  //    или привязке email — работает, даже если логин в STORE_CREDS неизвестен
+  // 0. Суперадмин из KV admin_creds (пароль зашифрован в KV)
   const adminCreds = await kvGet(env, 'admin_creds');
   if (adminCreds && adminCreds.login && adminCreds.password &&
-      adminCreds.login === login && adminCreds.password === pass) {
+      adminCreds.login === login && (await decryptSecret(env, adminCreds.password)) === pass) {
     user = { id: 'admin', name: 'Суперадмин', role: 'superadmin' };
   }
 
@@ -549,7 +604,7 @@ async function handleStoreAuth(request, env) {
         // Пароль суперадмина можно переопределить через KV admin_creds
         // (восстановление пароля без перезаписи read-only секрета)
         let expected = rec.password;
-        if (rec.role === 'superadmin' && adminCreds && adminCreds.password) expected = adminCreds.password;
+        if (rec.role === 'superadmin' && adminCreds && adminCreds.password) expected = await decryptSecret(env, adminCreds.password);
         if (expected === pass) {
           user = { id: rec.storeId || rec.id || login, name: rec.name || 'СЦ Greenleaf', role: rec.role || 'sc' };
         }
@@ -559,7 +614,7 @@ async function handleStoreAuth(request, env) {
     }
   }
 
-  // 2. Выданные суперадмином логины Сервис-Центров (KV)
+  // 2. Выданные суперадмином логины Сервис-Центров (KV, пароль зашифрован)
   if (!user) {
     const stores = await kvGet(env, 'stores');
     // Ключ записи может отличаться от логина кабинета — ищем по обоим
@@ -571,7 +626,7 @@ async function handleStoreAuth(request, env) {
         if (s && String(s.authLogin || '').toLowerCase() === login) { rec = s; break; }
       }
     }
-    if (rec && rec.status === 'active' && rec.authPassword === pass) {
+    if (rec && rec.status === 'active' && (await decryptSecret(env, rec.authPassword)) === pass) {
       user = { id: rec.id || login, name: rec.name || 'СЦ Greenleaf', role: 'sc' };
     }
   }
@@ -620,7 +675,7 @@ async function handleRegisterSc(request, env) {
     officeCode,
     officeId: hasCabinet ? normalizeOfficeCode(officeCode) : '',
     portalLogin,
-    portalPassword,
+    portalPassword: await encryptSecret(env, portalPassword),
     hasCabinet,
     comment: String(data.comment || data.message || '').trim(),
     experience: String(data.experience || '').trim(),
@@ -644,7 +699,8 @@ async function handleRegisterSc(request, env) {
 
 async function handleScApplications(env) {
   const apps = await kvGet(env, 'applications');
-  const list = Object.values(apps).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const list = Object.values(apps).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map(function (a) { return Object.assign({}, a, { portalPassword: undefined }); });
   return jsonResponse({ ok: true, applications: list });
 }
 
@@ -689,9 +745,9 @@ async function handleScApplicationAction(request, env) {
             : (app.comment || 'Магазин-партнёр Greenleaf. Приходите за эко-продукцией!')),
           partner: existing.partner || '',
           portalLogin: String(app.portalLogin || '').trim() || existing.portalLogin || '',
-          portalPassword: String(app.portalPassword || '').trim() || existing.portalPassword || '',
+          portalPassword: await encryptSecret(env, String(app.portalPassword || '').trim()) || existing.portalPassword || '',
           authLogin: existing.authLogin || storeId.toLowerCase(),
-          authPassword: existing.authPassword || randomPassword(10),
+          authPassword: existing.authPassword || await encryptSecret(env, randomPassword(10)),
           isPartner: app.hasCabinet ? false : true,
           status: 'active',
           createdAt: existing.createdAt || new Date().toISOString()
@@ -753,8 +809,11 @@ async function handleScStore(request, env, auth) {
   const existing = stores[storeId] || {};
   // Пароли: СЦ не видит текущие значения (portalPassword вырезается из ответа),
   // но может задать новый: непустое поле = смена, пустое = оставить как было.
+  // В KV пароли хранятся зашифрованными (AES-GCM, DATA_ENC_KEY).
   const submittedPortalPass = String(data.portalPassword || '').trim();
   const submittedAuthPass = String(data.authPassword || '').trim();
+  const newPortalPass = submittedPortalPass ? await encryptSecret(env, submittedPortalPass) : '';
+  const newAuthPass = submittedAuthPass ? await encryptSecret(env, submittedAuthPass) : '';
   const record = {
     id: storeId,
     officeCode: String(data.officeCode || '').trim() || existing.officeCode || '',
@@ -773,11 +832,11 @@ async function handleScStore(request, env, auth) {
     // Логин партнёра для каталога универсален для всех СЦ
     partner: existing.partner || 'kz44326234',
     portalLogin: String(data.portalLogin || '').trim() || existing.portalLogin || '',
-    portalPassword: submittedPortalPass || existing.portalPassword || '',
+    portalPassword: newPortalPass || existing.portalPassword || '',
     authLogin: isScRole
       ? (existing.authLogin || officeId || storeId.toLowerCase())
       : (String(data.authLogin || '').trim().toLowerCase() || existing.authLogin || officeId || storeId.toLowerCase()),
-    authPassword: submittedAuthPass || existing.authPassword || randomPassword(10),
+    authPassword: newAuthPass || existing.authPassword || await encryptSecret(env, randomPassword(10)),
     status: isScRole ? (existing.status || 'active') : (data.status === 'inactive' ? 'inactive' : 'active'),
     createdAt: existing.createdAt || new Date().toISOString()
   };
@@ -801,7 +860,7 @@ async function handleScStoreResetPassword(request, env) {
   const rec = stores[id];
   if (!rec) return jsonResponse({ ok: false, error: 'not found' }, 404);
   const password = randomPassword(10);
-  rec.authPassword = password;
+  rec.authPassword = await encryptSecret(env, password);
   await kvPut(env, 'stores', stores);
   return jsonResponse({ ok: true, id, login: rec.authLogin, password });
 }
@@ -814,11 +873,19 @@ async function handleScStoresAdmin(env, auth) {
   if (auth.role !== 'superadmin') {
     const login = String(auth.login || '').toLowerCase();
     const own = list.filter(function (s) { return String(s.authLogin || '').toLowerCase() === login; })
-      .map(function (s) { return Object.assign({}, s, { portalPassword: undefined }); });
+      .map(function (s) { return Object.assign({}, s, { portalPassword: undefined, authPassword: undefined }); });
     return jsonResponse({ ok: true, stores: own });
   }
   list.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'ru'); });
-  return jsonResponse({ ok: true, stores: list });
+  // Суперадмину пароли отдаём расшифрованными (для панели), в KV они зашифрованы
+  const decrypted = [];
+  for (const s of list) {
+    decrypted.push(Object.assign({}, s, {
+      portalPassword: await decryptSecret(env, s.portalPassword),
+      authPassword: await decryptSecret(env, s.authPassword)
+    }));
+  }
+  return jsonResponse({ ok: true, stores: decrypted });
 }
 
 // Удаление СЦ: карточка перемещается в архив (stores_archive) — оттуда суперадмин
@@ -938,15 +1005,17 @@ async function handleParserConfig(request, env) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403);
   }
   const stores = await kvGet(env, 'stores');
-  const list = Object.values(stores)
-    .filter(s => s.status === 'active' && s.portalLogin)
-    .map(s => ({
+  const list = [];
+  for (const s of Object.values(stores)) {
+    if (s.status !== 'active' || !s.portalLogin) continue;
+    list.push({
       id: s.id,
       officeCode: s.officeCode || '',
       login: s.portalLogin,
-      password: s.portalPassword || '',
+      password: await decryptSecret(env, s.portalPassword || ''),
       partner: PARTNER_LOGIN
-    }));
+    });
+  }
   return jsonResponse({ ok: true, stores: list });
 }
 
