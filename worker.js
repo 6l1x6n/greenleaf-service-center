@@ -327,7 +327,7 @@ function clientOffsetOf(data) {
 // Если филиал сейчас закрыт — вернуть сообщение об ошибке, иначе null
 async function reserveOpenCheck(env, storeId, clientOffsetMin) {
   const stores = await kvGet(env, 'stores');
-  const store = Array.isArray(stores) ? stores.find((s) => String(s.id) === storeId) : null;
+  const store = (stores && typeof stores === 'object') ? stores[storeId] : null;
   const sch = store && store.schedule;
   if (!sch) return null; // расписание не задано — ограничение не применяем
   const n = storeLocalNow(store, clientOffsetMin);
@@ -1661,7 +1661,7 @@ async function validatePickupSchedule(env, data) {
   // Время получения выбирается только для оплаты наличными; без времени (онлайн-оплата) не проверяем
   if (!storeId || !pDate || !pTime) return null;
   const stores = await kvGet(env, 'stores');
-  const store = Array.isArray(stores) ? stores.find((s) => String(s.id) === storeId) : null;
+  const store = (stores && typeof stores === 'object') ? stores[storeId] : null;
   const sch = store && store.schedule;
   if (!sch) return null;
   const d = new Date(pDate + 'T00:00:00');
