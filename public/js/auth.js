@@ -76,7 +76,8 @@
     var user = getCurrentUser();
     buttons.forEach(function (btn) {
       if (user) {
-        btn.innerHTML = '🟢 ' + Utils.esc(user.name);
+        // Имя оборачиваем в span — кнопка ужимается с многоточием (text-overflow)
+        btn.innerHTML = '<span class="sc-auth-name">🟢 ' + Utils.esc(user.name) + '</span>';
         btn.classList.remove('btn-outline');
         btn.classList.add('btn-primary');
       } else {
