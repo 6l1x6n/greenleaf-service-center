@@ -372,7 +372,7 @@ async function createOrder(env, data) {
 async function handleOrdersGet(request, env, auth) {
   const url = new URL(request.url);
   await archiveConfirmedOrders(env, url);
-  const history = url.searchParams.get('archive') === '1';
+  const history = url.searchParams.get('archive') === '1' && auth.role === 'superadmin';
   const source = history ? await kvGet(env, 'orders_history') : await loadOrders(env);
   const list = Object.values(source)
     .filter(function (o) { return auth.role === 'superadmin' || String(o.storeId) === String(auth.id); })
@@ -425,6 +425,14 @@ async function handleOrdersAction(request, env, auth) {
     const wasNew = order.status === 'new';
     delete orders[id];
     await kvPut(env, 'orders', orders);
+    // Суперадмин может удалять и архивные заказы
+    if (auth.role === 'superadmin') {
+      const history = await kvGet(env, 'orders_history');
+      if (history[id]) {
+        delete history[id];
+        await kvPut(env, 'orders_history', history);
+      }
+    }
     // Удаление не меняет физический остаток: для new резерв снимается (заказа больше
     // нет — товар снова доступен), для confirmed продажа остаётся продажей.
     return jsonResponse({ ok: true, deleted: true, returned: wasNew });
