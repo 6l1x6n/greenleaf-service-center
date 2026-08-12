@@ -711,16 +711,36 @@ def parse_move_row(html):
 
 
 def fetch_move_items(page, config, mv):
-    url = config["portal_url"] + "/do.vshow#admin/shop/move?action=show&move=" + mv["number"]
-    try:
-        page.goto(url, timeout=30000)
-        time.sleep(2.5)
-    except Exception as e:
-        print(f"Не удалось открыть накладную {mv['number']}: {e}")
+    number = mv["number"]
+    detail_url = config["portal_url"] + "/do.vshow#admin/shop/move?action=show&move=" + number
+    # SPA портала может не перерисовать детали при переходе с предыдущей накладной
+    # (тогда в следующую записываются чужие позиции). Поэтому: полная перезагрузка
+    # страницы (свежий запуск SPA с нужным hash) + проверка, что открылась именно
+    # эта накладная (move=N в URL и номер в тексте страницы). Если не вышло — пустой
+    # состав («Состав накладной уточняется»), чужие позиции не подставляем.
+    loaded = False
+    for attempt in range(1, 4):
+        try:
+            page.goto(detail_url, timeout=30000)
+            time.sleep(1)
+            page.reload(timeout=30000)
+            time.sleep(3)
+        except Exception as e:
+            print(f"Накладная {number}: не удалось открыть ({e}) — попытка {attempt}/3")
+            continue
+        try:
+            if ("move=" + number) in page.url and number in page.inner_text("body"):
+                loaded = True
+                break
+        except Exception:
+            pass
+        print(f"Накладная {number}: детали не загрузились (попытка {attempt}/3) — перезагружаю…")
+    if not loaded:
+        print(f"Накладная {number}: состав не получен — карточка покажет «Состав уточняется»")
         return []
     try:
         os.makedirs(DIAG_DIR, exist_ok=True)
-        with open(os.path.join(DIAG_DIR, f"move_{mv['number']}.html"), "w", encoding="utf-8") as f:
+        with open(os.path.join(DIAG_DIR, f"move_{number}.html"), "w", encoding="utf-8") as f:
             f.write(page.content())
     except Exception:
         pass

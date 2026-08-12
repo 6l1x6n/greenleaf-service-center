@@ -785,7 +785,7 @@
   }
 
   function moveStatusLabel(d) {
-    if (d.statusCode === 0) return { text: '🏭 На складе поставщика', cls: 'mv-warehouse', arrived: false };
+    if (d.statusCode === 0) return { text: '🏭 Оформлена · ждёт отгрузки', cls: 'mv-warehouse', arrived: false };
     if (d.statusCode === 4) return { text: '🚚 В пути', cls: 'mv-transit', arrived: false };
     if (d.statusCode === 7) return { text: '✅ Прибыла', cls: 'mv-arrived', arrived: true };
     return { text: 'Готовится к отправке', cls: 'mv-prep', arrived: false };
