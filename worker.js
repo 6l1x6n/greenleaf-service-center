@@ -1210,6 +1210,7 @@ async function handleStores(env) {
       address: s.address || '',
       hours: s.hours || '',
       schedule: s.schedule || null,
+      tz: s.tz || '',
       phone: s.phone || '',
       phoneRaw: s.phoneRaw || '',
       whatsapp: s.whatsapp || '',
