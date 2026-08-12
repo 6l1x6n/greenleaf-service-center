@@ -53,7 +53,7 @@
 
             <div class="form-error" id="adminLoginErr" style="margin-top:10px;">Неверный логин или пароль. Попробуйте еще раз.</div>
 
-            <button class="btn btn-outline btn-lg" type="button" id="authRegBtn" style="width:100%;">Оставить заявку</button>
+            <button class="btn btn-outline btn-lg" type="button" id="authOwnerBtn" style="width:100%;">🏬 Регистрация Сервис-Центра</button>
           </form>
         </div>
 
@@ -70,30 +70,6 @@
           </form>
 
           <button class="auth-switch-link" type="button" id="forgotBackBtn">← Назад ко входу</button>
-        </div>
-
-        <!-- Заявка клиента -->
-        <div id="authRegView" class="hidden">
-          <h3 style="margin-bottom:6px;">📝 Оставить заявку</h3>
-          <p class="modal-product">Оставьте контакты — администратор свяжется с вами.</p>
-
-          <form class="form" data-register-client="1">
-            <input name="name" placeholder="Ваше имя *" required>
-            <input name="phone" type="tel" placeholder="Телефон для связи *" required>
-            <input name="email" type="email" placeholder="Email (необязательно)" autocomplete="email">
-            <select name="city" class="city-select">
-              <option value="" selected disabled>Город</option>
-            </select>
-            <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
-            <input class="hp" name="company" tabindex="-1" autocomplete="off">
-            <button class="btn btn-primary btn-lg" type="submit">Отправить заявку</button>
-            <p class="form-note">🔒 Ваши контакты увидят только администраторы Greenleaf.</p>
-            <p class="form-success">Заявка отправлена! Администратор свяжется с вами.</p>
-            <p class="form-error">Проверьте обязательные поля: имя и телефон.</p>
-          </form>
-
-          <button class="auth-switch-link" type="button" id="authOwnerBtn">Я владелец магазина</button>
-          <button class="auth-switch-link" type="button" id="authBackToLoginBtn">← Назад ко входу</button>
         </div>
 
         <!-- Регистрация владельца магазина -->
@@ -151,33 +127,6 @@
     <div id="adminLayout" class="admin-layout hidden">
       <aside class="admin-sidebar" id="adminNav"></aside>
       <div class="admin-content" id="adminContent"></div>
-    </div>
-
-    <!-- Личный кабинет клиента -->
-    <div id="clientLayout" class="hidden">
-      <div class="container" style="max-width:720px; padding-top:32px; padding-bottom:32px;">
-        <div class="card admin-login-card">
-          <h3 style="margin-bottom:6px;">🧑 Личный кабинет</h3>
-          <p class="modal-product">Здравствуйте, <b id="clientName"></b>! Здесь ваш профиль Greenleaf.</p>
-
-          <div class="contacts-info" style="margin-top:14px;">
-            <div class="row"><span class="lbl">Email</span><span id="clientEmail">—</span></div>
-            <div class="row"><span class="lbl">Телефон</span><span id="clientPhone">—</span></div>
-            <div class="row"><span class="lbl">Статус</span><span>Аккаунт клиента</span></div>
-          </div>
-
-          <div class="admin-note" style="margin-top:14px;">
-            🛒 Заказы оформляются на странице корзины (кнопка «Корзина» в шапке сайта).
-            📦 Подписка на партнёрскую цену −50% — на странице <a href="podpiska.html">«Подписка»</a>.
-          </div>
-
-          <div class="admin-actions" style="margin-top:14px;">
-            <a class="btn btn-primary" href="index.html">🏠 На сайт</a>
-            <a class="btn btn-outline" href="podpiska.html">📦 Подписка −50%</a>
-            <a class="btn btn-outline" href="#" id="clientLogoutBtn">🚪 Выйти</a>
-          </div>
-        </div>
-      </div>
     </div>
 
   </main>

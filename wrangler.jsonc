@@ -11,6 +11,11 @@
       "id": "24ef0b12e7a74c618643d21b52edceec"
     }
   ],
+  // Workers Cache: ответы воркера кешируются на edge по Cache-Control
+  // (повторные запросы ботов/краулеров НЕ запускают воркер)
+  "cache": {
+    "enabled": true
+  },
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",

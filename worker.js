@@ -14,7 +14,9 @@
 //   stores       — {"<storeId>": { id, officeCode, name, city, cityKey, address, hours,
 //                   phone, phoneRaw, whatsapp, email, image, description, status, partner,
 //                   portalLogin, portalPassword, authLogin, authPassword, createdAt }}
-//   applications — {"<appId>": { id, type: sc_registration|partner|client, name, phone, email,
+//   stores_archive — удалённые СЦ (суперадмин может восстановить или удалить навсегда):
+//                   {"<storeId>": { ...карточка, archivedAt }}
+//   applications — {"<appId>": { id, type: sc_registration|partner, name, phone, email,
 //                   storeName, city, address, officeCode, portalLogin, portalPassword, comment,
 //                   status: pending|approved|rejected|new, createdAt }}
 //   password_resets — {"requests": {"<reqId>": { id, email, kind: sc|superadmin, storeId,
@@ -27,9 +29,37 @@
 const TELEGRAM_API = 'https://api.telegram.org/bot';
 const TOKEN_TTL = 12 * 3600; // 12 часов
 
+// ---------------- Защита от ботов (экономия запросов к Worker и KV) ----------------
+// Публичные GET, которые ходят в KV: для них блокируем агрессивных краулеров
+// и вырезаем трекинг-параметры, чтобы edge-кеш попадал в цель
+// (уникальный ?utm_... у бота = отдельный кеш-слот и запуск воркера).
+const PUBLIC_KV_GET = ['/api/stores', '/api/events', '/api/event-bookings', '/api/stock', '/data/products.json'];
+const TRACKING_PARAM_RE = /^(utm_|fbclid|gclid|yclid|gbraid|wbraid|msclkid|_ga|cmpid)/i;
+const BOT_UA_RE = /gptbot|chatgpt-user|oai-searchbot|claude|anthropic-ai|cohere-ai|perplexity|bytespider|amazonbot|applebot-extended|google-extended|ccbot|meta-external|diffbot|imagesiftbot|petalbot|dataforseobot|ahrefsbot|mj12bot|seekportbot|semrushbot|dotbot|screaming\s?frog/i;
+
+function cleanPublicUrl(url) {
+  const u = new URL(url);
+  const kept = [...u.searchParams.entries()].filter(function (kv) { return !TRACKING_PARAM_RE.test(kv[0]); });
+  u.search = kept.map(function (kv) { return kv[0] + '=' + kv[1]; }).join('&');
+  return u;
+}
+
+function isBotRequest(request) {
+  const ua = String(request.headers.get('User-Agent') || '');
+  return BOT_UA_RE.test(ua);
+}
+
 function jsonResponse(obj, status, cacheSeconds) {
   const headers = { 'Content-Type': 'application/json' };
-  if (cacheSeconds) headers['Cache-Control'] = 'public, max-age=' + cacheSeconds;
+  // Workers Cache (wrangler.jsonc: "cache": { "enabled": true }):
+  // публичным GET задаём явный max-age + stale-while-revalidate на edge,
+  // остальным ответам — no-store, чтобы эвристический кеш (RFC 9111)
+  // не закешировал чувствительные ответы (креды парсера и т.п.)
+  if (cacheSeconds) {
+    headers['Cache-Control'] = 'public, max-age=' + cacheSeconds + ', stale-while-revalidate=' + (cacheSeconds * 3);
+  } else {
+    headers['Cache-Control'] = 'no-store';
+  }
   // Маркер нового билда: scripts/verify.sh и deploy.sh проверяют его,
   // чтобы вовремя заметить деплой из устаревшей рабочей копии
   headers['x-greenleaf-build'] = 'v2';
@@ -153,7 +183,7 @@ async function computeEffectiveStock(env, url, excludeOrderId) {
 
 async function handleStock(env, url) {
   const eff = await computeEffectiveStock(env, url);
-  return jsonResponse({ ok: true, stock: eff.stock, updated: eff.updated, deducted: true }, 200, 30);
+  return jsonResponse({ ok: true, stock: eff.stock, updated: eff.updated, deducted: true }, 200, 60);
 }
 
 async function handleReserve(request, env, url) {
@@ -226,7 +256,7 @@ async function handleEventsGet(env, url) {
     base = base.filter((ev) => String(ev.storeId || '') !== String(storeId));
     arr.forEach((ev) => base.push(ev));
   });
-  return jsonResponse({ ok: true, events: base }, 200, 60);
+  return jsonResponse({ ok: true, events: base }, 200, 600);
 }
 
 async function handleEventsSave(request, env, auth) {
@@ -412,55 +442,9 @@ async function handleStoreAuth(request, env) {
   return jsonResponse({ ok: false });
 }
 
-// ---------------- Заявка клиента (публично) ----------------
+// ---------------- Восстановление пароля (заявка администратору) ----------------
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// POST /api/client-request — заявка клиента без аккаунта: уходит в панель администратора
-async function handleClientRequest(request, env) {
-  let data;
-  try {
-    data = await request.json();
-  } catch (e) {
-    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
-  }
-  const name = String(data.name || '').trim();
-  const phone = String(data.phone || '').trim();
-  const email = String(data.email || '').trim().toLowerCase();
-  if (!name || !phone) {
-    return jsonResponse({ ok: false, error: 'Укажите имя и телефон для связи' }, 400);
-  }
-  if (email && !EMAIL_RE.test(email)) {
-    return jsonResponse({ ok: false, error: 'Email указан неверно — проверьте ввод' }, 400);
-  }
-  const app = {
-    id: 'cl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-    type: 'client',
-    status: 'new',
-    name,
-    phone,
-    email,
-    city: String(data.city || '').trim(),
-    comment: String(data.comment || '').trim(),
-    createdAt: new Date().toISOString()
-  };
-  const apps = await kvGet(env, 'applications');
-  apps[app.id] = app;
-  await kvPut(env, 'applications', apps);
-
-  // Уведомление администратору
-  await sendTelegram(env,
-    '🙋 Новая заявка клиента\n' +
-    '👤 ' + name + '\n' +
-    '📞 ' + phone +
-    (email ? '\n📧 ' + email : '') +
-    (app.city ? '\n📍 ' + app.city : '') +
-    (app.comment ? '\n💬 ' + app.comment : ''));
-
-  return jsonResponse({ ok: true, id: app.id });
-}
-
-// ---------------- Восстановление пароля (заявка администратору) ----------------
 
 const RESET_COOLDOWN_MS = 5 * 60 * 1000;   // 5 минут между заявками на один email
 
@@ -834,6 +818,8 @@ async function handleScStoresAdmin(env, auth) {
   return jsonResponse({ ok: true, stores: list });
 }
 
+// Удаление СЦ: карточка перемещается в архив (stores_archive) — оттуда суперадмин
+// может восстановить её или удалить безвозвратно. Tombstones не создаются.
 async function handleScStoreDelete(request, env) {
   let body;
   try {
@@ -844,14 +830,17 @@ async function handleScStoreDelete(request, env) {
   const id = String(body.id || '').trim();
   if (!id) return jsonResponse({ ok: false, error: 'id required' }, 400);
   const stores = await kvGet(env, 'stores');
-  if (stores[id]) {
-    delete stores[id];
-  } else {
-    // Шаблонный СЦ (живёт только в статике stores.json) — помечаем удалённым,
-    // чтобы клиенты отфильтровали его из статичного списка
-    stores[id] = { id, deleted: true, status: 'deleted' };
+  const card = stores[id];
+  if (!card || card.deleted || card.status === 'deleted') {
+    return jsonResponse({ ok: false, error: 'Филиал не найден' }, 404);
   }
+  delete stores[id];
   await kvPut(env, 'stores', stores);
+  const archive = await kvGet(env, 'stores_archive');
+  card.status = 'active';
+  card.archivedAt = new Date().toISOString();
+  archive[id] = card;
+  await kvPut(env, 'stores_archive', archive);
   try {
     const scOverrides = await kvGet(env, 'sc_product_overrides');
     if (scOverrides && scOverrides[id]) {
@@ -859,7 +848,52 @@ async function handleScStoreDelete(request, env) {
       await kvPut(env, 'sc_product_overrides', scOverrides);
     }
   } catch (e) { console.error('cleanup sc overrides:', e); }
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true, archived: true, id });
+}
+
+// GET /api/sc-archive — список удалённых СЦ (суперадмин)
+async function handleScArchiveGet(env) {
+  const archive = await kvGet(env, 'stores_archive');
+  const list = Object.values(archive);
+  list.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'ru'); });
+  return jsonResponse({ ok: true, archived: list });
+}
+
+// POST /api/sc-archive/action {id, action: restore|purge}
+//   restore — вернуть карточку в активные; purge — удалить из архива навсегда
+async function handleScArchiveAction(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const id = String(body.id || '').trim();
+  const action = String(body.action || '').trim();
+  if (!id || !action) return jsonResponse({ ok: false, error: 'id и action обязательны' }, 400);
+  const archive = await kvGet(env, 'stores_archive');
+  const card = archive[id];
+  if (!card) return jsonResponse({ ok: false, error: 'Карточка не найдена в архиве' }, 404);
+
+  if (action === 'restore') {
+    delete card.archivedAt;
+    card.status = 'active';
+    card.restoredAt = new Date().toISOString();
+    const stores = await kvGet(env, 'stores');
+    stores[id] = card;
+    delete archive[id];
+    await kvPut(env, 'stores', stores);
+    await kvPut(env, 'stores_archive', archive);
+    return jsonResponse({ ok: true, store: card });
+  }
+
+  if (action === 'purge') {
+    delete archive[id];
+    await kvPut(env, 'stores_archive', archive);
+    return jsonResponse({ ok: true, purged: true });
+  }
+
+  return jsonResponse({ ok: false, error: 'unknown action' }, 400);
 }
 
 // ---------------- Список СЦ для сайта (публично) ----------------
@@ -886,7 +920,7 @@ async function handleStores(env) {
   const deletedIds = Object.values(stores)
     .filter(s => s.deleted || s.status === 'deleted')
     .map(s => s.id);
-  return jsonResponse({ ok: true, stores: list, deletedIds }, 200, 60);
+  return jsonResponse({ ok: true, stores: list, deletedIds }, 200, 1800);
 }
 
 // ---------------- Конфиг для парсера (по API-ключу) ----------------
@@ -1121,7 +1155,7 @@ async function handleAdminProducts(request, env) {
 // /data/products.json (виртуальный путь, база в products.base.json) → слияние
 // с серверными оверрайдами суперадмина, чтобы цены/описания/скрытия
 // применялись для всех посетителей и при оплате.
-async function handleProductsJson(env, url) {
+async function handleProductsJson(request, env, url) {
   const asset = await env.ASSETS.fetch(new URL('/data/products.base.json', url));
   if (!asset.ok) return asset;
   let data;
@@ -1179,11 +1213,17 @@ async function handleProductsJson(env, url) {
   data.overrides = overrides;
   data.scOverrides = scOverrides;
   data.settings = settings;
-  // Кеш 60с на edge: каталог обновляется не чаще парсинга, а 60-секундный
-  // кеш срезает число вызовов воркера и чтений KV (лимит Free: 100k запросов/день)
-  return new Response(JSON.stringify(data), {
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' }
-  });
+  // Кеш 1 час на edge: каталог меняется только парсером (раз в 3 часа) и
+  // ручными оверрайдами; stale-while-revalidate перевыпускает фоном.
+  // ETag: повторные запросы ботов/краулеров уходят по 304 без тела.
+  const body = JSON.stringify(data);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
+  const etag = '"' + bytesToHex(digest) + '"';
+  const cacheHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=7200', 'ETag': etag };
+  if (request.headers.get('If-None-Match') === etag) {
+    return new Response(null, { status: 304, headers: cacheHeaders });
+  }
+  return new Response(body, { headers: cacheHeaders });
 }
 
 // ---------------- Telegram ----------------
@@ -1335,6 +1375,24 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // Публичные GET в KV: ботов режем сразу (403 без чтений KV),
+    // трекинг-параметры вырезаем — кеш edge работает по каноничному URL
+    if (request.method === 'GET' && PUBLIC_KV_GET.indexOf(path) !== -1) {
+      if (isBotRequest(request)) {
+        return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+      }
+      // Кеш edge ключуется по исходному URL запроса, поэтому переписывать
+      // URL «внутри» воркера бесполезно — отдаём 301 на каноничный URL
+      // (краулеры запоминают редирект, а сам 301 кешируется на сутки)
+      const clean = cleanPublicUrl(request.url);
+      if (clean.toString() !== url.toString()) {
+        return new Response(null, {
+          status: 301,
+          headers: { 'Location': clean.toString(), 'Cache-Control': 'public, max-age=86400' }
+        });
+      }
+    }
+
     // 1. Формы → Telegram
     if (path === '/telegram' && request.method === 'POST') {
       return handleTelegram(request, env);
@@ -1350,12 +1408,7 @@ export default {
       return handleRegisterSc(request, env);
     }
 
-    // 1.2.1 Заявка клиента (без аккаунта — уходит в панель администратора)
-    if (path === '/api/client-request' && request.method === 'POST') {
-      return handleClientRequest(request, env);
-    }
-
-    // 1.2.2 Восстановление пароля — заявка администратору (без email-ссылки)
+    // 1.2.1 Восстановление пароля — заявка администратору (без email-ссылки)
     if (path === '/api/forgot-password' && request.method === 'POST') {
       return handleForgotPassword(request, env);
     }
@@ -1404,7 +1457,7 @@ export default {
     // 1.4.3 Брони мест на мероприятия (единая БД на всех устройствах)
     if (path === '/api/event-bookings' && request.method === 'GET') {
       const bookings = await kvGet(env, 'event_bookings');
-      return jsonResponse({ ok: true, bookings }, 200, 30);
+      return jsonResponse({ ok: true, bookings }, 200, 600);
     }
     if (path === '/api/event-book' && request.method === 'POST') {
       return handleEventBook(request, env);
@@ -1413,7 +1466,8 @@ export default {
     // 1.5 Админские API (суперадмин по токену; /api/sc-stores — суперадмин или свой СЦ)
     if (path === '/api/sc-applications' || path === '/api/sc-application' || path === '/api/sc-store' ||
         path === '/api/sc-store/resend' || path === '/api/sc-stores' || path === '/api/admin/products' ||
-        path === '/api/admin/email' || path === '/api/password-requests' || path === '/api/password-request') {
+        path === '/api/admin/email' || path === '/api/password-requests' || path === '/api/password-request' ||
+        path === '/api/sc-archive' || path === '/api/sc-archive/action') {
       const auth = await verifyToken(env, request.headers.get('Authorization'));
       if (!auth) {
         return jsonResponse({ ok: false, error: 'forbidden' }, 403);
@@ -1464,6 +1518,12 @@ export default {
       if (path === '/api/password-request' && request.method === 'POST') {
         return handlePasswordRequestAction(request, env);
       }
+      if (path === '/api/sc-archive' && request.method === 'GET') {
+        return handleScArchiveGet(env);
+      }
+      if (path === '/api/sc-archive/action' && request.method === 'POST') {
+        return handleScArchiveAction(request, env);
+      }
     }
 
     // 2. /admin и /admin/* → панель Decap CMS (обходим clean-url редиректы)
@@ -1479,7 +1539,7 @@ export default {
     // Каталог товаров отдаём через серверные оверрайды суперадмина
     // (цены/описания/категории/скрытие применяются и при оплате).
     if (path === '/data/products.json') {
-      return handleProductsJson(env, url);
+      return handleProductsJson(request, env, url);
     }
 
     const asset = await env.ASSETS.fetch(request);

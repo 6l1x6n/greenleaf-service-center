@@ -158,43 +158,6 @@
     });
   }
 
-  function submitClientRequest(form) {
-    var data = {};
-    form.querySelectorAll('input, select, textarea').forEach(function (el) {
-      if (!el.name || el.type === 'radio' || el.type === 'checkbox') return;
-      data[el.name] = el.value;
-    });
-    if (!data.name || !data.phone) {
-      form.classList.remove('show-success');
-      form.classList.add('show-error');
-      return;
-    }
-    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-      form.classList.remove('show-success');
-      form.classList.add('show-error');
-      return;
-    }
-    var btn = form.querySelector('button[type="submit"]');
-    var prev = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.textContent = 'Отправляем…'; }
-
-    fetch('/api/client-request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(function (r) { return r.json(); }).then(function (res) {
-      if (!res || !res.ok) throw new Error((res && res.error) || 'HTTP error');
-      form.classList.add('show-success');
-      if (window.Utils) Utils.showToast('📨 Заявка отправлена! Администратор свяжется с вами');
-    }).catch(function (err) {
-      form.classList.remove('show-success');
-      form.classList.add('show-error');
-      if (window.Utils && err && err.message) Utils.showToast(err.message);
-    }).then(function () {
-      if (btn) { btn.disabled = false; btn.innerHTML = prev; }
-    });
-  }
-
   document.addEventListener('submit', function (e) {
     var partnerForm = e.target.closest('form[data-partner-register]');
     if (partnerForm) {
@@ -202,11 +165,7 @@
       submitPartnerRegistration(partnerForm);
       return;
     }
-    var clientForm = e.target.closest('form[data-register-client]');
-    if (clientForm) {
-      e.preventDefault();
-      submitClientRequest(clientForm);
-    }
+    // Клиентская форма убрана: вход и регистрация только для СЦ и суперадмина
   });
 
   document.addEventListener('DOMContentLoaded', function () {

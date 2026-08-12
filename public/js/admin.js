@@ -48,6 +48,7 @@
     overview: { label: '📊 Обзор', roles: ['superadmin'] },
     cabinet: { label: '📋 Кабинет СЦ', roles: ['sc'] },
     sc: { label: '🏬 Сервис-Центры', roles: ['superadmin'] },
+    scArchive: { label: '🗄 Архив СЦ', roles: ['superadmin'] },
     stock: { label: '📦 Остатки товаров', roles: ['sc'] },
     deliveries: { label: '🚚 Поставки', roles: ['superadmin', 'sc'] },
     events: { label: '📅 Мероприятия', roles: ['superadmin', 'sc'] },
@@ -274,6 +275,7 @@
       overview: renderOverview,
       cabinet: renderCabinet,
       sc: renderScContacts,
+      scArchive: renderScArchive,
       stock: renderStock,
       deliveries: renderDeliveries,
       events: renderEvents,
@@ -562,10 +564,10 @@
     var delBtn = content.querySelector('#storeDeleteBtn');
     if (delBtn) {
       delBtn.addEventListener('click', function () {
-        if (!confirm('Удалить филиал «' + store.name + '»? Восстановить его можно будет только вручную.')) return;
+        if (!confirm('Удалить филиал «' + store.name + '»? Он исчезнет с сайта, но останется в архиве — оттуда его можно восстановить.')) return;
         Auth.api('/api/sc-store', { method: 'DELETE', body: JSON.stringify({ id: store.id }) }).then(function (res) {
           state.editingStoreId = null;
-          Utils.showToast(res && res.ok ? '✅ Филиал удалён' : '⚠️ Не удалось удалить. Войдите заново (сессия истекла).');
+          Utils.showToast(res && res.ok ? '✅ Филиал перемещён в архив' : '⚠️ Не удалось удалить. Войдите заново (сессия истекла).');
           loadData().then(function () { openSection('sc'); });
         });
       });
@@ -621,9 +623,9 @@
       if (!rmBtn) return;
       var sid = rmBtn.getAttribute('data-sc-remove');
       var s = list.find(function (x) { return x.id === sid; });
-      if (!confirm('Удалить филиал «' + (s ? s.name : sid) + '»? Удалённый филиал исчезнет с сайта.')) return;
+      if (!confirm('Удалить филиал «' + (s ? s.name : sid) + '»? Он исчезнет с сайта, но останется в архиве — оттуда его можно восстановить.')) return;
       Auth.api('/api/sc-store', { method: 'DELETE', body: JSON.stringify({ id: sid }) }).then(function (res) {
-        Utils.showToast(res && res.ok ? '✅ Филиал удалён' : '⚠️ Не удалось удалить. Войдите заново (сессия истекла).');
+        Utils.showToast(res && res.ok ? '✅ Филиал перемещён в архив' : '⚠️ Не удалось удалить. Войдите заново (сессия истекла).');
         state.editingStoreId = null;
         loadData().then(function () { openSection('sc'); });
       });
@@ -676,6 +678,56 @@
         '<div class="admin-card" style="border-color:var(--danger); color:var(--danger);">⚠️ Ошибка рендера формы: ' + h(String(err && err.message || err)) + '</div>'
       );
     }
+  }
+
+  // ---------------- Архив Сервис-Центров ----------------
+
+  function renderScArchive(content) {
+    content.insertAdjacentHTML('beforeend', '<div class="admin-note">🗄 Сюда попадают филиалы, удалённые из раздела «Сервис-Центры». Здесь их можно <b>восстановить</b> или <b>удалить навсегда</b> (безвозвратно).</div><div class="admin-card"><div id="scArchiveList">Загружаем…</div></div>');
+    var listEl = content.querySelector('#scArchiveList');
+    Auth.api('/api/sc-archive').then(function (d) {
+      var list = (d && d.archived) || [];
+      if (!list.length) {
+        listEl.innerHTML = '<div class="owner-req-empty">Архив пуст.</div>';
+        return;
+      }
+      listEl.innerHTML = '<ul class="admin-list">' + list.map(function (s) {
+        return '<li>' +
+          '<div class="admin-list-main">' +
+          '<strong>' + h(s.name) + '</strong>' +
+          '<span>📍 ' + h(s.city || '') + ' · ' + h(s.address || '') + '</span>' +
+          '<span>🗓 В архиве с ' + h(new Date(s.archivedAt || Date.now()).toLocaleString('ru-RU')) + '</span>' +
+          '</div>' +
+          '<div class="admin-actions">' +
+          '<button class="btn btn-outline btn-sm" data-sc-archive-restore="' + h(s.id) + '">↩️ Восстановить</button>' +
+          '<button class="btn btn-outline btn-sm danger-btn" data-sc-archive-purge="' + h(s.id) + '">🗑 Удалить навсегда</button>' +
+          '</div>' +
+          '</li>';
+      }).join('') + '</ul>';
+
+      listEl.addEventListener('click', function (e) {
+        var restoreBtn = e.target.closest('[data-sc-archive-restore]');
+        if (restoreBtn) {
+          var rid = restoreBtn.getAttribute('data-sc-archive-restore');
+          if (!confirm('Восстановить филиал «' + rid + '»? Он снова появится на сайте.')) return;
+          Auth.api('/api/sc-archive/action', { method: 'POST', body: JSON.stringify({ id: rid, action: 'restore' }) }).then(function (res) {
+            Utils.showToast(res && res.ok ? '✅ Филиал восстановлен' : '⚠️ Не удалось восстановить. Войдите заново (сессия истекла).');
+            openSection('scArchive');
+          });
+          return;
+        }
+        var purgeBtn = e.target.closest('[data-sc-archive-purge]');
+        if (!purgeBtn) return;
+        var pid = purgeBtn.getAttribute('data-sc-archive-purge');
+        if (!confirm('Удалить филиал «' + pid + '» НАВСЕГДА? Это действие необратимо.')) return;
+        Auth.api('/api/sc-archive/action', { method: 'POST', body: JSON.stringify({ id: pid, action: 'purge' }) }).then(function (res) {
+          Utils.showToast(res && res.ok ? '🗑 Удалён безвозвратно' : '⚠️ Не удалось удалить. Войдите заново (сессия истекла).');
+          openSection('scArchive');
+        });
+      });
+    }).catch(function () {
+      listEl.innerHTML = '<div class="owner-req-empty">Не удалось загрузить архив. Войдите заново.</div>';
+    });
   }
 
   // ---------------- Остатки ----------------
@@ -1226,13 +1278,8 @@
   function renderApplications(content) {
     content.insertAdjacentHTML('beforeend',
       '<div class="admin-card">' +
-      '<p style="color:var(--muted); font-size:13.5px; margin-bottom:12px;">Заявки приходят из формы «Войти» → «Оставить заявку». Обычные заявки партнёров помечены 🤝, заявки с кабинетом поставщика — 🏬 (остатки будут парситься автоматически).</p>' +
+      '<p style="color:var(--muted); font-size:13.5px; margin-bottom:12px;">Заявки приходят из формы «Войти» → «Регистрация Сервис-Центра». Обычные заявки партнёров помечены 🤝, заявки с кабинетом поставщика — 🏬 (остатки будут парситься автоматически).</p>' +
       '<div id="scAppsList">Загружаем заявки…</div>' +
-      '</div>' +
-      '<div class="admin-card" style="margin-top:12px;">' +
-      '<strong>🙋 Заявки клиентов</strong>' +
-      '<p style="color:var(--muted); font-size:13px; margin:6px 0 10px;">Клиенты оставляют контакты через кнопку «Оставить заявку» на странице входа — свяжитесь с ними сами.</p>' +
-      '<div id="clientAppsList">Загружаем…</div>' +
       '</div>' +
       '<div class="admin-card" style="margin-top:12px;">' +
       '<strong>🔑 Восстановление паролей</strong>' +
@@ -1244,7 +1291,6 @@
     Auth.api('/api/sc-applications').then(function (data) {
       var apps = (data && data.applications) || [];
       var scApps = apps.filter(function (a) { return a.type !== 'client'; });
-      var clientApps = apps.filter(function (a) { return a.type === 'client'; });
       var listEl = content.querySelector('#scAppsList');
       if (!scApps.length) {
         listEl.innerHTML = '<div class="owner-req-empty">Заявок пока нет. Новые заявки появятся здесь автоматически.</div>';
@@ -1267,27 +1313,6 @@
             (a.status === 'pending' ? '<button class="btn btn-primary btn-sm" data-sc-app-approve="' + h(a.id) + '">✅ Одобрить</button>' : '') +
             (a.status === 'pending' ? '<button class="btn btn-outline btn-sm" data-sc-app-edit="' + h(a.id) + '">✏️ Редактировать перед созданием</button>' : '') +
             (a.status !== 'approved' && a.status !== 'rejected' ? '<button class="btn btn-outline btn-sm danger-btn" data-sc-app-reject="' + h(a.id) + '">🚫 Отклонить</button>' : '') +
-            '</div></li>';
-        }).join('') + '</ul>';
-      }
-
-      var clientEl = content.querySelector('#clientAppsList');
-      if (!clientApps.length) {
-        clientEl.innerHTML = '<div class="owner-req-empty">Заявок клиентов пока нет.</div>';
-      } else {
-        clientEl.innerHTML = '<ul class="admin-list">' + clientApps.map(function (a) {
-          var wa = (a.phone || '').replace(/\D/g, '');
-          return '<li>' +
-            '<div class="admin-list-main">' +
-            '<strong>' + h(a.name || 'Клиент') + '</strong>' +
-            '<span>📞 ' + h(a.phone || '') + (a.email ? ' · 📧 ' + h(a.email) : '') + '</span>' +
-            '<span>📍 ' + h(a.city || '—') + '</span>' +
-            (a.comment ? '<span style="color:var(--muted);">«' + h(a.comment) + '»</span>' : '') +
-            '<span style="color:var(--muted); font-size:12px;">🕐 ' + h(new Date(a.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
-            '</div>' +
-            '<div class="admin-actions" style="flex-wrap:wrap;">' +
-            (wa ? '<a class="btn btn-whatsapp btn-sm" href="https://wa.me/' + wa + '" target="_blank" rel="noopener">📱 Написать</a>' : '') +
-            '<button class="btn btn-outline btn-sm danger-btn" data-client-app-delete="' + h(a.id) + '">🗑 Удалить</button>' +
             '</div></li>';
         }).join('') + '</ul>';
       }
@@ -1332,21 +1357,6 @@
           });
         }
       });
-
-      if (clientEl) {
-        clientEl.addEventListener('click', function (e) {
-          var delBtn = e.target.closest('[data-client-app-delete]');
-          if (!delBtn) return;
-          var cid = delBtn.getAttribute('data-client-app-delete');
-          var capp = clientApps.find(function (x) { return x.id === cid; });
-          if (!capp) return;
-          if (!confirm('Удалить заявку клиента «' + (capp.name || '') + '»?')) return;
-          Auth.api('/api/sc-application', { method: 'POST', body: JSON.stringify({ id: cid, action: 'delete' }) }).then(function () {
-            Utils.showToast('🗑 Заявка удалена');
-            openSection('applications');
-          });
-        });
-      }
     });
 
     // Запросы на восстановление пароля
@@ -2059,38 +2069,15 @@
   function showLogin() {
     document.getElementById('loginScreen').classList.remove('hidden');
     document.getElementById('adminLayout').classList.add('hidden');
-    var clientLayout = document.getElementById('clientLayout');
-    if (clientLayout) clientLayout.classList.add('hidden');
     var badge = document.getElementById('adminUserBadge');
     var logout = document.getElementById('adminLogoutBtn');
     if (badge) badge.classList.add('hidden');
     if (logout) logout.classList.add('hidden');
   }
 
-  function showClientPanel() {
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('adminLayout').classList.add('hidden');
-    var clientLayout = document.getElementById('clientLayout');
-    if (!clientLayout) { showPanel(); return; }
-    clientLayout.classList.remove('hidden');
-    var user = state.user || {};
-    var nameEl = document.getElementById('clientName');
-    if (nameEl) nameEl.textContent = user.name || user.login || 'клиент';
-    var emailEl = document.getElementById('clientEmail');
-    if (emailEl) emailEl.textContent = user.email || user.login || '—';
-    var phoneEl = document.getElementById('clientPhone');
-    if (phoneEl) phoneEl.textContent = user.phone || '—';
-    var badge = document.getElementById('adminUserBadge');
-    var logout = document.getElementById('adminLogoutBtn');
-    if (badge) { badge.classList.remove('hidden'); badge.innerHTML = '🧑 ' + h(user.name || user.login || 'клиент'); }
-    if (logout) logout.classList.remove('hidden');
-  }
-
   function showPanel() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('adminLayout').classList.remove('hidden');
-    var clientLayout = document.getElementById('clientLayout');
-    if (clientLayout) clientLayout.classList.add('hidden');
     var badge = document.getElementById('adminUserBadge');
     var logout = document.getElementById('adminLogoutBtn');
     if (badge) { badge.classList.remove('hidden'); badge.innerHTML = '🟢 ' + h(state.user.name); }
@@ -2104,32 +2091,26 @@
 
   function bindAuthSwitchers() {
     var loginView = document.getElementById('authLoginView');
-    var regView = document.getElementById('authRegView');
     var ownerView = document.getElementById('authOwnerView');
     var forgotView = document.getElementById('authForgotView');
     var card = document.querySelector('.admin-login-card');
-    if (!loginView || !regView || !ownerView) return;
+    if (!loginView || !ownerView) return;
     function show(view) {
       loginView.classList.add('hidden');
-      regView.classList.add('hidden');
-      ownerView.classList.add('hidden');
       if (forgotView) forgotView.classList.add('hidden');
+      ownerView.classList.add('hidden');
       view.classList.remove('hidden');
       if (card) {
         if (view === ownerView) card.classList.add('wide');
         else card.classList.remove('wide');
       }
     }
-    var regBtn = document.getElementById('authRegBtn');
-    if (regBtn) regBtn.addEventListener('click', function () { show(regView); });
     var ownerBtn = document.getElementById('authOwnerBtn');
     if (ownerBtn) ownerBtn.addEventListener('click', function () { show(ownerView); });
     var forgotBtn = document.getElementById('forgotPassLink');
     if (forgotBtn) forgotBtn.addEventListener('click', function () { show(forgotView); });
     var forgotBack = document.getElementById('forgotBackBtn');
     if (forgotBack) forgotBack.addEventListener('click', function () { show(loginView); });
-    var back1 = document.getElementById('authBackToLoginBtn');
-    if (back1) back1.addEventListener('click', function () { show(loginView); });
     var back2 = document.getElementById('authOwnerBackBtn');
     if (back2) back2.addEventListener('click', function () { show(loginView); });
 
@@ -2176,10 +2157,6 @@
         if (user) {
           Auth.setCurrentUser(user);
           state.user = user;
-          if (user.role === 'client') {
-            showClientPanel();
-            return;
-          }
           loadData().then(showPanel);
         } else {
           document.getElementById('adminLoginErr').style.display = 'block';
@@ -2199,16 +2176,6 @@
       showLogin();
     });
 
-    var clientLogout = document.getElementById('clientLogoutBtn');
-    if (clientLogout) {
-      clientLogout.addEventListener('click', function (e) {
-        e.preventDefault();
-        Auth.setCurrentUser(null);
-        state.user = null;
-        showLogin();
-      });
-    }
-
     document.getElementById('adminNav').addEventListener('click', function (e) {
       var btn = e.target.closest('[data-section]');
       if (!btn) return;
@@ -2218,11 +2185,7 @@
     var user = Auth.getCurrentUser();
     if (user) {
       state.user = user;
-      if (user.role === 'client') {
-        showClientPanel();
-      } else {
-        loadData().then(showPanel);
-      }
+      loadData().then(showPanel);
     } else {
       showLogin();
     }

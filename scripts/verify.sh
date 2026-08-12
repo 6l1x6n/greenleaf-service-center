@@ -46,7 +46,7 @@ fi
 
 # 4. Кеширование каталога
 CC=$(curl -sI "$SITE/data/products.json" | tr -d '\r' | grep -i '^cache-control:' | head -1 | sed 's/^[Cc]ache-[Cc]ontrol: *//')
-echo "$CC" | grep -q 'max-age=60' && echo "✅ Кеш каталога: $CC" || { echo "⚠️ Кеш каталога не установлен: ${CC:-нет}"; }
+echo "$CC" | grep -q 'max-age=3600' && echo "✅ Кеш каталога: $CC" || { echo "⚠️ Кеш каталога не установлен: ${CC:-нет}"; }
 
 if [ "$FAIL" -ne 0 ]; then
   echo "❌ Проверка не пройдена — смотрите ошибки выше."

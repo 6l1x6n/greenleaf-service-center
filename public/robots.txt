@@ -1,8 +1,65 @@
-User-agent: *
+# Сервис-центры Greenleaf — каталог продукции и эко-товаров.
+# Поисковики (Google/Yandex/Bing) индексируют каталог и карточки СЦ.
+# AI-краулеры и прочие боты ограничены: /api/ не индексируют, LLM-ботам сайт закрыт.
+
+User-agent: Googlebot
 Allow: /
 Disallow: /admin/
 Disallow: /assets/
 Disallow: /data/
 Disallow: /cabinet.html
+Disallow: /api/
+
+User-agent: YandexBot
+Allow: /
+Disallow: /admin/
+Disallow: /assets/
+Disallow: /data/
+Disallow: /cabinet.html
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin/
+Disallow: /assets/
+Disallow: /data/
+Disallow: /cabinet.html
+Disallow: /api/
+
+# LLM-краулеры и агрегаторы — сайт этим роботам не нужен
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: OAI-SearchBot
+User-agent: ClaudeBot
+User-agent: Claude-Web
+User-agent: anthropic-ai
+User-agent: cohere-ai
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Bytespider
+User-agent: Amazonbot
+User-agent: Applebot-Extended
+User-agent: Google-Extended
+User-agent: GoogleOther
+User-agent: CCBot
+User-agent: meta-externalagent
+User-agent: Meta-ExternalAgent
+User-agent: meta-externalfetcher
+User-agent: Diffbot
+User-agent: ImagesiftBot
+User-agent: PetalBot
+User-agent: DataForSeoBot
+User-agent: AhrefsBot
+User-agent: MJ12bot
+User-agent: SeekportBot
+Disallow: /
+
+# Все прочие роботы
+User-agent: *
+Disallow: /admin/
+Disallow: /assets/
+Disallow: /data/
+Disallow: /cabinet.html
+Disallow: /api/
 
 Sitemap: https://mygreenleaf.postalarchive.workers.dev/sitemap.xml
