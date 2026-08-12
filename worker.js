@@ -727,6 +727,9 @@ async function handleScApplicationAction(request, env) {
           ? (app.officeId || normalizeOfficeCode(app.officeCode))
           : ('sc-partner-' + app.id);
         const existing = stores[storeId] || {};
+        // Пароль из заявки может быть уже зашифрован (миграция/повторное одобрение) —
+        // расшифровываем и шифруем заново один раз
+        const appPortalPass = String(app.portalPassword || '').trim();
         const record = {
           id: storeId,
           officeCode: String(app.officeCode || '').trim(),
@@ -745,7 +748,7 @@ async function handleScApplicationAction(request, env) {
             : (app.comment || 'Магазин-партнёр Greenleaf. Приходите за эко-продукцией!')),
           partner: existing.partner || '',
           portalLogin: String(app.portalLogin || '').trim() || existing.portalLogin || '',
-          portalPassword: await encryptSecret(env, String(app.portalPassword || '').trim()) || existing.portalPassword || '',
+          portalPassword: (appPortalPass ? await encryptSecret(env, await decryptSecret(env, appPortalPass)) : '') || existing.portalPassword || '',
           authLogin: existing.authLogin || storeId.toLowerCase(),
           authPassword: existing.authPassword || await encryptSecret(env, randomPassword(10)),
           isPartner: app.hasCabinet ? false : true,
