@@ -92,6 +92,9 @@
 
     var data = collectFormData(form);
 
+    // Часовой пояс посетителя (минуты) — сервер сверяет «сейчас» и расписание филиала в локальном времени
+    if (data.type === 'order') data.tz_offset = -new Date().getTimezoneOffset();
+
     // Повторная запись на мероприятие с того же устройства — блокируем
     if (data.type === 'event' && data.event_id && alreadyBookedEvent(data.event_id)) {
       Utils.showToast('Вы уже записаны на это мероприятие');
@@ -133,6 +136,10 @@
                 if (errData && errData.error === 'expired' && attemptsLeft > 0) {
                   setTimeout(function () { submitOrder(attemptsLeft - 1); }, 3000);
                   return;
+                }
+                if (errData && errData.error === 'schedule') {
+                  if (window.Utils) Utils.showToast('⏰ ' + (errData.message || 'Выбранное время недоступно — измените дату/время получения'));
+                  markError(form);
                 }
                 if (errData && errData.error === 'expired') {
                   if (window.Utils) Utils.showToast('⏳ ' + (errData.message || 'Время бронирования истекло — соберите корзину заново'));

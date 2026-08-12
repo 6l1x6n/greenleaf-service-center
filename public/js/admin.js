@@ -19,6 +19,14 @@
     ['out', '— Нет в наличии']
   ];
 
+  // Часовые пояса филиалов (IANA) — по ним считаются «открыт ли филиал сейчас» и ближайшая выдача
+  var TZ_OPTIONS = ['', 'Asia/Almaty', 'Asia/Aqtobe', 'Asia/Aqtau', 'Asia/Qostanay', 'Asia/Oral', 'Asia/Qyzylorda', 'Asia/Shanghai', 'Europe/Moscow', 'UTC'];
+  function tzOptionsHtml(selected) {
+    return TZ_OPTIONS.map(function (t) {
+      return '<option value="' + t + '"' + (String(selected || '') === t ? ' selected' : '') + '>' + (t || 'Авто (по посетителю)') + '</option>';
+    }).join('');
+  }
+
   var state = {
     user: null,
     stores: [],
@@ -407,6 +415,7 @@
       '<div class="form-group"><label>WhatsApp (только цифры, с 7)</label><input name="whatsapp" value="' + h(store.whatsapp) + '" placeholder="77001234567"></div>' +
       '</div>' +
             Utils.scheduleFormHtml(store) +
+      '<div class="form-group" style="max-width:340px;"><label>Часовой пояс (для расписания)</label><select name="tz">' + tzOptionsHtml(store.tz) + '</select><p class="form-note">В этой зоне считаются «открыт ли филиал сейчас» и ближайшая дата выдачи. Если не задано — по часовому поясу посетителя сайта.</p></div>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
       '<div class="form-group"><label>Фото (путь или ссылка) *</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..." required>' + imagePreview + '</div>' +
       '<div class="form-group"><label>Краткое описание филиала *</label><textarea name="description" required>' + h(store.description) + '</textarea></div>' +
@@ -494,6 +503,7 @@
       store.address = form.address.value.trim();
       store.hours = hoursText;
       store.schedule = schedule;
+      store.tz = form.tz ? form.tz.value : '';
       store.phone = form.phone.value.trim();
       store.whatsapp = form.whatsapp.value.trim();
       store.kaspi_qr = form.kaspi_qr.value.trim();
@@ -519,6 +529,7 @@
         address: store.address,
         hours: store.hours,
         schedule: store.schedule,
+        tz: store.tz,
         phone: store.phone,
         phoneRaw: store.phoneRaw,
         whatsapp: store.whatsapp,

@@ -282,6 +282,65 @@ async function handleStock(env, url) {
   return jsonResponse({ ok: true, stock: eff.stock, updated: eff.updated, deducted: true }, 200, 60);
 }
 
+// День недели → ключ расписания (sun..sat), время "HH:MM" → минуты с полуночи
+function scheduleDayKey(date) {
+  return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()];
+}
+function scheduleMinutes(t) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+}
+
+// «Сейчас» в локальном времени филиала: { date: 'YYYY-MM-DD', dayKey, minutes }
+// Приоритет: store.tz (IANA-зона из настроек СЦ) → смещение клиента (минуты из запроса) → UTC.
+// Cloudflare Workers работает в UTC, а филиалы в Астане (UTC+5): без учёта зоны «сегодня»
+// и часы работы съезжают на границе суток (ночь по Астане = предыдущий день по UTC).
+function storeLocalNow(store, clientOffsetMin) {
+  const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const now = new Date();
+  const tz = store && store.tz;
+  if (tz) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    }).formatToParts(now);
+    const get = (t) => { const p = parts.find((x) => x.type === t); return p ? Number(p.value) : 0; };
+    const y = get('year'), mo = get('month'), d = get('day');
+    const date = y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    return { date, minutes: get('hour') * 60 + get('minute'), dayKey: DAYS[new Date(y, mo - 1, d).getDay()] };
+  }
+  const off = Number(clientOffsetMin) || 0;
+  const shifted = new Date(now.getTime() + off * 60000);
+  const y = shifted.getUTCFullYear(), mo = shifted.getUTCMonth() + 1, d = shifted.getUTCDate();
+  const date = y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  return { date, minutes: shifted.getUTCHours() * 60 + shifted.getUTCMinutes(), dayKey: DAYS[shifted.getUTCDay()] };
+}
+
+// Смещение часового пояса из запроса: tz_offset / tzOffset (минуты, +300 для Астаны)
+function clientOffsetOf(data) {
+  const v = data && (data.tz_offset !== undefined ? data.tz_offset : data.tzOffset);
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Если филиал сейчас закрыт — вернуть сообщение об ошибке, иначе null
+async function reserveOpenCheck(env, storeId, clientOffsetMin) {
+  const stores = await kvGet(env, 'stores');
+  const store = Array.isArray(stores) ? stores.find((s) => String(s.id) === storeId) : null;
+  const sch = store && store.schedule;
+  if (!sch) return null; // расписание не задано — ограничение не применяем
+  const n = storeLocalNow(store, clientOffsetMin);
+  const slot = sch[n.dayKey];
+  if (!slot) return 'Филиал сегодня не работает — бронирование недоступно';
+  const openM = scheduleMinutes(slot.open);
+  const closeM = scheduleMinutes(slot.close);
+  if (openM < 0 || closeM < 0 || n.minutes < openM || n.minutes >= closeM) {
+    return 'Филиал сейчас закрыт — бронирование доступно в рабочее время ' + slot.open + '–' + slot.close;
+  }
+  return null;
+}
+
 async function handleReserve(request, env, url) {
   let data;
   try {
@@ -295,6 +354,13 @@ async function handleReserve(request, env, url) {
   if (!orderId || !storeId || !items.length) {
     return jsonResponse({ ok: false, error: 'orderId, storeId и items обязательны' }, 400);
   }
+
+  // Бронь доступна только в рабочее время выбранного филиала (расписание из настроек СЦ)
+  const closedMsg = await reserveOpenCheck(env, storeId, clientOffsetOf(data));
+  if (closedMsg) {
+    return jsonResponse({ ok: false, error: 'closed', message: closedMsg }, 409);
+  }
+
   const ttl = Math.min(Number(data.ttlSeconds) || 120, 600) * 1000;
   const eff = await computeEffectiveStock(env, url, orderId);
   const reservations = await activeReservations(env);
@@ -985,6 +1051,7 @@ async function handleScStore(request, env, auth) {
     address: String(data.address || '').trim() || existing.address || '',
     hours: String(data.hours || '').trim() || existing.hours || '',
     schedule: (data.schedule && typeof data.schedule === 'object') ? data.schedule : existing.schedule || null,
+    tz: String(data.tz || '').trim() || existing.tz || '',
     phone: String(data.phone || '').trim() || existing.phone || '',
     phoneRaw: String(data.phoneRaw || '').trim() || existing.phoneRaw || '',
     whatsapp: String(data.whatsapp || '').trim() || existing.whatsapp || '',
@@ -1584,6 +1651,43 @@ function buildText(data) {
   return lines.join('\n');
 }
 
+// Проверка даты/времени получения по расписанию филиала: сообщение об ошибке или null.
+// Страховка поверх клиентских ограничений — прямое обращение к /telegram не обойдёт.
+async function validatePickupSchedule(env, data) {
+  const storeId = String(data.orderStoreId || data.store_id || '');
+  const pDate = String(data.pickup_date || data.pickupDate || '');
+  const pTime = String(data.pickup_time || data.pickupTime || '');
+  // Время получения выбирается только для оплаты наличными; без времени (онлайн-оплата) не проверяем
+  if (!storeId || !pDate || !pTime) return null;
+  const stores = await kvGet(env, 'stores');
+  const store = Array.isArray(stores) ? stores.find((s) => String(s.id) === storeId) : null;
+  const sch = store && store.schedule;
+  if (!sch) return null;
+  const d = new Date(pDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  const slot = sch[scheduleDayKey(d)];
+  if (!slot) return 'Выбранный день — выходной в филиале. Выберите рабочий день.';
+  const pM = scheduleMinutes(pTime);
+  const openM = scheduleMinutes(slot.open);
+  const closeM = scheduleMinutes(slot.close);
+  if (pM < 0 || openM < 0 || closeM < 0 || pM < openM || pM >= closeM) {
+    return 'Выберите время получения в рабочее время филиала (' + slot.open + '–' + slot.close + ')';
+  }
+  const n = storeLocalNow(store, clientOffsetOf(data));
+  if (pDate < n.date) {
+    return 'Дата получения не может быть в прошлом. Выберите сегодняшний или следующий день.';
+  }
+  if (pDate === n.date) {
+    if (n.minutes >= closeM - 30) {
+      return 'Сегодня уже недоступно — филиал закрывается в ' + slot.close + '. Выберите другой день.';
+    }
+    if (pM < n.minutes + 30) {
+      return 'Время получения должно быть минимум через 30 минут от текущего времени';
+    }
+  }
+  return null;
+}
+
 async function handleTelegram(request, env) {
   const BOT_TOKEN = env.TG_BOT_TOKEN;
 
@@ -1604,6 +1708,8 @@ async function handleTelegram(request, env) {
   if (data.type === 'order') {
     const check = await validateOrderReservation(env, data);
     if (!check.ok) return check.res;
+    const schedErr = await validatePickupSchedule(env, data);
+    if (schedErr) return jsonResponse({ ok: false, error: 'schedule', message: schedErr }, 409);
     try { createdOrder = await createOrder(env, data); } catch (e) { console.error('createOrder error:', e); }
   }
 

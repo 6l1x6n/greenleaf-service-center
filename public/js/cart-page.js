@@ -139,10 +139,16 @@
         orderId: orderId(),
         storeId: state.storeId,
         items: t.lines.map(function (l) { return { productId: l.p.id, qty: l.qty }; }),
-        ttlSeconds: RESERVE_TTL
+        ttlSeconds: RESERVE_TTL,
+        tz_offset: -new Date().getTimezoneOffset()
       })
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d || !d.ok) {
+        if (d && d.error === 'closed' && window.Utils) {
+          Utils.showToast('⏰ ' + (d.message || 'Филиал сейчас закрыт — оформить можно в рабочее время'));
+          expiredState();
+          return;
+        }
         if (d && d.error === 'not enough' && window.Utils) {
           var pid = d.product && d.product.productId;
           var p = products.find(function (x) { return x.id === pid; });
@@ -472,7 +478,14 @@
     var picked = 0;
     for (var i = 0; picked < 7 && i < 14; i++) {
       var d = new Date(base.getTime() + i * 86400000);
-      if (sch && !sch[dayKeyOf(d)]) continue; // выходной — пропускаем
+      var dayS = sch ? sch[dayKeyOf(d)] : null;
+      if (sch && !dayS) continue; // выходной — пропускаем
+      // Сегодня недоступно, если филиал уже закрыт или до закрытия менее 30 минут
+      if (i === 0 && dayS) {
+        var closeM = slotMinutes(dayS.close);
+        var nowM = now.getHours() * 60 + now.getMinutes();
+        if (closeM < 0 || nowM >= closeM - 30) continue;
+      }
       var iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       opts.push('<option value="' + iso + '">' + pickupDateLabel(d) + '</option>');
       picked++;
