@@ -290,6 +290,33 @@
     }
   });
 
+  // Счётчик заказов на кнопке «Мои заказы»: запрос только если у устройства уже есть
+  // clientToken (у новых посетителей — 0 дополнительных запросов).
+  function refreshMyOrdersBadge() {
+    var token = null;
+    try { token = localStorage.getItem(CLIENT_TOKEN_KEY) || ''; } catch (e) { token = ''; }
+    if (!token) return;
+    fetch('/api/my-orders?token=' + encodeURIComponent(token))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var n = (d && d.orders) ? d.orders.length : 0;
+        if (!n) return;
+        document.querySelectorAll('.my-orders-link').forEach(function (btn) {
+          var count = btn.querySelector('.my-orders-count');
+          if (!count) {
+            count = document.createElement('span');
+            count.className = 'cart-badge my-orders-count';
+            btn.appendChild(count);
+          }
+          count.textContent = n;
+        });
+      })
+      .catch(function () { });
+  }
+
+  document.addEventListener('DOMContentLoaded', refreshMyOrdersBadge);
+  if (document.readyState === 'interactive' || document.readyState === 'complete') refreshMyOrdersBadge();
+
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;')

@@ -56,11 +56,22 @@
   function clear() { save([]); }
 
   function updateBadge() {
-    var badge = document.getElementById('cartCount');
-    if (!badge) return;
     var n = count();
-    badge.textContent = n > 99 ? '99+' : String(n);
-    badge.style.display = n ? 'inline-flex' : 'none';
+    var badge = document.getElementById('cartCount');
+    if (badge) {
+      badge.textContent = n > 99 ? '99+' : String(n);
+      badge.style.display = n ? 'inline-flex' : 'none';
+    }
+    // Плавающая кнопка корзины (видна, только когда в корзине есть товары)
+    var fab = document.getElementById('cartFab');
+    if (fab) {
+      fab.classList.toggle('hidden', !n);
+      var fabCount = document.getElementById('cartFabCount');
+      if (fabCount) {
+        fabCount.textContent = n > 99 ? '99+' : String(n);
+        fabCount.style.display = n ? 'inline-flex' : 'none';
+      }
+    }
   }
 
   document.addEventListener('change', function (e) {

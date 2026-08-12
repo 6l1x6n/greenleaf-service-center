@@ -395,23 +395,36 @@ async function scOwnStoreId(env, auth) {
 }
 
 // Подтверждённые заказы, по которым уже прошёл синк базы (base.updated > confirmedAt),
-// уходят в архив: суперадмин их видит в /api/orders?archive=1
+// уходят в архив: суперадмин их видит в /api/orders?archive=1.
+// Отменённые заказы хранятся 24 часа, затем тоже переносятся в архив
+// (у клиента из «Моих заказов» исчезают, у суперадмина остаётся аудит).
+const CANCELLED_RETENTION_MS = 24 * 3600 * 1000;
+
 async function archiveConfirmedOrders(env, url) {
   const base = await loadBaseStock(env, url);
   const baseUpdatedMs = base.updated ? new Date(base.updated).getTime() : 0;
-  if (!baseUpdatedMs) return;
   const orders = await loadOrders(env);
   let changed = false;
   const history = await kvGet(env, 'orders_history');
   Object.keys(orders).forEach((oid) => {
     const o = orders[oid];
-    if (!o || o.status !== 'confirmed') return;
-    const confirmedMs = o.confirmedAt ? new Date(o.confirmedAt).getTime() : 0;
-    if (confirmedMs && baseUpdatedMs > confirmedMs) {
-      o.archivedAt = new Date().toISOString();
-      history[oid] = o;
-      delete orders[oid];
-      changed = true;
+    if (!o) return;
+    if (o.status === 'confirmed' && baseUpdatedMs) {
+      const confirmedMs = o.confirmedAt ? new Date(o.confirmedAt).getTime() : 0;
+      if (confirmedMs && baseUpdatedMs > confirmedMs) {
+        o.archivedAt = new Date().toISOString();
+        history[oid] = o;
+        delete orders[oid];
+        changed = true;
+      }
+    } else if (o.status === 'cancelled' && o.cancelledAt) {
+      const cancelledMs = new Date(o.cancelledAt).getTime();
+      if (!isNaN(cancelledMs) && Date.now() - cancelledMs > CANCELLED_RETENTION_MS) {
+        o.archivedAt = new Date().toISOString();
+        history[oid] = o;
+        delete orders[oid];
+        changed = true;
+      }
     }
   });
   if (changed) {
@@ -422,11 +435,20 @@ async function archiveConfirmedOrders(env, url) {
 
 // Создание заказа из оформленной корзины: 2-минутный холд конвертируется в заказ,
 // который и держит резерв до подтверждения/отмены.
+// Бронь читаем напрямую по ключу (как в validateOrderReservation): обход списка
+// всех броней (activeReservations) опаздывает на KV-репликах, из-за чего заказ
+// молча не создавался («Заказ отправлен!» без заказа в базе).
 async function createOrder(env, data) {
   const orderId = String(data.order_id || data.orderId || '').trim();
   if (!orderId) return null;
-  const reservations = await activeReservations(env);
-  const res = reservations[orderId];
+  let res = null;
+  try {
+    const raw = await env.SC_STORES.get('res_' + orderId);
+    if (raw) {
+      const r = JSON.parse(raw);
+      if (r && r.expiresAt && r.expiresAt > Date.now()) res = r;
+    }
+  } catch (e) { /* нет брони или повреждена */ }
   if (!res || !res.items || !res.items.length) return null;
   let items = [];
   try {
@@ -574,6 +596,7 @@ async function handleMyOrders(request, env) {
   if (!token || token.length < 16) {
     return jsonResponse({ ok: false, error: 'token required' }, 400);
   }
+  await archiveConfirmedOrders(env, url);
   const stores = await kvGet(env, 'stores');
   const active = await loadOrders(env);
   const history = await kvGet(env, 'orders_history');
@@ -1162,6 +1185,50 @@ async function handleAdminProductsGet(env) {
   });
 }
 
+// POST /api/admin/parser-run {task: products|deliveries|all, full?} — запуск парсера
+// через GitHub Actions (workflow_dispatch). Только суперадмин. Требуется Worker-секрет GH_PAT.
+async function handleParserRun(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const pat = String(env.GH_PAT || '');
+  if (!pat) {
+    return jsonResponse({ ok: false, error: 'GH_PAT не настроен — кнопка недоступна' }, 400);
+  }
+  const task = String(body.task || 'all').trim();
+  if (['all', 'products', 'deliveries'].indexOf(task) === -1) {
+    return jsonResponse({ ok: false, error: 'task должен быть all|products|deliveries' }, 400);
+  }
+  const res = await fetch(
+    'https://api.github.com/repos/6l1x6n/greenleaf-service-center/actions/workflows/parse-catalog.yml/dispatches',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + pat,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'greenleaf-worker'
+      },
+      body: JSON.stringify({
+        ref: 'main',
+        inputs: {
+          task: task,
+          full: body.full === true ? 'true' : 'false',
+          skip_delay: 'true'
+        }
+      })
+    }
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(function () { return ''; });
+    return jsonResponse({ ok: false, error: 'GitHub: HTTP ' + res.status + ' ' + text.slice(0, 120) }, 502);
+  }
+  return jsonResponse({ ok: true, task: task, full: body.full === true });
+}
+
 // POST /api/admin/products — сохранение оверрайдов/настроек
 async function handleAdminProducts(request, env) {
   let body;
@@ -1646,6 +1713,7 @@ export default {
     // 1.5 Админские API (суперадмин по токену; /api/sc-stores, /api/orders — суперадмин или свой СЦ)
     if (path === '/api/sc-applications' || path === '/api/sc-application' || path === '/api/sc-store' ||
         path === '/api/sc-store/reset-password' || path === '/api/sc-stores' || path === '/api/admin/products' ||
+        path === '/api/admin/parser-run' ||
         path === '/api/sc-archive' || path === '/api/sc-archive/action' ||
         path === '/api/orders' || path === '/api/orders/action') {
       const auth = await verifyToken(env, request.headers.get('Authorization'));
@@ -1695,6 +1763,9 @@ export default {
       }
       if (path === '/api/admin/products' && request.method === 'POST') {
         return handleAdminProducts(request, env);
+      }
+      if (path === '/api/admin/parser-run' && request.method === 'POST') {
+        return handleParserRun(request, env);
       }
       if (path === '/api/sc-archive' && request.method === 'GET') {
         return handleScArchiveGet(env);

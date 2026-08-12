@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Парсер пушит через GITHUB_TOKEN — событие push для таких пушей GitHub не создаёт,
+  # поэтому деплоим после завершения прогона парсера (каталог обновляется на сайте).
+  workflow_run:
+    workflows: ["Parse catalog"]
+    types: [completed]
 
 permissions:
   contents: read

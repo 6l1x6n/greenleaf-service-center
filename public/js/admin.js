@@ -321,6 +321,16 @@
       '<button class="btn btn-primary btn-sm" data-go="catalog">📦 Наличие товаров в СЦ</button>' +
       '<button class="btn btn-primary btn-sm" data-go="orders">🛒 Заказы</button>' +
       '</div>' +
+      '</div>' +
+      '<div class="admin-card">' +
+      '<h4 style="margin-bottom:6px;">⚙️ Парсер каталога</h4>' +
+      '<p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Ручной запуск синхронизации с порталом (GitHub Actions). Результат появится на сайте через ~3–5 минут. Расписание 11:00/14:00/17:00/20:00 продолжает работать автоматически.</p>' +
+      '<div class="admin-actions" style="flex-wrap:wrap;">' +
+      '<button class="btn btn-outline btn-sm" id="parserRunProducts">🔄 Обновить товары</button>' +
+      '<button class="btn btn-outline btn-sm" id="parserRunDeliveries">🚚 Обновить поступления</button>' +
+      '<button class="btn btn-outline btn-sm" id="parserRunFull">⏳ Полный прогон товаров</button>' +
+      '</div>' +
+      '<p class="form-note" id="parserRunMsg" style="margin-top:8px;"></p>' +
       '</div>';
     content.insertAdjacentHTML('beforeend', html);
 
@@ -328,6 +338,33 @@
       var btn = content.querySelector('[data-go="' + name + '"]');
       if (btn) btn.addEventListener('click', function () { openSection(name); });
     });
+
+    function bindParserRun(btnId, task, full, label) {
+      var btn = content.querySelector(btnId);
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        if (!confirm('Запустить парсер: ' + label + '?')) return;
+        btn.disabled = true;
+        var msg = content.querySelector('#parserRunMsg');
+        if (msg) msg.textContent = '⏳ Запускаю…';
+        Auth.api('/api/admin/parser-run', { method: 'POST', body: JSON.stringify({ task: task, full: full }) }).then(function (res) {
+          if (res && res.ok) {
+            if (msg) msg.textContent = '✅ Запущено. Результат на сайте через ~3–5 минут.';
+            Utils.showToast('⚙️ Парсер запущен: ' + label);
+          } else {
+            if (msg) msg.textContent = '⚠️ ' + ((res && res.error) || 'Не удалось запустить');
+            Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось запустить парсер'));
+          }
+          btn.disabled = false;
+        }).catch(function () {
+          if (msg) msg.textContent = '⚠️ Нет связи — попробуйте ещё раз';
+          btn.disabled = false;
+        });
+      });
+    }
+    bindParserRun('#parserRunProducts', 'products', false, 'обновление товаров');
+    bindParserRun('#parserRunDeliveries', 'deliveries', false, 'обновление поступлений');
+    bindParserRun('#parserRunFull', 'products', true, 'полный прогон товаров');
   }
 
   function statCard(ico, val, lbl) {
