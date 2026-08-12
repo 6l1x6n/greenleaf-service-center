@@ -60,11 +60,23 @@
     return '';
   }
 
-  // Актуальный статус: оверрайд СЦ → глобальный → базовый
+  // Фактический остаток: по выбранному СЦ или сумма по всем филиалам (null — данных нет)
+  function stockCountOf(p) {
+    if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+      return StoreStock.count(state.selectedStoreId, p.id);
+    }
+    return StoreStock.totalCount ? StoreStock.totalCount(p.id) : null;
+  }
+
+  // Актуальный статус: оверрайд СЦ → глобальный → базовый;
+  // при нулевом остатке «Заканчивается»/«В наличии» принудительно становятся «Нет в наличии»
   function effectiveStatus(p) {
     var so = scOverrideFor(p);
-    if (so.status) return so.status;
-    return p.status;
+    var st = so.status || p.status;
+    if ((st === 'in_stock' || st === 'low') && stockCountOf(p) === 0) {
+      return 'out';
+    }
+    return st;
   }
 
   function statusInfo(p) {
@@ -114,6 +126,7 @@
 
   function rowHtml(p) {
     var st = statusInfo(p);
+    var outCls = st.meta === STATUS.out ? ' product-row-out' : '';
     var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
     var stockInSelectedStore = '';
     if (state.selectedStoreId && state.selectedStoreId !== 'all') {
@@ -150,7 +163,7 @@
     }
 
     return '' +
-      '<article class="product-row" data-product-id="' + Utils.esc(p.id) + '">' +
+      '<article class="product-row' + outCls + '" data-product-id="' + Utils.esc(p.id) + '">' +
       '<div class="row-media" data-open-detail="' + Utils.esc(p.id) + '">' +
       priorityBadge(p) +
       '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
@@ -839,7 +852,7 @@
       });
       var shown = names.slice(0, 5);
       var more = names.length - shown.length;
-      itemsHtml = '<div class="delivery-items">Прибудет: ' + shown.join('') +
+      itemsHtml = '<div class="delivery-items">Товары: ' + shown.join('') +
         (more > 0 ? '<span class="delivery-more" title="Открыть состав накладной">+' + more + '</span>' : '') +
         '</div>';
     } else if (d.itemsParsed === false) {
@@ -920,7 +933,7 @@
         storeTag = '<span class="delivery-store">Общая поставка</span>';
       }
       var itemsHtml = d.items
-        ? '<div class="delivery-items">Прибудет: ' + d.items.split(/[;,]/).map(function (i) {
+        ? '<div class="delivery-items">Товары: ' + d.items.split(/[;,]/).map(function (i) {
           var t = String(i).trim();
           return t ? Utils.deliveryItemHtml(products, t, '') : '';
         }).join('') + '</div>'

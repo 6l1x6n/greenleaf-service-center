@@ -392,7 +392,7 @@
 
     var waButtons = document.querySelectorAll('#waHero, #waContacts, #waFooter');
     waButtons.forEach(function (b) {
-      b.href = waLink('Здравствуйте! Интересует наличие эко-продукции Greenleaf.');
+      b.href = waLink('Здравствуйте!\nПишу из сайта mygreenleaf.\nИнтересует наличие эко-продукции');
     });
 
     // Восстановление пароля — по email (форма в cabinet.html), не через WhatsApp

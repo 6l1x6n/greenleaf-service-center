@@ -157,7 +157,6 @@ a:hover { text-decoration: none; }
   .nav { gap: 2px; }
   .nav a { padding: 0 8px; font-size: 12.5px; }
   .logo-text { font-size: 18px; }
-  .logo-text small { display: none; }
   #scAuthBtn { padding: 8px 10px; font-size: 12px; }
   .header-actions { gap: 8px; margin-left: 8px; }
 }
@@ -191,9 +190,23 @@ a:hover { text-decoration: none; }
     border-radius: 12px;
     width: 100%;
   }
-  /* «Мои заказы»/«Войти» живут в бургер-меню, из шапки убраны */
+}
+
+/* «Мои заказы»/«Войти» остаются в шапке до 570px — в бургер уходят только на очень узких */
+@media (max-width: 570px) {
   .header-actions .my-orders-link,
   .header-actions #scAuthBtn { display: none; }
+}
+/* ---------- Hero ---------- */
+.hero {
+  background:
+    radial-gradient(circle at 88% 18%, rgba(168, 224, 99, 0.20), transparent 42%),
+    radial-gradient(circle at 8% 85%, rgba(168, 224, 99, 0.12), transparent 40%),
+    linear-gradient(135deg, var(--green-darker) 0%, var(--green-dark) 52%, var(--green) 100%);
+  color: #fff;
+  padding: 68px 0 96px;
+  position: relative;
+  overflow: hidden;
 }
 .hero::before {
   content: "";
@@ -728,6 +741,14 @@ a:hover { text-decoration: none; }
   animation: fadeUp 0.3s ease both;
 }
 .product-row:hover { box-shadow: var(--shadow-lg); border-color: var(--green); }
+
+/* Товар без наличия — визуально тусклый */
+.product-row.product-row-out {
+  opacity: 0.55;
+  filter: grayscale(0.45);
+}
+.product-row.product-row-out .row-media img { filter: grayscale(0.8); }
+.product-row.product-row-out .btn { pointer-events: none; opacity: 0.5; }
 .row-media { grid-area: media; position: relative; }
 .badge-hot {
   position: absolute;
@@ -966,7 +987,7 @@ a:hover { text-decoration: none; }
 }
 
 /* ---------- Поставки ---------- */
-.deliveries-list { display: grid; gap: 14px; max-width: 800px; }
+.deliveries-list { display: grid; gap: 14px; max-width: 800px; margin: 0 auto; }
 .deliveries-scope {
   display: flex;
   align-items: center;
@@ -1294,6 +1315,7 @@ a:hover { text-decoration: none; }
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--line);
+  height: 300px;
   min-height: 300px;
 }
 .map-2gis {
@@ -1301,14 +1323,13 @@ a:hover { text-decoration: none; }
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 300px;
 }
 .map-2gis img {
   width: 100%;
   height: 100%;
-  min-height: 300px;
   object-fit: cover;
   display: block;
+  background: #eef2ee;
 }
 .map-2gis-overlay {
   position: absolute;
