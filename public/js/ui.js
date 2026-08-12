@@ -229,10 +229,11 @@
           (window.CatalogProducts || []).forEach(function (p) { byId[p.id] = p; });
           listEl.innerHTML = '<ul class="admin-list my-orders-list">' + orders.map(function (o) {
             var st = orderStatusMeta(o.status);
-            // Номер: #N (новые заказы), иначе — читаемый хвост id без «…»
+            // Номер: #N (новые заказы), иначе — читаемый суффикс id (без «…» и мусора)
             var oid = String(o.id || '');
             var isShort = /^GL-[A-Z0-9]{6}$/.test(oid);
-            var oidShow = o.number ? ('#' + o.number) : (isShort ? oid : oid.slice(-8).toUpperCase());
+            var suffix = oid.slice(oid.lastIndexOf('_') + 1).toUpperCase();
+            var oidShow = o.number ? ('#' + o.number) : (isShort ? oid : (suffix || oid));
             var itemsHtml = (o.items || []).map(function (i) {
               var p = byId[i.productId];
               var img = p ? (p.thumb || p.image) : '';
