@@ -194,18 +194,39 @@ async function handleStockSave(request, env) {
   return jsonResponse({ ok: true });
 }
 
+// Активные 2-минутные брони корзины.
+// Каждая бронь — отдельный ключ res_<orderId> с expirationTtl (KV сам удаляет
+// истёкшие). Отдельные ключи исключают гонку «прочитать-изменить-записать»,
+// из-за которой при параллельных резервах с двух устройств терялась бронь.
 async function activeReservations(env) {
-  const all = await kvGet(env, 'reservations');
   const now = Date.now();
-  let changed = false;
   const out = {};
-  Object.keys(all).forEach((id) => {
-    const r = all[id];
-    if (r && r.expiresAt && r.expiresAt > now) out[id] = r;
-    else { delete all[id]; changed = true; }
+  const listed = await env.SC_STORES.list({ prefix: 'res_' });
+  const keys = (listed.keys || []).map(function (k) { return k.name; });
+  if (!keys.length) return out;
+  const got = await env.SC_STORES.getMulti(keys);
+  (got || []).forEach(function (item) {
+    if (!item || !item.value) return;
+    try {
+      const r = JSON.parse(item.value);
+      const id = String(item.key).slice(4);
+      if (r && r.expiresAt && r.expiresAt > now) out[id] = r;
+    } catch (e) { /* повреждённая бронь — пропускаем */ }
   });
-  if (changed) await kvPut(env, 'reservations', all);
   return out;
+}
+
+// Сохранение брони отдельным ключом: без read-modify-write на общей карте
+async function saveReservation(env, orderId, hold, ttlMs) {
+  await env.SC_STORES.put('res_' + orderId, JSON.stringify(hold), {
+    expirationTtl: Math.max(1, Math.ceil(ttlMs / 1000))
+  });
+}
+
+async function deleteReservation(env, orderId) {
+  try {
+    await env.SC_STORES.delete('res_' + orderId);
+  } catch (e) { /* ключа нет — не страшно */ }
 }
 
 // Эффективные остатки: факт(парсер) − 2-мин холды − активные заказы (new)
@@ -288,8 +309,7 @@ async function handleReserve(request, env, url) {
   });
   if (error) return jsonResponse({ ok: false, error: 'not enough', product: error }, 409);
 
-  reservations[orderId] = { storeId, items, createdAt: new Date().toISOString(), expiresAt: now + ttl };
-  await kvPut(env, 'reservations', reservations);
+  await saveReservation(env, orderId, { storeId, items, createdAt: new Date().toISOString(), expiresAt: now + ttl }, ttl);
   return jsonResponse({ ok: true, expiresAt: now + ttl, ttlSeconds: ttl / 1000 });
 }
 
@@ -441,8 +461,7 @@ async function createOrder(env, data) {
   orders[orderId] = order;
   await kvPut(env, 'orders', orders);
   // Холд на 2 минуты больше не нужен — резерв держит сам заказ
-  delete reservations[orderId];
-  await kvPut(env, 'reservations', reservations);
+  await deleteReservation(env, orderId);
   console.log('Заказ создан:', orderId, 'СЦ', res.storeId, order.items.length, 'поз.');
   return order;
 }

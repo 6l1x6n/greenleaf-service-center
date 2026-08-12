@@ -25,7 +25,7 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+html { scroll-behavior: smooth; scroll-padding-top: 84px; overflow-x: hidden; }
 
 body {
   font-family: var(--font);
@@ -34,6 +34,7 @@ body {
   line-height: 1.55;
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 img { max-width: 100%; display: block; }
@@ -182,10 +183,28 @@ a:hover { text-decoration: none; }
     box-shadow: var(--shadow-lg);
     display: none;
     margin: 0;
+    max-height: calc(100vh - 68px);
+    overflow-y: auto;
   }
   .nav.open { display: flex; }
   .nav a { padding: 13px 14px; font-size: 17px; border-radius: 12px; width: 100%; }
+  .nav .nav-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+    padding: 13px 14px;
+    font-size: 16px;
+    border-radius: 12px;
+    width: 100%;
+  }
+  /* В шапке на мобильном — только логотип, корзина и бургер */
+  .header-actions .my-orders-link,
+  .header-actions #scAuthBtn { display: none; }
 }
+
+/* Кнопки «Мои заказы»/«Войти» в навигации показываются только на мобильных */
+.nav .nav-btn { display: none; }
 
 /* ---------- Hero ---------- */
 .hero {

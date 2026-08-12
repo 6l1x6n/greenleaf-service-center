@@ -138,7 +138,10 @@
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d || !d.ok) {
         if (d && d.error === 'not enough' && window.Utils) {
-          Utils.showToast('⚠️ Товаров в этом количестве уже нет — измените состав корзины');
+          var pid = d.product && d.product.productId;
+          var p = products.find(function (x) { return x.id === pid; });
+          var name = p ? p.name : (pid || 'товар');
+          Utils.showToast('⚠️ «' + name + '» сейчас зарезервирован другим покупателем — измените количество');
         }
         expiredState();
         return;

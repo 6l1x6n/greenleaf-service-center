@@ -71,22 +71,24 @@
   }
 
   function updateAuthBtn() {
-    var btn = document.getElementById('scAuthBtn');
-    if (!btn) return;
+    var buttons = document.querySelectorAll('.sc-auth-btn');
+    if (!buttons.length) return;
     var user = getCurrentUser();
-    if (user) {
-      btn.innerHTML = '🟢 ' + Utils.esc(user.name);
-      btn.classList.remove('btn-outline');
-      btn.classList.add('btn-primary');
-    } else {
-      btn.innerHTML = 'Войти';
-      btn.classList.remove('btn-primary');
-      btn.classList.add('btn-outline');
-    }
+    buttons.forEach(function (btn) {
+      if (user) {
+        btn.innerHTML = '🟢 ' + Utils.esc(user.name);
+        btn.classList.remove('btn-outline');
+        btn.classList.add('btn-primary');
+      } else {
+        btn.innerHTML = 'Войти';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline');
+      }
+    });
   }
 
   document.addEventListener('click', function (e) {
-    var btn = e.target.closest('#scAuthBtn');
+    var btn = e.target.closest('.sc-auth-btn');
     if (!btn) return;
     window.location.href = 'cabinet.html';
   });
