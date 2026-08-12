@@ -137,16 +137,20 @@
   function deliveryItemHtml(products, label, qty, exactProduct) {
     var txt = Utils.esc(String(label == null ? '' : label));
     var p = exactProduct || productByArticle(products, label);
-    var img = 'assets/images/products/placeholder.svg';
     var dataAttr = '';
     var cls = 'delivery-item';
+    var inner;
     if (p) {
-      img = p.thumb || p.image || img;
-      dataAttr = ' data-del-open="' + Utils.esc(p.id) + '"';
+      var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
       cls += ' has-prod';
+      dataAttr = ' data-del-open="' + Utils.esc(p.id) + '"';
+      inner = '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">';
+    } else {
+      // Товара ещё нет в каталоге — «часики»: фото появится после парсинга
+      inner = '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
     }
     return '<span class="' + cls + '"' + dataAttr + ' title="' + txt + '" style="cursor:pointer;">' +
-      '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
+      inner +
       (qty ? ' <b class="delivery-item-qty">× ' + Utils.esc(String(qty).replace(/^×\s*/, '')) + '</b>' : '') +
       '</span>';
   }

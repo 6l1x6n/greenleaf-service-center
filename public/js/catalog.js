@@ -961,9 +961,11 @@
       var p = null;
       if (l.sku) p = products.find(function (x) { return x.id === l.sku; }) || null;
       if (!p) p = Utils.productByArticle(products, l.label);
-      var img = p ? (p.thumb || p.image || 'assets/images/products/placeholder.svg') : 'assets/images/products/placeholder.svg';
+      var media = p
+        ? '<img class="delivery-item-img" src="' + Utils.esc(p.thumb || p.image || 'assets/images/products/placeholder.svg') + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
+        : '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
       return '<div class="delivery-detail-item">' +
-        '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+        media +
         '<span class="delivery-detail-name">' + Utils.esc(l.label) + '</span>' +
         (l.qty ? '<span class="muted-sku">' + Utils.esc(l.qty) + '</span>' : '') +
         '</div>';

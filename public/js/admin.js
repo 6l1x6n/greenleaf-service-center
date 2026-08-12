@@ -1018,6 +1018,8 @@
             if (p) {
               var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
               chip = '<img class="delivery-item-img" src="' + h(img) + '" alt="' + h(p.name) + '" onerror="this.style.display=\'none\'">';
+            } else {
+              chip = '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
             }
             return '<span class="delivery-item-chip">' + chip + h(name) + (qty ? ' · ' + h(qty) : '') + '</span>';
           }).join('') + '</div>';
