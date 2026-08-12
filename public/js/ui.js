@@ -184,7 +184,12 @@
   function openMyOrdersModal() {
     var token = clientToken();
     if (!token) { showToast('Не удалось определить устройство'); return; }
-    openModal('<h3>📦 Мои заказы</h3><p class="modal-product">Заказы, оформленные с этого устройства. Если заказ «Готов к выдаче» — можно забирать.</p><div id="myOrdersList">Загружаем…</div>');
+    openModal(
+      '<h3>📦 Мои заказы</h3>' +
+      '<div class="my-orders-info">ℹ️ Заказы, оформленные с этого устройства. Когда статус «Готов к выдаче» — товары можно забирать.</div>' +
+      '<div id="myOrdersList">Загружаем…</div>',
+      true
+    );
     var listEl = document.getElementById('myOrdersList');
     var render = function () {
       listEl.innerHTML = 'Загружаем…';
@@ -198,33 +203,45 @@
           }
           var byId = {};
           (window.CatalogProducts || []).forEach(function (p) { byId[p.id] = p; });
-          listEl.innerHTML = '<ul class="admin-list">' + orders.map(function (o) {
+          listEl.innerHTML = '<ul class="admin-list my-orders-list">' + orders.map(function (o) {
             var st = orderStatusMeta(o.status);
+            // Номер заказа: короткие GL-XXXXXX показываем целиком, старые o_… — компактно
+            var oid = String(o.id || '');
+            var isShort = /^GL-[A-Z0-9]{6}$/.test(oid);
+            var oidShow = isShort ? oid : ('№ …' + oid.slice(-6));
             var itemsHtml = (o.items || []).map(function (i) {
               var p = byId[i.productId];
               var img = p ? (p.thumb || p.image) : '';
               var name = i.name || (p ? p.name : '') || i.sku || i.productId;
               var unit = Number(i.price) || 0;
               var subtotal = unit ? (unit * (Number(i.qty) || 1)) : 0;
-              return '<span class="delivery-item-row order-receipt-row">' +
-                (img ? '<img class="delivery-item-img order-receipt-img" src="' + esc(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' : '') +
-                '<span class="order-receipt-name">' + esc(name) + '</span>' +
-                (unit ? '<span class="order-receipt-price">' + fmtPrice(unit) + ' × ' + esc(i.qty) + ' = <b>' + fmtPrice(subtotal) + '</b></span>' : '<span class="order-receipt-price">× ' + esc(i.qty) + '</span>') +
-                '</span>';
+              return '<div class="order-receipt-row">' +
+                (img ? '<img class="order-receipt-img" src="' + esc(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' : '<span class="order-receipt-img delivery-item-clock">⏳</span>') +
+                '<span class="order-receipt-name" title="' + esc(name) + '">' + esc(name) + '</span>' +
+                '<span class="order-receipt-qty">× ' + esc(i.qty) + '</span>' +
+                (unit ? '<span class="order-receipt-sum">' + fmtPrice(subtotal) + '</span>' : '') +
+                '</div>';
             }).join('');
-            var totalTxt = o.total ? '<span>💰 Итого: <b>' + esc(o.total) + ' ₸</b></span>' : '';
-            var payTxt = o.payment ? '<span>💳 ' + esc(o.payment) + '</span>' : '';
-            var discTxt = o.partnerMode ? '<span class="badge" style="background:#d1e7dd;color:#0a5c36;">🎫 Партнёрские цены −50%</span>' : '';
-            var pickupTxt = o.pickupDate ? '<span>📅 Забрать: ' + esc(o.pickupDate) + (o.pickupTime ? ' в ' + esc(o.pickupTime) : '') + '</span>' : '';
-            var idTxt = '<span style="font-size:12px;color:var(--muted);">🆔 ID клиента: ' + esc(token) + '</span>';
-            var noteTxt = o.managerNote ? '<p class="form-note" style="margin-top:6px;">💬 ' + esc(o.managerNote) + '</p>' : '';
+            var totalTxt = o.total ? '<b>' + fmtPrice(o.total) + '</b>' : '';
+            var payTxt = o.payment ? esc(o.payment) : '';
+            var discTxt = o.partnerMode ? '<span class="order-disc-badge">🎫 Партнёрские цены −50%</span>' : '';
+            var pickupTxt = o.pickupDate ? '<span class="order-pickup-chip">📅 Забрать: ' + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' })) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : '') + '</span>' : '';
+            var noteTxt = o.managerNote ? '<div class="order-manager-note"><b>💬 Менеджер:</b> ' + esc(o.managerNote) + '</div>' : '';
             return '<li>' +
+              '<div class="order-card-head">' +
+              '<span class="order-id-chip" title="' + esc(oid) + '">Заказ ' + esc(oidShow) +
+              '<button class="btn btn-outline btn-sm" type="button" data-copy-order="' + esc(oid) + '" title="Скопировать номер заказа">📋</button></span>' +
+              '<span class="' + st.cls + '">' + st.label + '</span>' +
+              '</div>' +
               '<div class="admin-list-main">' +
-              '<strong>' + esc(o.id) + ' <span class="' + st.cls + '">' + st.label + '</span></strong>' +
-              '<span>🏬 ' + esc(o.storeName || '—') + ' · 🕐 ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
-              '<div class="delivery-items order-receipt" style="margin:6px 0 0; display:flex; flex-direction:column; align-items:flex-start; gap:4px;">' + itemsHtml + '</div>' +
-              '<span style="font-size:13px;color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center;">' + [totalTxt, payTxt, discTxt, pickupTxt].filter(Boolean).join('') + '</span>' +
-              idTxt +
+              '<span class="order-meta">🏬 ' + esc(o.storeName || '—') + ' · 🕐 ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Almaty' })) + '</span>' +
+              '<div class="order-receipt">' + itemsHtml + '</div>' +
+              '<div class="order-summary">' +
+              (totalTxt ? '<span class="order-total">💰 Итого: ' + totalTxt + '</span>' : '') +
+              (payTxt ? '<span class="order-pay">💳 ' + payTxt + '</span>' : '') +
+              discTxt +
+              pickupTxt +
+              '</div>' +
               noteTxt +
               '</div>' +
               (o.status === 'new' ? '<div class="admin-actions"><button class="btn btn-outline btn-sm danger-btn" data-my-cancel="' + esc(o.id) + '">🚫 Отменить заказ</button></div>' : '') +
@@ -233,6 +250,14 @@
           '<div class="admin-actions" style="margin-top:12px;"><button class="btn btn-outline btn-sm" type="button" id="myOrdersRefreshBtn">🔄 Обновить</button></div>';
 
           listEl.addEventListener('click', function (e) {
+            var copyBtn = e.target.closest('[data-copy-order]');
+            if (copyBtn) {
+              var txt = copyBtn.getAttribute('data-copy-order');
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(txt).then(function () { showToast('📋 Номер заказа скопирован: ' + txt); });
+              }
+              return;
+            }
             var btn = e.target.closest('[data-my-cancel]');
             if (!btn) return;
             var oid = btn.getAttribute('data-my-cancel');

@@ -28,7 +28,13 @@
     if (!reserve.orderId) {
       try { reserve.orderId = sessionStorage.getItem(RESERVE_KEY) || ''; } catch (e) { }
       if (!reserve.orderId) {
-        reserve.orderId = 'o_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        // Короткий номер заказа GL-XXXXXX (без похожих символов 0/O, 1/I/L)
+        var alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        var code = '';
+        for (var i = 0; i < 6; i++) {
+          code += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+        }
+        reserve.orderId = 'GL-' + code;
         try { sessionStorage.setItem(RESERVE_KEY, reserve.orderId); } catch (e) { }
       }
     }
