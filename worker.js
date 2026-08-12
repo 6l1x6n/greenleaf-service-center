@@ -734,12 +734,8 @@ async function handleScStore(request, env, auth) {
   } catch (e) {
     return jsonResponse({ ok: false, error: 'invalid json' }, 400);
   }
-  // Сервис-Центр может сохранять только свой филиал
-  const isScRole = !!(auth && auth.role === 'sc');
-  if (isScRole && String(data.id || '').trim() !== String(auth.id || '')) {
-    return jsonResponse({ ok: false, error: 'forbidden' }, 403);
-  }
   // Сервис-Центр может сохранять только свой филиал (по логину кабинета)
+  const isScRole = !!(auth && auth.role === 'sc');
   const stores = await kvGet(env, 'stores');
   const scOwnId = isScRole ? await scOwnStoreId(env, auth) : null;
   if (isScRole && (!scOwnId || String(data.id || '').trim() !== String(scOwnId))) {
