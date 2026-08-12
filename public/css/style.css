@@ -749,12 +749,12 @@ a:hover { text-decoration: none; }
   line-height: 1.35;
 }
 .badge-hot.badge-p2 {
-  background: linear-gradient(135deg, #5b8def, #4a5fd0);
-  box-shadow: 0 2px 8px rgba(74, 95, 208, 0.35);
+  background: linear-gradient(135deg, #3ecf8e, #1fa36a);
+  box-shadow: 0 2px 8px rgba(31, 163, 106, 0.35);
 }
 .badge-hot.badge-p3 {
-  background: linear-gradient(135deg, #8a94a6, #5f6b7d);
-  box-shadow: 0 2px 8px rgba(95, 107, 125, 0.35);
+  background: linear-gradient(135deg, #a78bfa, #7c5ce0);
+  box-shadow: 0 2px 8px rgba(124, 92, 224, 0.35);
 }
 .row-media img {
   width: 64px;
