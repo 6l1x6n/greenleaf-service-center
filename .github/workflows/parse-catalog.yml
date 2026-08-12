@@ -3,8 +3,8 @@ name: Parse catalog
 on:
   schedule:
     # Астана (UTC+5): 11:00, 14:00, 17:00, 20:00 → UTC 06:00, 09:00, 12:00, 15:00.
-    # Утренний запуск 06:00 = полный (full): новые товары с утра + все остатки;
-    # остальные = инкрементальные (incr): только количества по артикулам.
+    # Все запуски «умные»: существующие товары — только количества, новые артикулы
+    # создаются с полными данными один раз (в любом запуске).
     - cron: "0 6,9,12,15 * * *"
   workflow_dispatch:
     inputs:
@@ -12,14 +12,10 @@ on:
         description: "Пропустить случайную задержку (для отладки)"
         type: boolean
         default: false
-      mode:
-        description: "Режим парсинга (auto = full в 06:00 UTC, incr в остальные)"
-        type: choice
-        default: auto
-        options:
-          - auto
-          - full
-          - incr
+      full:
+        description: "Полный прогон (перезапись названий/цен/фото существующих карточек)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -66,8 +62,7 @@ jobs:
         env:
           SC_LOGIN: ${{ secrets.SC_LOGIN }}
           SC_PASSWORD: ${{ secrets.SC_PASSWORD }}
-          PARSER_MODE: ${{ github.event.inputs.mode != 'auto' && github.event.inputs.mode || (github.event.schedule == '0 6 * * *' && 'full' || 'incr') }}
-        run: python scripts/parser/parser.py
+        run: python scripts/parser/parser.py ${{ github.event.inputs.full == 'true' && '--full' || '' }}
 
       - name: Upload diag (если парсер что-то сохранил)
         if: always()

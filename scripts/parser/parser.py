@@ -823,11 +823,11 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
     новые коды создают новые карточки. Описание не перезаписывается (заполняется
     только при создании карточки).
 
-    full=True  — полный режим (утренний запуск): обновляются название, категория,
-                 цена, фото существующих карточек (ловит утренние изменения).
-    full=False — инкрементальный (днём): существующие карточки обновляются ТОЛЬКО
-                 по количеству (по артикулу) — экономим запросы к порталу;
-                 новые товары всё равно создаются с полными данными."""
+    full=True  — ручной полный прогон (--full): обновляются название, категория,
+                 цена, фото существующих карточек.
+    full=False — умный режим (по умолчанию, все запуски): существующие карточки
+                 обновляются ТОЛЬКО по количеству (по артикулу) — экономим запросы
+                 к порталу; новые товары всё равно создаются с полными данными."""
     categories = config.get("categories", [])
     low_threshold = config.get("low_threshold", 6)
     multiplier = config.get("price_multiplier", 2)
@@ -1119,12 +1119,12 @@ def write_store_stock(products, config, active_ids=None):
 def run_parse_store(page, store_config, base_products, full=True):
     """Парсит каталог одного сервис-центра и вливает его в единую базу.
 
-    full=False (инкрементальный запуск): существующие карточки обновляются только
+    full=False (умный режим по умолчанию): существующие карточки обновляются только
     по количеству — без перезаписи названий/цен/фото. Описания и карта товаров
     портала запрашиваются только для новых артикулов (их полные данные вносятся
-    один раз при создании карточки)."""
+    один раз при создании карточки). Полный прогон — флаг --full."""
     sc_id = store_config["sc_id"]
-    print(f"--- Сервис-Центр: {sc_id} (режим: {'full' if full else 'incr'}) ---")
+    print(f"--- Сервис-Центр: {sc_id} (режим: {'полный' if full else 'умный'}) ---")
     login(page, store_config)
     open_shop(page, store_config)
     items = scrape_goods(page, store_config)
@@ -1147,8 +1147,7 @@ def run_parse_store(page, store_config, base_products, full=True):
         descriptions = scrape_descriptions(new_items, goods_map, store_config)
     else:
         descriptions = {}
-        if not full:
-            print("Новых товаров нет — карта портала и описания не запрашиваются")
+        print("Новых товаров нет — карта портала и описания не запрашиваются")
 
     images = download_images(items, store_config, page.request)
     return merge_sc_items(base_products, items, sc_id, store_config, images, descriptions, full=full)
@@ -1156,10 +1155,10 @@ def run_parse_store(page, store_config, base_products, full=True):
 
 def main():
     moves_only = "--moves-only" in sys.argv
-    # Режим: full (утренний запуск 11:00 Астаны) или incr (14:00/17:00/20:00).
-    # По умолчанию incr; GitHub Actions передаёт PARSER_MODE.
-    mode = os.environ.get("PARSER_MODE", "incr").strip().lower()
-    full = mode == "full"
+    # Всегда «умный» режим: существующие карточки обновляются только по количеству,
+    # новые артикулы (в любом запуске) создаются с полными данными один раз.
+    # Редкий ручной полный прогон (перезапись названий/цен/фото) — флаг --full.
+    full = "--full" in sys.argv
     config = load_config()
     try:
         if moves_only:
@@ -1187,7 +1186,7 @@ def main():
             central = config.get("central_store_id", "s240534")
             active_ids = active_store_ids(config)
             base_products = load_base_products()
-            print(f"База товаров: {len(base_products)} карточек, режим: {'full' if full else 'incr'}, СЦ: {[s['id'] for s in stores]}")
+            print(f"База товаров: {len(base_products)} карточек, режим: {'полный' if full else 'умный'}, СЦ: {[s['id'] for s in stores]}")
             for store in stores:
                 store_config = build_store_config(config, store)
                 base_products = run_parse_store(page, store_config, base_products, full=full)
