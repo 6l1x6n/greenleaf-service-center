@@ -85,28 +85,9 @@
     return list;
   }
 
-  function applyStoreOverrides() {
-    var saved = lsGet(KEYS.stores) || {};
-    Object.keys(saved).forEach(function (id) {
-      var idx = state.stores.findIndex(function (s) { return s.id === id; });
-      if (idx >= 0) {
-        state.stores[idx] = Object.assign({}, state.stores[idx], saved[id]);
-      } else {
-        state.stores.push(Object.assign({}, saved[id], { id: id }));
-      }
-    });
-  }
-
-  function applyProductOverrides() {
-    var saved = lsGet(KEYS.products) || {};
-    state.products.forEach(function (p) {
-      var o = saved[p.id];
-      if (!o) return;
-      ['price', 'status', 'eta', 'incoming', 'description', 'category'].forEach(function (f) {
-        if (o[f] !== undefined && o[f] !== '') p[f] = o[f];
-      });
-    });
-  }
+  // Устаревшие localStorage-оверрайды СЦ/товаров больше не применяются:
+  // источник правок — KV Worker (/api/sc-stores, /data/products.json).
+  // Иначе старые значения из localStorage маскируют свежие правки («не меняется»).
 
   // Поставки: базовый JSON → глобальный оверрайд суперадмина → пер-филиальные оверрайды СЦ
   function mergeDeliveries(base) {
@@ -133,8 +114,10 @@
     return result;
   }
 
-  // Сохранение списка поставок: глобальные — в общий оверрайд, филиальные — в пер-филиальную карту
+  // Сохранение списка поставок: глобальные — в общий оверрайд, филиальные — в пер-филиальную карту.
+  // Правки уходят в Worker KV (/api/deliveries) — видны посетителям и СЦ на всех устройствах.
   function saveDeliveries(list) {
+    Auth.api('/api/deliveries', { method: 'POST', body: JSON.stringify({ deliveries: list }) }).catch(function () { });
     if (isSuper()) {
       var globals = list.filter(function (d) { return !d.storeId; });
       lsSet(KEYS.deliveries, globals);
@@ -192,7 +175,13 @@
           .catch(function () { return base; });
       });
     var p2 = loadJSON('data/products.json').then(function (d) { return d.products || []; }).catch(function () { return []; });
-    var p3 = loadJSON('data/deliveries.json').then(function (d) { return mergeDeliveries(d.deliveries || []); }).catch(function () { return mergeDeliveries([]); });
+    // Поставки — из Worker KV (общие для всех устройств); при недоступности — статика + локальные
+    var p3 = fetch('/api/deliveries')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { return (d && d.deliveries) || []; })
+      .catch(function () {
+        return loadJSON('data/deliveries.json').then(function (d) { return mergeDeliveries(d.deliveries || []); }).catch(function () { return mergeDeliveries([]); });
+      });
     var p4 = Auth.api('/api/events')
       .then(function (d) { return (d && d.events) || []; })
       .catch(function () {
@@ -238,8 +227,6 @@
       state.siteSettings = Object.assign({ showDiscountPrices: true, categories: [] }, res[7].settings || {});
       state.pendingProductChanges = {};
       state.pendingScChanges = {};
-      applyStoreOverrides();
-      applyProductOverrides();
       // Стабильные строковые id: у базовых поставок/мероприятий их нет или они числа
       state.deliveries.forEach(function (d) {
         if (d.id === undefined || d.id === null) d.id = 'del_' + shortHash((d.date || '') + '|' + (d.note || '') + '|' + (d.storeId || ''));
@@ -374,9 +361,10 @@
   // ---------------- Кабинет СЦ (контакты своего филиала) ----------------
 
   function renderCabinet(content) {
-    var store = state.stores.find(function (s) { return s.id === state.user.id; }) || {
-      id: state.user.id, name: state.user.name, address: '', hours: '', phone: '', whatsapp: '', description: ''
-    };
+    var store = state.stores.find(function (s) { return s.id === state.user.id; }) ||
+      state.stores.find(function (s) { return String(s.authLogin || '').toLowerCase() === String(state.user.login || '').toLowerCase(); }) || {
+        id: state.user.id, name: state.user.name, address: '', hours: '', phone: '', whatsapp: '', description: ''
+      };
     content.insertAdjacentHTML('beforeend',
       '<div class="admin-note">⚙️ Управляете контактами своего филиала — они показываются посетителям на сайте.</div>' +
       '<form class="form admin-form" id="storeForm">' + storeFormHtml(store, false) + '</form>'
@@ -409,8 +397,8 @@
             Utils.scheduleFormHtml(store) +
       '<p class="form-note" style="max-width:360px;">🕐 Часы работы — по времени Астаны (UTC+5), общий часовой пояс для всех филиалов. Бронь и выдача проверяются по нему.</p>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
-      '<div class="form-group"><label>Фото (путь или ссылка) *</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..." required>' + imagePreview + '</div>' +
-      '<div class="form-group"><label>Краткое описание филиала *</label><textarea name="description" required>' + h(store.description) + '</textarea></div>' +
+      '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."' + (store.image ? '' : '') + '>' + imagePreview + '</div>' +
+      '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
       '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
       '<strong style="font-size:14px;">🔐 Доступ к кабинету сайта</strong>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
@@ -440,6 +428,7 @@
       '<button class="btn btn-primary" type="submit">💾 Сохранить филиал</button>' +
       (withAuth ? '<button class="btn btn-outline danger-btn" type="button" id="storeDeleteBtn">' + Utils.iconTrash(14) + 'Удалить филиал</button>' : '') +
       '</div>' +
+      '<p class="form-error hidden">Проверьте заполнение полей.</p>' +
       '</div>';
   }
 
@@ -453,7 +442,7 @@
     }
     return '<div class="admin-card" style="border-color:var(--green); margin-top:12px;">' +
       '<strong style="color:var(--green-darker);">🔐 Доступ для Сервис-Центра</strong>' +
-      '<p style="margin:6px 0;">Логин: <b>' + h(rec.authLogin) + '</b><br>Пароль: <b>' + h(rec.authPassword) + '</b></p>' +
+      '<p style="margin:6px 0;">Логин: <b>' + h(rec.authLogin || '') + '</b><br>Пароль: <b>' + h(rec.authPassword || '') + '</b></p>' +
       '<p class="form-note">Доступы передаёт суперадмин лично — почтовые письма не используются.</p>' +
       '<div class="admin-actions">' +
       '<button class="btn btn-outline btn-sm" data-copy="' + h(rec.authLogin + ' / ' + rec.authPassword) + '">📋 Копировать</button>' +
@@ -474,21 +463,27 @@
       e.preventDefault();
       var errMsg = form.querySelector('.form-error');
       var errors = [];
-      ['storeName', 'city', 'address', 'hours', 'phone', 'image', 'description'].forEach(function (f) {
+      ['storeName', 'city', 'address', 'phone'].forEach(function (f) {
         if (!form[f] || !String(form[f].value || '').trim()) errors.push(f);
       });
       if (errors.length) {
-        if (errMsg) errMsg.classList.remove('hidden');
+        form.classList.remove('show-success');
+        form.classList.add('show-error');
+        if (errMsg) errMsg.textContent = 'Не заполнены обязательные поля: ' + errors.join(', ');
+        Utils.showToast('⚠️ Не заполнены обязательные поля: ' + errors.join(', '));
         return;
       }
-      if (errMsg) errMsg.classList.add('hidden');
       // Расписание из селекторов; если все дни — выходной, не сохраняем
       var schedule = Utils.collectSchedule(form);
-      var hoursText = schedule ? Utils.scheduleToText(schedule) : (form.hours ? form.hours.value.trim() : '');
+      var hoursText = schedule ? Utils.scheduleToText(schedule) : '';
       if (!schedule) {
-        if (errMsg) errMsg.classList.remove('hidden');
+        form.classList.remove('show-success');
+        form.classList.add('show-error');
+        if (errMsg) errMsg.textContent = 'Укажите часы работы хотя бы в один день недели (снимите «Выходной — закрыто»).';
+        Utils.showToast('⚠️ Укажите часы работы хотя бы в один день недели');
         return;
       }
+      form.classList.remove('show-error');
       store.name = form.storeName.value.trim();
       store.city = form.city.value;
       store.cityKey = form.city.value.toLowerCase();
@@ -532,7 +527,11 @@
       };
       Auth.api('/api/sc-store', { method: 'POST', body: JSON.stringify(payload) }).then(function (data) {
         if (!data || !data.ok) {
-          Utils.showToast('⚠️ Не удалось сохранить в Worker. Войдите заново (сессия истекла).');
+          var reason = (data && data.error) || 'Не удалось сохранить. Проверьте соединение и попробуйте ещё раз.';
+          form.classList.remove('show-success');
+          form.classList.add('show-error');
+          if (errMsg) errMsg.textContent = reason;
+          Utils.showToast('⚠️ ' + reason);
           return;
         }
         var rec = data.store;
@@ -544,13 +543,15 @@
           Auth.api('/api/sc-application', { method: 'POST', body: JSON.stringify({ id: state.lastAppId, action: 'approve' }) });
           state.lastAppId = null;
         }
-        var credsPanel = content.querySelector('#issuedCreds');
-        if (!credsPanel) {
-          credsPanel = document.createElement('div');
-          credsPanel.id = 'issuedCreds';
-          content.appendChild(credsPanel);
+        if (isSuper()) {
+          var credsPanel = content.querySelector('#issuedCreds');
+          if (!credsPanel) {
+            credsPanel = document.createElement('div');
+            credsPanel.id = 'issuedCreds';
+            content.appendChild(credsPanel);
+          }
+          credsPanel.innerHTML = issuedCredsHtml(rec, store.phoneRaw || store.phone);
         }
-        credsPanel.innerHTML = issuedCredsHtml(rec, store.phoneRaw || store.phone);
         loadData().then(function () { openSection(state.section); });
       });
     });
@@ -595,7 +596,7 @@
             }
             credsPanel.innerHTML = issuedCredsHtml({ id: store.id, authLogin: res.login, authPassword: res.password }, store.phoneRaw || store.phone);
           } else {
-            Utils.showToast('⚠️ Не удалось сбросить пароль. Войдите заново (сессия истекла).');
+            Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сбросить пароль. Проверьте соединение.'));
           }
         });
       });
@@ -607,7 +608,7 @@
         if (!confirm('Удалить филиал «' + store.name + '»? Он исчезнет с сайта, но останется в архиве — оттуда его можно восстановить.')) return;
         Auth.api('/api/sc-store', { method: 'DELETE', body: JSON.stringify({ id: store.id }) }).then(function (res) {
           state.editingStoreId = null;
-          Utils.showToast(res && res.ok ? '✅ Филиал перемещён в архив' : '⚠️ Не удалось удалить. Войдите заново (сессия истекла).');
+          Utils.showToast(res && res.ok ? '✅ Филиал перемещён в архив' : '⚠️ ' + ((res && res.error) || 'Не удалось удалить. Проверьте соединение.'));
           loadData().then(function () { openSection('sc'); });
         });
       });
@@ -665,7 +666,7 @@
       var s = list.find(function (x) { return x.id === sid; });
       if (!confirm('Удалить филиал «' + (s ? s.name : sid) + '»? Он исчезнет с сайта, но останется в архиве — оттуда его можно восстановить.')) return;
       Auth.api('/api/sc-store', { method: 'DELETE', body: JSON.stringify({ id: sid }) }).then(function (res) {
-        Utils.showToast(res && res.ok ? '✅ Филиал перемещён в архив' : '⚠️ Не удалось удалить. Войдите заново (сессия истекла).');
+        Utils.showToast(res && res.ok ? '✅ Филиал перемещён в архив' : '⚠️ ' + ((res && res.error) || 'Не удалось удалить. Проверьте соединение.'));
         state.editingStoreId = null;
         loadData().then(function () { openSection('sc'); });
       });
@@ -751,7 +752,7 @@
           var rid = restoreBtn.getAttribute('data-sc-archive-restore');
           if (!confirm('Восстановить филиал «' + rid + '»? Он снова появится на сайте.')) return;
           Auth.api('/api/sc-archive/action', { method: 'POST', body: JSON.stringify({ id: rid, action: 'restore' }) }).then(function (res) {
-            Utils.showToast(res && res.ok ? '✅ Филиал восстановлен' : '⚠️ Не удалось восстановить. Войдите заново (сессия истекла).');
+            Utils.showToast(res && res.ok ? '✅ Филиал восстановлен' : '⚠️ ' + ((res && res.error) || 'Не удалось восстановить. Проверьте соединение.'));
             openSection('scArchive');
           });
           return;
@@ -761,7 +762,7 @@
         var pid = purgeBtn.getAttribute('data-sc-archive-purge');
         if (!confirm('Удалить филиал «' + pid + '» НАВСЕГДА? Это действие необратимо.')) return;
         Auth.api('/api/sc-archive/action', { method: 'POST', body: JSON.stringify({ id: pid, action: 'purge' }) }).then(function (res) {
-          Utils.showToast(res && res.ok ? '🗑 Удалён безвозвратно' : '⚠️ Не удалось удалить. Войдите заново (сессия истекла).');
+          Utils.showToast(res && res.ok ? '🗑 Удалён безвозвратно' : '⚠️ ' + ((res && res.error) || 'Не удалось удалить. Проверьте соединение.'));
           openSection('scArchive');
         });
       });
@@ -876,7 +877,7 @@
             Utils.showToast('✅ Остатки филиала сохранены — сайт обновлён');
             return StoreStock.reload();
           }
-          Utils.showToast('⚠️ Не удалось сохранить. Войдите заново (сессия истекла).');
+          Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сохранить. Проверьте соединение.'));
           return null;
         }).then(function () {
           loadData().then(function () { openSection(state.section); });
@@ -1500,9 +1501,15 @@
     );
 
     var load = function () {
+      var showArchive = isSuper() && !!state.orderShowArchive;
       var url = '/api/orders' + (showArchive ? '?archive=1' : '');
       Auth.api(url).then(function (d) {
         var orders = (d && d.orders) || [];
+        // Фильтр по филиалу (суперадмин): применяем к загруженному списку
+        var sf = state.orderStoreFilter;
+        if (isSuper() && sf && sf !== 'all') {
+          orders = orders.filter(function (o) { return String(o.storeId) === sf; });
+        }
         var listEl = content.querySelector('#ordersList');
         if (!orders.length) {
           listEl.innerHTML = '<div class="owner-req-empty">' + (showArchive ? 'Архив пуст.' : 'Заказов пока нет.') + '</div>';
@@ -1815,7 +1822,7 @@
                 drawRows();
                 Utils.showToast('🚫 Товар скрыт с сайта');
               } else {
-                Utils.showToast('⚠️ Не удалось сохранить. Войдите заново (сессия истекла).');
+                Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сохранить. Проверьте соединение.'));
               }
             })
             .catch(function () { Utils.showToast('⚠️ Сеть недоступна — попробуйте ещё раз'); });
@@ -1836,7 +1843,7 @@
               drawRows();
               Utils.showToast('✅ Товар снова виден на сайте');
             } else {
-              Utils.showToast('⚠️ Не удалось сохранить. Войдите заново (сессия истекла).');
+              Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сохранить. Проверьте соединение.'));
             }
           })
           .catch(function () { Utils.showToast('⚠️ Сеть недоступна — попробуйте ещё раз'); });
@@ -1917,9 +1924,10 @@
           edits[prodId][field] = '';
           return;
         }
-        if (val === '' || val === curStr) return;
+        // Пустое значение = снять правку (вернуть базовую цену/описание)
+        if (val === curStr) return;
         if (!edits[prodId]) edits[prodId] = {};
-        edits[prodId][field] = field === 'price' || field === 'discount_price' ? parseFloat(val) : val;
+        edits[prodId][field] = (field === 'price' || field === 'discount_price' || val === '') ? (val === '' ? '' : parseFloat(val)) : val;
       });
       var btn = content.querySelector('#prodSaveBtn');
       btn.disabled = true;
@@ -1929,7 +1937,7 @@
         if (ok) {
           Utils.showToast('✅ Изменения сохранены — применены на сайте');
         } else {
-          Utils.showToast('⚠️ Не удалось сохранить в Worker. Войдите заново (сессия истекла).');
+          Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сохранить. Проверьте соединение.'));
         }
         btn.disabled = false;
         btn.textContent = '💾 Сохранить изменения';
@@ -1947,7 +1955,7 @@
         if (res && res.ok) {
           Utils.showToast('🧹 Все правки товаров сброшены');
         } else {
-          Utils.showToast('⚠️ Не удалось сбросить. Войдите заново (сессия истекла).');
+          Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сбросить. Проверьте соединение.'));
         }
         loadData().then(function () { openSection(state.section); });
       });
@@ -2046,9 +2054,10 @@
         var val = el.value.trim();
         var cur = (state.scProductOverrides[scId] || {})[pid] ? state.scProductOverrides[scId][pid][field] : null;
         var curStr = cur == null ? '' : String(cur);
-        if (val === '' || val === curStr) return;
+        // Пустое значение = снять правку филиала (вернуть базовую цену/статус)
+        if (val === curStr) return;
         if (!edits[pid]) edits[pid] = {};
-        edits[pid][field] = field === 'price' || field === 'discount_price' ? parseFloat(val) : val;
+        edits[pid][field] = (field === 'price' || field === 'discount_price' || val === '') ? (val === '' ? '' : parseFloat(val)) : val;
       });
       var items = Object.keys(edits).map(function (pid) {
         return Object.assign({ productId: pid }, edits[pid]);
@@ -2060,7 +2069,7 @@
         if (data && data.ok) {
           Utils.showToast('✅ Настройки филиала сохранены');
         } else {
-          Utils.showToast('⚠️ Не удалось сохранить в Worker. Войдите заново (сессия истекла).');
+          Utils.showToast('⚠️ ' + ((data && data.error) || 'Не удалось сохранить. Проверьте соединение.'));
         }
         btn.disabled = false;
         btn.textContent = '💾 Сохранить настройки филиала';
@@ -2080,7 +2089,7 @@
           Utils.showToast('🧹 Настройки филиала сброшены');
           loadData().then(function () { openSection(state.section); });
         } else {
-          Utils.showToast('⚠️ Не удалось сбросить. Войдите заново (сессия истекла).');
+          Utils.showToast('⚠️ ' + ((data && data.error) || 'Не удалось сбросить. Проверьте соединение.'));
         }
       });
     });
@@ -2110,7 +2119,7 @@
             Utils.showToast('✅ Остатки филиала сохранены — сайт обновлён');
             return StoreStock.reload();
           }
-          Utils.showToast('⚠️ Не удалось сохранить. Войдите заново (сессия истекла).');
+          Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сохранить. Проверьте соединение.'));
           return null;
         }).then(function () {
           loadData().then(function () { openSection(state.section); });
@@ -2183,10 +2192,24 @@
     }
   }
 
-  // ---------------- Уведомления СЦ ----------------
+  // ---------------- Уведомления СЦ (KV — видны СЦ на всех устройствах) ----------------
 
   function renderNotices(content) {
-    var notices = lsGet(KEYS.notices) || [];
+    var notices = [];
+
+    function draw() {
+      var listEl = content.querySelector('#noticeList');
+      if (!listEl) return;
+      listEl.innerHTML = (notices.length ? notices.map(function (n) {
+        return '<li><div class="admin-list-main"><strong>' + h(new Date(n.date).toLocaleString('ru-RU')) + '</strong><span>' + h(n.text) + '</span></div>' +
+          (isSuper() ? '<div class="admin-actions"><button class="btn btn-outline btn-sm danger-btn" data-notice-remove="' + h(n.id) + '">🗑</button></div>' : '') +
+          '</li>';
+      }).join('') : '<li style="color:var(--muted);">Уведомлений пока нет.</li>') + '</ul>';
+    }
+
+    function save() {
+      Auth.api('/api/notices', { method: 'POST', body: JSON.stringify({ notices: notices }) }).catch(function () { });
+    }
 
     if (isSuper()) {
       content.insertAdjacentHTML('beforeend',
@@ -2197,7 +2220,7 @@
         '<button class="btn btn-primary" type="submit">💾 Сохранить уведомление</button>' +
         '<button class="btn btn-whatsapp" type="button" id="noticeTgBtn">✈️ Сохранить и отправить в Telegram</button>' +
         '</div>' +
-        '<p style="margin-top:10px; font-size:13px; color:var(--muted);">Уведомления видны в кабинетах СЦ на этом устройстве. Отправка в Telegram приходит вам (единый чат владельца).</p>' +
+        '<p style="margin-top:10px; font-size:13px; color:var(--muted);">Уведомления видны в кабинетах СЦ на всех устройствах. Отправка в Telegram приходит вам (единый чат владельца).</p>' +
         '</form>'
       );
 
@@ -2205,9 +2228,8 @@
       function addNotice(sendTg) {
         var text = form.notice.value.trim();
         if (!text) { Utils.showToast('Введите текст уведомления'); return; }
-        var list = lsGet(KEYS.notices) || [];
-        list.unshift({ id: 'n_' + Date.now(), text: text, date: new Date().toISOString() });
-        lsSet(KEYS.notices, list);
+        notices.unshift({ id: 'n_' + Date.now(), text: text, date: new Date().toISOString() });
+        save();
         if (sendTg) {
           fetch('/telegram', {
             method: 'POST',
@@ -2219,28 +2241,31 @@
         } else {
           Utils.showToast('✅ Уведомление сохранено');
         }
-        openSection('notices');
+        draw();
+        form.notice.value = '';
       }
       form.addEventListener('submit', function (e) { e.preventDefault(); addNotice(false); });
       form.querySelector('#noticeTgBtn').addEventListener('click', function () { addNotice(true); });
     }
 
-    var html = '<div class="admin-card"><h4 style="margin-bottom:10px;">История уведомлений</h4><ul class="admin-list">' +
-      (notices.length ? notices.map(function (n) {
-        return '<li><div class="admin-list-main"><strong>' + h(new Date(n.date).toLocaleString('ru-RU')) + '</strong><span>' + h(n.text) + '</span></div>' +
-          (isSuper() ? '<div class="admin-actions"><button class="btn btn-outline btn-sm danger-btn" data-notice-remove="' + h(n.id) + '">🗑</button></div>' : '') +
-          '</li>';
-      }).join('') : '<li style="color:var(--muted);">Уведомлений пока нет.</li>') +
-      '</ul></div>';
-    content.insertAdjacentHTML('beforeend', html);
+    content.insertAdjacentHTML('beforeend',
+      '<div class="admin-card"><h4 style="margin-bottom:10px;">История уведомлений</h4><ul class="admin-list" id="noticeList">Загружаем…</ul></div>'
+    );
+
+    Auth.api('/api/notices').then(function (d) {
+      notices = (d && d.notices) || [];
+      draw();
+    }).catch(function () {
+      draw();
+    });
 
     content.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-notice-remove]');
       if (!btn) return;
       var id = btn.getAttribute('data-notice-remove');
-      var list = (lsGet(KEYS.notices) || []).filter(function (n) { return n.id !== id; });
-      lsSet(KEYS.notices, list);
-      openSection('notices');
+      notices = notices.filter(function (n) { return n.id !== id; });
+      save();
+      draw();
     });
   }
 

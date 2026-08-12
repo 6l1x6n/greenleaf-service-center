@@ -415,8 +415,8 @@
   }
 
   function pickupDateLabel(d) {
-    var today = new Date();
-    var base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    var ast = astanaNow();
+    var base = new Date(ast.date + 'T00:00:00');
     var diff = Math.round((d.getTime() - base.getTime()) / 86400000);
     if (diff === 0) return 'Сегодня, ' + d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
     if (diff === 1) return 'Завтра, ' + d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
@@ -437,11 +437,28 @@
     return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
   }
 
+  // «Сейчас» в часовом поясе Астаны (UTC+5): расписание филиалов задаётся в этом времени.
+  // Без пересчёта ночь по Астане была бы «вчера» по местному времени посетителя.
+  function astanaNow() {
+    var parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Almaty', hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+    }).formatToParts(new Date());
+    var get = function (t) { var p = parts.find(function (x) { return x.type === t; }); return p ? Number(p.value) : 0; };
+    var y = get('year'), mo = get('month'), d = get('day');
+    return {
+      date: y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0'),
+      minutes: get('hour') * 60 + get('minute'),
+      dayKey: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(y, mo - 1, d).getDay()]
+    };
+  }
+
   // Ближайший рабочий слот выдачи: следующий рабочий день + время открытия
   function nextPickupSlot() {
     var sch = storeSchedule();
     if (!sch) return null;
-    var d = new Date();
+    var ast = astanaNow();
+    var d = new Date(ast.date + 'T00:00:00');
     d.setDate(d.getDate() + 1);
     for (var i = 0; i < 9; i++) {
       var s = sch[dayKeyOf(d)];
@@ -454,9 +471,9 @@
   function pickupHintText() {
     var sch = storeSchedule();
     if (!sch) return '';
-    var now = new Date();
-    var slot = sch[dayKeyOf(now)];
-    var curMin = now.getHours() * 60 + now.getMinutes();
+    var ast = astanaNow();
+    var slot = sch[ast.dayKey];
+    var curMin = ast.minutes;
     var workingNow = slot && curMin >= slotMinutes(slot.open) && curMin <= slotMinutes(slot.close) - 30;
     var slot2 = nextPickupSlot();
     if (!slot2) return '';
@@ -472,8 +489,8 @@
     if (!date || !time) return;
     var sch = storeSchedule();
     var opts = [];
-    var now = new Date();
-    var base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var ast = astanaNow();
+    var base = new Date(ast.date + 'T00:00:00');
     var picked = 0;
     for (var i = 0; picked < 7 && i < 14; i++) {
       var d = new Date(base.getTime() + i * 86400000);
@@ -482,8 +499,7 @@
       // Сегодня недоступно, если филиал уже закрыт или до закрытия менее 30 минут
       if (i === 0 && dayS) {
         var closeM = slotMinutes(dayS.close);
-        var nowM = now.getHours() * 60 + now.getMinutes();
-        if (closeM < 0 || nowM >= closeM - 30) continue;
+        if (closeM < 0 || ast.minutes >= closeM - 30) continue;
       }
       var iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       opts.push('<option value="' + iso + '">' + pickupDateLabel(d) + '</option>');
@@ -493,23 +509,26 @@
     function buildTimes() {
       var minMin = 9 * 60;
       var maxMin = 19 * 60 + 30;
+      var excludeEnd = false;
       if (sch) {
         var slot = sch[dayKeyOf(new Date(date.value + 'T00:00:00'))];
         if (slot) {
           var oM = slotMinutes(slot.open);
           var cM = slotMinutes(slot.close);
           if (oM >= 0) minMin = oM;
-          if (cM > 0) maxMin = Math.min(cM, 21 * 60);
+          if (cM > 0) { maxMin = Math.min(cM, 21 * 60); excludeEnd = true; }
         }
       }
-      if (date.value === dateStr()) minMin = Math.max(minMin, now.getHours() * 60 + now.getMinutes() + 30);
+      var aNow = astanaNow();
+      if (date.value === aNow.date) minMin = Math.max(minMin, aNow.minutes + 30);
       var out = [];
-      for (var m = minMin; m <= maxMin; m += 30) {
+      // Время закрытия не предлагаем: сервер принимает только pM < close
+      for (var m = minMin; (excludeEnd ? m < maxMin : m <= maxMin); m += 30) {
         var hh = String(Math.floor(m / 60)).padStart(2, '0');
         var mm = String(m % 60).padStart(2, '0');
         out.push('<option value="' + hh + ':' + mm + '">' + hh + ':' + mm + '</option>');
       }
-      time.innerHTML = out.join('');
+      time.innerHTML = out.length ? out.join('') : '<option value="">Нет доступного времени</option>';
     }
     date.addEventListener('change', buildTimes);
     buildTimes();
@@ -742,11 +761,13 @@
         if (payBtn) blink(payBtn);
         return;
       }
-      // Дата и время приезда (для самовывоза): дата не раньше сегодня, время — корректное
+      // Дата и время приезда (для самовывоза): только рабочие часы филиала,
+      // дата не раньше сегодня, время — не раньше чем через 30 минут (по Астане)
       var pDate = orderForm.pickup_date ? orderForm.pickup_date.value : '';
       var pTime = orderForm.pickup_time ? orderForm.pickup_time.value : '';
       if (pDate) {
-        var todayS = dateStr();
+        var ast = astanaNow();
+        var todayS = ast.date;
         if (pDate < todayS) {
           e.preventDefault();
           Utils.showToast('⚠️ Дата приезда не может быть раньше сегодняшнего дня');
@@ -754,16 +775,39 @@
           if (dateInp) blink(dateInp);
           return;
         }
+        // День должен быть рабочим (если у филиала задано расписание)
+        var sch = storeSchedule();
+        var slot = sch ? sch[dayKeyOf(new Date(pDate + 'T00:00:00'))] : null;
+        if (sch && !slot) {
+          e.preventDefault();
+          Utils.showToast('⚠️ В этот день филиал не работает — выберите другой день');
+          if (dateInp) blink(dateInp);
+          return;
+        }
         if (pDate === todayS && pTime) {
           var hm = /^([0-9]{2}):([0-9]{2})$/.exec(pTime);
-          var now = new Date();
-          var curMin = now.getHours() * 60 + now.getMinutes();
-          if (hm && (Number(hm[1]) * 60 + Number(hm[2])) < curMin + 30) {
+          if (hm && (Number(hm[1]) * 60 + Number(hm[2])) < ast.minutes + 30) {
             e.preventDefault();
             Utils.showToast('⚠️ Время приезда уже прошло — выберите время не раньше, чем через 30 минут');
             var timeInp = orderForm.pickup_time;
             if (timeInp) blink(timeInp);
             return;
+          }
+        }
+        // Время — только в рабочем окне филиала
+        if (pTime && slot) {
+          var hm2 = /^([0-9]{1,2}):([0-9]{2})$/.exec(pTime);
+          if (hm2) {
+            var pM = Number(hm2[1]) * 60 + Number(hm2[2]);
+            var oM = slotMinutes(slot.open);
+            var cM = slotMinutes(slot.close);
+            if (pM < oM || pM >= cM) {
+              e.preventDefault();
+              Utils.showToast('⚠️ Выберите время получения в рабочее время филиала (' + slot.open + '–' + slot.close + ')');
+              var timeInp2 = orderForm.pickup_time;
+              if (timeInp2) blink(timeInp2);
+              return;
+            }
           }
         }
       }

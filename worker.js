@@ -312,23 +312,6 @@ function storeLocalNow() {
   return { date, minutes: get('hour') * 60 + get('minute'), dayKey: DAYS[new Date(y, mo - 1, d).getDay()] };
 }
 
-// Если филиал сейчас закрыт — вернуть сообщение об ошибке, иначе null
-async function reserveOpenCheck(env, storeId) {
-  const stores = await kvGet(env, 'stores');
-  const store = (stores && typeof stores === 'object') ? stores[storeId] : null;
-  const sch = store && store.schedule;
-  if (!sch) return null; // расписание не задано — ограничение не применяем
-  const n = storeLocalNow();
-  const slot = sch[n.dayKey];
-  if (!slot) return 'Филиал сегодня не работает — бронирование недоступно';
-  const openM = scheduleMinutes(slot.open);
-  const closeM = scheduleMinutes(slot.close);
-  if (openM < 0 || closeM < 0 || n.minutes < openM || n.minutes >= closeM) {
-    return 'Филиал сейчас закрыт — бронирование доступно в рабочее время ' + slot.open + '–' + slot.close;
-  }
-  return null;
-}
-
 async function handleReserve(request, env, url) {
   let data;
   try {
@@ -343,12 +326,8 @@ async function handleReserve(request, env, url) {
     return jsonResponse({ ok: false, error: 'orderId, storeId и items обязательны' }, 400);
   }
 
-  // Бронь доступна только в рабочее время выбранного филиала (расписание из настроек СЦ)
-  const closedMsg = await reserveOpenCheck(env, storeId);
-  if (closedMsg) {
-    return jsonResponse({ ok: false, error: 'closed', message: closedMsg }, 409);
-  }
-
+  // Бронь доступна в любое время суток: ограничение по рабочим часам применяется
+  // только к выбору времени получения (validatePickupSchedule при оформлении заказа).
   const ttl = Math.min(Number(data.ttlSeconds) || 120, 600) * 1000;
   const eff = await computeEffectiveStock(env, url, orderId);
   const reservations = await activeReservations(env);
@@ -419,10 +398,80 @@ async function handleEventsSave(request, env, auth) {
   if (auth.role === 'superadmin') {
     await kvPut(env, 'events', events);
   } else {
+    // Токен сессии не несёт storeId — ищем свой филиал по логину кабинета
+    const scOwnId = await scOwnStoreId(env, auth);
+    if (!scOwnId) return jsonResponse({ ok: false, error: 'forbidden' }, 403);
     const scEv = await kvGet(env, 'sc_events');
-    scEv[auth.storeId] = events;
+    scEv[scOwnId] = events.filter((ev) => String(ev.storeId || '') === String(scOwnId));
     await kvPut(env, 'sc_events', scEv);
   }
+  return jsonResponse({ ok: true });
+}
+
+// ---------------- Поставки и уведомления СЦ (KV, общие для всех устройств) ----------------
+// KV:
+//   deliveries    — глобальные поставки суперадмина (массив, как events)
+//   sc_deliveries — {"<storeId>": [...]} — поставки конкретного СЦ
+//   notices       — уведомления СЦ (массив)
+
+// GET /api/deliveries — публичный список: статика deliveries.json → глобальные
+// правки суперадмина (KV deliveries) → пер-филиальные правки СЦ (KV sc_deliveries)
+async function handleDeliveriesGet(env, url) {
+  const res = await env.ASSETS.fetch(new URL('/data/deliveries.json', url));
+  let base = [];
+  if (res.ok) {
+    const d = await res.json();
+    base = (d && d.deliveries) || (Array.isArray(d) ? d : []);
+  }
+  const over = await kvGet(env, 'deliveries');
+  if (Array.isArray(over) && over.length) base = over;
+  const scDel = await kvGet(env, 'sc_deliveries');
+  Object.keys(scDel).forEach((storeId) => {
+    const arr = scDel[storeId];
+    if (!Array.isArray(arr)) return;
+    base = base.filter((d) => String(d.storeId || '') !== String(storeId));
+    arr.forEach((d) => base.push(d));
+  });
+  return jsonResponse({ ok: true, deliveries: base }, 200, 300);
+}
+
+// POST /api/deliveries {deliveries: [...]} — суперадмин: весь список; СЦ: только свои
+async function handleDeliveriesSave(request, env, auth) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const list = Array.isArray(body.deliveries) ? body.deliveries : [];
+  if (auth.role === 'superadmin') {
+    await kvPut(env, 'deliveries', list);
+  } else {
+    const scOwnId = await scOwnStoreId(env, auth);
+    if (!scOwnId) return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+    const map = await kvGet(env, 'sc_deliveries');
+    map[scOwnId] = list.filter((d) => String(d.storeId || '') === String(scOwnId));
+    await kvPut(env, 'sc_deliveries', map);
+  }
+  return jsonResponse({ ok: true });
+}
+
+// GET /api/notices — уведомления СЦ (только для кабинета, авторизованным)
+async function handleNoticesGet(env) {
+  const v = await env.SC_STORES.get('notices', 'json');
+  return jsonResponse({ ok: true, notices: Array.isArray(v) ? v : [] });
+}
+
+// POST /api/notices {notices: [...]} — суперадмин перезаписывает список
+async function handleNoticesSave(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const list = Array.isArray(body.notices) ? body.notices : [];
+  await env.SC_STORES.put('notices', JSON.stringify(list));
   return jsonResponse({ ok: true });
 }
 
@@ -571,9 +620,11 @@ async function handleOrdersGet(request, env, auth) {
   const history = url.searchParams.get('archive') === '1' && auth.role === 'superadmin';
   const source = history ? await kvGet(env, 'orders_history') : await loadOrders(env);
   const ownId = auth.role === 'superadmin' ? null : await scOwnStoreId(env, auth);
+  const storeFilter = auth.role === 'superadmin' ? (url.searchParams.get('storeId') || '') : '';
   const list = Object.values(source)
     .filter(function (o) {
-      return auth.role === 'superadmin' || (ownId && String(o.storeId) === String(ownId));
+      if (auth.role !== 'superadmin' && (!ownId || String(o.storeId) !== String(ownId))) return false;
+      return !storeFilter || String(o.storeId) === storeFilter;
     })
     .sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
   return jsonResponse({ ok: true, orders: list, archive: history });
@@ -1014,8 +1065,10 @@ async function handleScStore(request, env, auth) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403);
   }
   // Обязательные поля карточки (форма суперадмина требует их все).
+  // Фото и описание не блокируют сохранение: у филиалов, созданных из заявок,
+  // description может быть пустым — но часы работы менять нужно всегда.
   // Email владельца убран: доступы передаёт только суперадмин лично.
-  const required = ['name', 'city', 'address', 'hours', 'phone', 'image'];
+  const required = ['name', 'city', 'address', 'phone'];
   const missing = required.filter(function (f) { return !String(data[f] || '').trim(); });
   if (missing.length) {
     return jsonResponse({ ok: false, error: 'Не заполнены обязательные поля: ' + missing.join(', ') }, 400);
@@ -1319,26 +1372,23 @@ async function handleAdminProducts(request, env) {
       if (!u || typeof u !== 'object') return;
       const clean = {};
       ['price', 'description', 'category', 'status', 'discount_price', 'eta', 'incoming', 'priority'].forEach(function (f) {
-        if (u[f] !== undefined && u[f] !== null && u[f] !== '') {
-          clean[f] = (f === 'price' || f === 'discount_price' || f === 'priority') ? Number(u[f]) : u[f];
+        if (u[f] === undefined || u[f] === null) return;
+        // Пустое значение = вернуть значение по умолчанию (снять оверрайд поля)
+        if (u[f] === '') {
+          if (overrides[pid] && overrides[pid][f] !== undefined) {
+            delete overrides[pid][f];
+            if (!Object.keys(overrides[pid]).length) delete overrides[pid];
+          }
+          return;
         }
+        clean[f] = (f === 'price' || f === 'discount_price' || f === 'priority') ? Number(u[f]) : u[f];
       });
-      // Приоритет снимается пустой строкой
-      if (u.priority === '') {
-        const o0 = overrides[pid];
-        if (o0) {
-          delete o0.priority;
-          if (Object.keys(o0).length) overrides[pid] = o0;
-          else delete overrides[pid];
-        }
-        return;
-      }
       if (typeof u.hidden === 'boolean') clean.hidden = u.hidden;
       if (typeof u.hit === 'boolean') clean.hit = u.hit;
       if (typeof u.showDiscount === 'boolean') clean.showDiscount = u.showDiscount;
       if (Object.keys(clean).length) {
         overrides[pid] = Object.assign({}, overrides[pid], clean);
-      } else {
+      } else if (!overrides[pid] || !Object.keys(overrides[pid]).length) {
         delete overrides[pid];
       }
     });
@@ -1439,9 +1489,16 @@ async function handleAdminProducts(request, env) {
       if (!pid) return;
       const clean = {};
       ['status', 'price', 'discount_price', 'eta', 'incoming'].forEach(function (f) {
-        if (it[f] !== undefined && it[f] !== null && it[f] !== '') {
-          clean[f] = (f === 'price' || f === 'discount_price') ? Number(it[f]) : it[f];
+        if (it[f] === undefined || it[f] === null) return;
+        // Пустое значение = вернуть значение по умолчанию (снять оверрайд поля)
+        if (it[f] === '') {
+          if (map[storeId][pid] && map[storeId][pid][f] !== undefined) {
+            delete map[storeId][pid][f];
+            if (!Object.keys(map[storeId][pid]).length) delete map[storeId][pid];
+          }
+          return;
         }
+        clean[f] = (f === 'price' || f === 'discount_price') ? Number(it[f]) : it[f];
       });
       if (typeof it.hidden === 'boolean') clean.hidden = it.hidden;
       if (Object.keys(clean).length) {
@@ -1641,7 +1698,8 @@ function buildText(data) {
 // Проверка даты/времени получения по расписанию филиала: сообщение об ошибке или null.
 // Страховка поверх клиентских ограничений — прямое обращение к /telegram не обойдёт.
 async function validatePickupSchedule(env, data) {
-  const storeId = String(data.orderStoreId || data.store_id || '');
+  // Форма корзины шлёт поле order_store_id; старые клиенты могли слать orderStoreId
+  const storeId = String(data.orderStoreId || data.order_store_id || data.store_id || '');
   const pDate = String(data.pickup_date || data.pickupDate || '');
   const pTime = String(data.pickup_time || data.pickupTime || '');
   // Время получения выбирается только для оплаты наличными; без времени (онлайн-оплата) не проверяем
@@ -1807,6 +1865,11 @@ export default {
       return handleEventsSave(request, env, auth);
     }
 
+    // 1.4.1в Поставки (KV, общие для всех устройств)
+    if (path === '/api/deliveries' && request.method === 'GET') {
+      return handleDeliveriesGet(env, url);
+    }
+
     // 1.4.2 Бронь товаров на 2 минуты (оформление заказа)
     if (path === '/api/reserve' && request.method === 'POST') {
       return handleReserve(request, env, url);
@@ -1834,7 +1897,8 @@ export default {
         path === '/api/sc-store/reset-password' || path === '/api/sc-stores' || path === '/api/admin/products' ||
         path === '/api/admin/parser-run' ||
         path === '/api/sc-archive' || path === '/api/sc-archive/action' ||
-        path === '/api/orders' || path === '/api/orders/action') {
+        path === '/api/orders' || path === '/api/orders/action' ||
+        path === '/api/deliveries' || path === '/api/notices') {
       const auth = await verifyToken(env, request.headers.get('Authorization'));
       if (!auth) {
         return jsonResponse({ ok: false, error: 'forbidden' }, 403);
@@ -1858,6 +1922,20 @@ export default {
       // Подтверждение/отмена/удаление заказов: СЦ — только свои, суперадмин — все
       if (path === '/api/orders/action' && request.method === 'POST') {
         return handleOrdersAction(request, env, auth);
+      }
+      // Поставки: суперадмин — весь список, СЦ — свои (хранятся в KV, как мероприятия)
+      if (path === '/api/deliveries' && request.method === 'POST') {
+        if (auth.role !== 'superadmin' && auth.role !== 'sc') {
+          return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+        }
+        return handleDeliveriesSave(request, env, auth);
+      }
+      // Уведомления СЦ: читают суперадмин и СЦ
+      if (path === '/api/notices' && request.method === 'GET') {
+        if (auth.role !== 'superadmin' && auth.role !== 'sc') {
+          return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+        }
+        return handleNoticesGet(env);
       }
       if (auth.role !== 'superadmin') {
         return jsonResponse({ ok: false, error: 'forbidden' }, 403);
@@ -1891,6 +1969,9 @@ export default {
       }
       if (path === '/api/sc-archive/action' && request.method === 'POST') {
         return handleScArchiveAction(request, env);
+      }
+      if (path === '/api/notices' && request.method === 'POST') {
+        return handleNoticesSave(request, env);
       }
     }
 

@@ -1371,10 +1371,16 @@ fetch('/api/event-bookings')
         render();
       })
       .catch(function () {
-        fetch('data/deliveries.json')
+        // Парсер молчит — показываем ручные поставки из Worker KV (общие для всех)
+        fetch('/api/deliveries')
           .then(function (r) { return r.json(); })
-          .then(function (d) { renderDeliveries(applyDeliveriesOverrides(d.deliveries || [])); })
-          .catch(function () { renderDeliveries(applyDeliveriesOverrides([])); });
+          .then(function (d) { renderDeliveries((d && d.deliveries) || []); })
+          .catch(function () {
+            fetch('data/deliveries.json')
+              .then(function (r) { return r.json(); })
+              .then(function (d) { renderDeliveries(applyDeliveriesOverrides(d.deliveries || [])); })
+              .catch(function () { renderDeliveries(applyDeliveriesOverrides([])); });
+          });
       });
 
     fetch('/api/events')
