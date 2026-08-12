@@ -414,8 +414,15 @@ async function createOrder(env, data) {
   const order = {
     id: orderId,
     storeId: res.storeId,
+    // Полный снимок позиций на момент оформления (имя/цена для «чека»)
     items: items.map(function (i) {
-      return { productId: String(i.productId || ''), qty: Math.max(1, Number(i.qty) || 1) };
+      return {
+        productId: String(i.productId || ''),
+        sku: String(i.sku || i.productId || ''),
+        name: String(i.name || '').trim(),
+        qty: Math.max(1, Number(i.qty) || 1),
+        price: Number(i.price) || 0
+      };
     }),
     name: String(data.name || '').trim(),
     phone: String(data.phone || '').trim(),
@@ -424,6 +431,7 @@ async function createOrder(env, data) {
     managerNote: '',
     total: Number(data.order_total) || 0,
     payment: String(data.payment || ''),
+    partnerMode: data.order_partner_mode === '1',
     pickupDate: String(data.pickup_date || data.pickupDate || ''),
     pickupTime: String(data.pickup_time || data.pickupTime || ''),
     status: 'new',

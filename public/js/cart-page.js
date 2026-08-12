@@ -835,6 +835,8 @@
       var res = await fetch('data/products.json');
       var data = await res.json();
       products = data.products || [];
+      // Каталог для модалки «Мои заказы» (названия/фото в чеке) — без доп. запросов
+      window.CatalogProducts = products;
       // Серверные оверрайды суперадмина (цены, скидки, скрытие по СЦ) —
       // отдаются вместе с каталогом и применяются и при оплате
       window.__productOverrides = data.overrides || {};

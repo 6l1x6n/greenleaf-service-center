@@ -2132,3 +2132,9 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .sched-times { display: inline-flex; align-items: center; gap: 6px; }
 .sched-times select { padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 .sched-row.has-off .sched-times { display: none; }
+
+/* Чек-строки заказа (Мои заказы / админка) */
+.order-receipt-row { display: flex; align-items: center; gap: 8px; width: 100%; flex-wrap: wrap; }
+.order-receipt-img { width: 36px; height: 36px; object-fit: contain; flex: none; border-radius: 6px; background: #fff; border: 1px solid #edf0f5; }
+.order-receipt-name { font-size: 13.5px; font-weight: 600; min-width: 140px; }
+.order-receipt-price { font-size: 13px; color: var(--muted); margin-left: auto; }

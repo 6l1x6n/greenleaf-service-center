@@ -151,11 +151,11 @@
   }
 
   // Модалка со списком заказов этого устройства. Данные грузятся только при открытии
-  // (1 запрос); позиции подтягиваются из уже загруженного каталога.
+  // (1 запрос); позиции/фото подтягиваются из уже загруженного каталога (0 запросов).
   function openMyOrdersModal() {
     var token = clientToken();
     if (!token) { showToast('Не удалось определить устройство'); return; }
-    openModal('<h3>📦 Мои заказы</h3><p class="modal-product">Заказы, оформленные с этого устройства.</p><div id="myOrdersList">Загружаем…</div>');
+    openModal('<h3>📦 Мои заказы</h3><p class="modal-product">Заказы, оформленные с этого устройства. Если заказ «Готов к выдаче» — можно забирать.</p><div id="myOrdersList">Загружаем…</div>');
     var listEl = document.getElementById('myOrdersList');
     var render = function () {
       listEl.innerHTML = 'Загружаем…';
@@ -174,20 +174,28 @@
             var itemsHtml = (o.items || []).map(function (i) {
               var p = byId[i.productId];
               var img = p ? (p.thumb || p.image) : '';
-              var name = p ? p.name : i.productId;
-              return '<span class="delivery-item-row">' +
-                (img ? '<img class="delivery-item-img" src="' + esc(img) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
-                esc(name) + ' × ' + esc(i.qty) + '</span>';
+              var name = i.name || (p ? p.name : '') || i.sku || i.productId;
+              var unit = Number(i.price) || 0;
+              var subtotal = unit ? (unit * (Number(i.qty) || 1)) : 0;
+              return '<span class="delivery-item-row order-receipt-row">' +
+                (img ? '<img class="delivery-item-img order-receipt-img" src="' + esc(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' : '') +
+                '<span class="order-receipt-name">' + esc(name) + '</span>' +
+                (unit ? '<span class="order-receipt-price">' + fmtPrice(unit) + ' × ' + esc(i.qty) + ' = <b>' + fmtPrice(subtotal) + '</b></span>' : '<span class="order-receipt-price">× ' + esc(i.qty) + '</span>') +
+                '</span>';
             }).join('');
-            var totalTxt = o.total ? ' · 💰 ' + esc(o.total) + ' ₸' : '';
-            var payTxt = o.payment ? ' · ' + esc(o.payment) : '';
+            var totalTxt = o.total ? '<span>💰 Итого: <b>' + esc(o.total) + ' ₸</b></span>' : '';
+            var payTxt = o.payment ? '<span>💳 ' + esc(o.payment) + '</span>' : '';
+            var discTxt = o.partnerMode ? '<span class="badge" style="background:#d1e7dd;color:#0a5c36;">🎫 Партнёрские цены −50%</span>' : '';
+            var pickupTxt = o.pickupDate ? '<span>📅 Забрать: ' + esc(o.pickupDate) + (o.pickupTime ? ' в ' + esc(o.pickupTime) : '') + '</span>' : '';
+            var idTxt = '<span style="font-size:12px;color:var(--muted);">🆔 ID клиента: ' + esc(token) + '</span>';
             var noteTxt = o.managerNote ? '<p class="form-note" style="margin-top:6px;">💬 ' + esc(o.managerNote) + '</p>' : '';
             return '<li>' +
               '<div class="admin-list-main">' +
               '<strong>' + esc(o.id) + ' <span class="' + st.cls + '">' + st.label + '</span></strong>' +
               '<span>🏬 ' + esc(o.storeName || '—') + ' · 🕐 ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
-              '<div class="delivery-items" style="margin:6px 0 0;">' + itemsHtml + '</div>' +
-              '<span style="font-size:13px;color:var(--muted);">' + (totalTxt || '') + (payTxt || '') + '</span>' +
+              '<div class="delivery-items order-receipt" style="margin:6px 0 0; display:flex; flex-direction:column; align-items:flex-start; gap:4px;">' + itemsHtml + '</div>' +
+              '<span style="font-size:13px;color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center;">' + [totalTxt, payTxt, discTxt, pickupTxt].filter(Boolean).join('') + '</span>' +
+              idTxt +
               noteTxt +
               '</div>' +
               (o.status === 'new' ? '<div class="admin-actions"><button class="btn btn-outline btn-sm danger-btn" data-my-cancel="' + esc(o.id) + '">🚫 Отменить заказ</button></div>' : '') +

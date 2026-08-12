@@ -1397,11 +1397,21 @@
                 : '<span class="badge" style="background:#f8d7da;color:#721c24;">🚫 Отменён</span>'));
           var itemsHtml = (o.items || []).map(function (i) {
             var p = byId[i.productId];
-            return '<li><span>' + h(i.productId) + (p ? ' · ' + h(p.name) : '') + '</span><b>× ' + h(i.qty) + '</b></li>';
+            var img = p ? (p.thumb || p.image) : '';
+            var name = i.name || (p ? p.name : '') || i.sku || i.productId;
+            var unit = Number(i.price) || 0;
+            var subtotal = unit ? (unit * (Number(i.qty) || 1)) : 0;
+            return '<span class="delivery-item-row order-receipt-row">' +
+              (img ? '<img class="delivery-item-img order-receipt-img" src="' + h(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' : '') +
+              '<span class="order-receipt-name">' + h(name) + '</span>' +
+              (unit ? '<span class="order-receipt-price">' + h(String(unit).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) + ' ₸ × ' + h(i.qty) + ' = <b>' + h(String(subtotal).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) + ' ₸</b></span>' : '<span class="order-receipt-price">× ' + h(i.qty) + '</span>') +
+              '</span>';
           }).join('');
-          var totalTxt = o.total ? '<span>💰 ' + h(o.total) + ' ₸</span>' : '';
+          var totalTxt = o.total ? '<span>💰 Итого: <b>' + h(String(o.total).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) + ' ₸</b></span>' : '';
           var payTxt = o.payment ? '<span>💳 ' + h(o.payment) + '</span>' : '';
-          var pickupTxt = o.pickupDate ? '<span>📅 ' + h(o.pickupDate) + (o.pickupTime ? ' в ' + h(o.pickupTime) : '') + '</span>' : '';
+          var pickupTxt = o.pickupDate ? '<span>📅 Забрать: ' + h(o.pickupDate) + (o.pickupTime ? ' в ' + h(o.pickupTime) : '') + '</span>' : '';
+          var discTxt = o.partnerMode ? '<span class="badge" style="background:#d1e7dd;color:#0a5c36;">🎫 Партнёрские цены −50%</span>' : '';
+          var clientIdTxt = o.clientToken ? '<span style="font-size:12px;color:var(--muted);">🆔 ID клиента: ' + h(o.clientToken) + '</span>' : '';
           var noteTxt = o.managerNote ? '<span style="color:var(--muted);">💬 Менеджер: ' + h(o.managerNote) + '</span>' : '';
           var canResolve = o.status === 'new' || o.status === 'ready';
           return '<li>' +
@@ -1409,8 +1419,9 @@
             '<strong>' + h(o.id) + ' ' + statusBadge + '</strong>' +
             '<span>👤 ' + h(o.name || '—') + (o.phone ? ' · 📞 ' + h(o.phone) : '') + '</span>' +
             '<span>🏬 ' + h(storeName[o.storeId] || o.storeId || '—') + ' · 🕐 ' + h(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
-            '<ul style="margin:6px 0 0 18px;">' + itemsHtml + '</ul>' +
-            (totalTxt || payTxt || pickupTxt ? '<span>' + [totalTxt, payTxt, pickupTxt].filter(Boolean).join(' · ') + '</span>' : '') +
+            '<div class="delivery-items order-receipt" style="margin:6px 0 0; display:flex; flex-direction:column; align-items:flex-start; gap:4px;">' + itemsHtml + '</div>' +
+            '<span style="font-size:13px;color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center;">' + [totalTxt, payTxt, discTxt, pickupTxt].filter(Boolean).join('') + '</span>' +
+            clientIdTxt +
             (o.comment ? '<span style="color:var(--muted);">💬 Клиент: ' + h(o.comment) + '</span>' : '') +
             noteTxt +
             '</div>' +
@@ -1493,8 +1504,21 @@
     }
 
     function prioValue(p) {
+      // Свежие оверрайды (KV, /api/admin/products без кеша) — в приоритете над
+      // закешированным каталогом: после сохранения панель сразу показывает бейдж
+      var o = state.productOverrides[p.id] || {};
+      if (o.priority != null && o.priority !== '') return String(o.priority);
+      if (o.hit) return '1';
       if (p.priority != null && p.priority !== '') return String(p.priority);
       return p.hit ? '1' : '';
+    }
+
+    function prioBadgeChip(p) {
+      var v = prioValue(p);
+      if (v === '1') return ' <span class="badge-hot badge-p1">🔥 Хит</span>';
+      if (v === '2') return ' <span class="badge-hot badge-p2">✨ Новинка</span>';
+      if (v === '3') return ' <span class="badge-hot badge-p3">🚀 Топ</span>';
+      return '';
     }
 
     content.insertAdjacentHTML('beforeend',
@@ -1548,7 +1572,7 @@
             : '<button class="btn btn-outline btn-sm" data-prod-del="' + h(p.id) + '" title="Скрыть с сайта">🗑</button>');
         return '<tr' + (isHidden ? ' class="row-hidden"' : '') + changed + '>' +
           '<td><img class="admin-thumb" src="' + h(img) + '" alt="' + h(p.name) + '" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\';"></td>' +
-          '<td><strong>' + h(p.name) + '</strong>' + (isCustom ? ' <span class="admin-sc-tag">🖊 ручной</span>' : '') + (isHidden ? ' <span class="badge st-out">скрыт</span>' : '') + '</td>' +
+          '<td><strong>' + h(p.name) + '</strong>' + prioBadgeChip(p) + (isCustom ? ' <span class="admin-sc-tag">🖊 ручной</span>' : '') + (isHidden ? ' <span class="badge st-out">скрыт</span>' : '') + '</td>' +
           '<td class="muted-sku">' + h(p.sku) + '</td>' +
           '<td><input class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="description" value="' + h(p.description || '') + '"></td>' +
           '<td><select class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="category">' + catOptionsHtml(p.category || '') + '</select></td>' +
