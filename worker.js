@@ -623,16 +623,24 @@ async function handleMyOrdersAction(request, env) {
   return jsonResponse({ ok: false, error: 'unknown action' }, 400);
 }
 
-// Проверка заказа перед отправкой: бронь на 2 минуты должна быть активной
-// и покрывать все позиции заказа. Иначе заказ не принимается (409) —
-// остатки могли уже уйти другим покупателям.
+// Проверка заказа перед отправкой: бронь должна быть активной и покрывать все
+// позиции заказа. Иначе заказ не принимается (409) — остатки могли уже уйти.
+// Читаем бронь напрямую по ключу (res_<orderId>) — быстрее и без обхода всех
+// броней; в пределах одного расположения KV отдаёт запись сразу после записи.
 async function validateOrderReservation(env, data) {
   const orderId = String(data.order_id || data.orderId || '').trim();
-  if (!orderId) return { ok: false, res: jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409) };
-  const reservations = await activeReservations(env);
-  const res = reservations[orderId];
+  const expiredRes = jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409);
+  if (!orderId) return { ok: false, res: expiredRes };
+  let res = null;
+  try {
+    const raw = await env.SC_STORES.get('res_' + orderId);
+    if (raw) {
+      const r = JSON.parse(raw);
+      if (r && r.expiresAt && r.expiresAt > Date.now()) res = r;
+    }
+  } catch (e) { /* нет брони или повреждена */ }
   if (!res || !res.items || !res.items.length) {
-    return { ok: false, res: jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409) };
+    return { ok: false, res: expiredRes };
   }
   let items = [];
   try {

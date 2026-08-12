@@ -115,11 +115,12 @@
     var btn = form.querySelector('button[type="submit"]');
     var prev = btn ? btn.innerHTML : '';
 
-    // Отправка заказа с одним повтором при «expired»: KV eventual consistency —
-    // бронь может быть не видна на другом коло сразу после резерва (секунды),
-    // повтор через 3с обычно проходит. Если брони реально нет — покажем истекший.
+    // Отправка заказа с повторами при «expired»: KV eventual consistency —
+    // бронь может быть не видна на другом коло сразу после резерва (секунды).
+    // До 3 повторов с паузой 3с закрывают окно лага; если брони реально нет —
+    // покажем «время истекло».
     function submitOrder(attemptsLeft) {
-      if (btn) { btn.disabled = true; btn.textContent = 'Отправляем…'; }
+      if (btn) { btn.disabled = true; btn.textContent = attemptsLeft > 0 ? '⏳ Проверяем бронь…' : 'Отправляем…'; }
       fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,6 +173,6 @@
         });
     }
 
-    submitOrder(data.type === 'order' ? 1 : 0);
+    submitOrder(data.type === 'order' ? 3 : 0);
   });
 })();
