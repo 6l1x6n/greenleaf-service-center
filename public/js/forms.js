@@ -114,53 +114,64 @@
 
     var btn = form.querySelector('button[type="submit"]');
     var prev = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.textContent = 'Отправляем…'; }
 
-    fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-      .then(function (res) {
-        if (!res.ok) {
-          if (data.type === 'order') {
-            return res.json().catch(function () { return null; }).then(function (errData) {
-              if (errData && errData.error === 'expired') {
-                if (window.Utils) Utils.showToast('⏳ ' + (errData.message || 'Время бронирования истекло — соберите корзину заново'));
-                window.dispatchEvent(new CustomEvent('order:expired'));
-              }
-              markError(form);
-            });
+    // Отправка заказа с одним повтором при «expired»: KV eventual consistency —
+    // бронь может быть не видна на другом коло сразу после резерва (секунды),
+    // повтор через 3с обычно проходит. Если брони реально нет — покажем истекший.
+    function submitOrder(attemptsLeft) {
+      if (btn) { btn.disabled = true; btn.textContent = 'Отправляем…'; }
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+        .then(function (res) {
+          if (!res.ok) {
+            if (data.type === 'order') {
+              return res.json().catch(function () { return null; }).then(function (errData) {
+                if (errData && errData.error === 'expired' && attemptsLeft > 0) {
+                  setTimeout(function () { submitOrder(attemptsLeft - 1); }, 3000);
+                  return;
+                }
+                if (errData && errData.error === 'expired') {
+                  if (window.Utils) Utils.showToast('⏳ ' + (errData.message || 'Время бронирования истекло — соберите корзину заново'));
+                  window.dispatchEvent(new CustomEvent('order:expired'));
+                }
+                markError(form);
+              });
+            }
+            throw new Error('HTTP ' + res.status);
           }
-          throw new Error('HTTP ' + res.status);
-        }
-        markSuccess(form, data.type === 'order' ? '' : 'Заявка отправлена!', successTextFor(data));
-        if (data.type === 'order') {
-          window.dispatchEvent(new CustomEvent('order:sent', { detail: data }));
-        }
-        if (data.type === 'event' && data.event_id) {
-          // Бронь места в единой БД (Worker KV) + защита от дублей на этом устройстве
-          fetch('/api/event-book', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ eventId: data.event_id, qty: 1 })
-          }).catch(function () { });
-          try {
-            var mine = JSON.parse(localStorage.getItem('greenleaf_event_my_v1') || '{}');
-            mine[data.event_id] = Date.now();
-            localStorage.setItem('greenleaf_event_my_v1', JSON.stringify(mine));
-          } catch (e) { }
-          window.dispatchEvent(new CustomEvent('event:booked', { detail: { id: data.event_id } }));
-        }
-        if (data.type === 'partner' && window.Partners) {
-          window.Partners.addStoreFromForm(data);
-        }
-      })
-      .catch(function () {
-        markError(form);
-      })
-      .finally(function () {
-        if (btn) { btn.disabled = false; btn.innerHTML = prev; }
-      });
+          markSuccess(form, data.type === 'order' ? '' : 'Заявка отправлена!', successTextFor(data));
+          if (data.type === 'order') {
+            window.dispatchEvent(new CustomEvent('order:sent', { detail: data }));
+          }
+          if (data.type === 'event' && data.event_id) {
+            // Бронь места в единой БД (Worker KV) + защита от дублей на этом устройстве
+            fetch('/api/event-book', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ eventId: data.event_id, qty: 1 })
+            }).catch(function () { });
+            try {
+              var mine = JSON.parse(localStorage.getItem('greenleaf_event_my_v1') || '{}');
+              mine[data.event_id] = Date.now();
+              localStorage.setItem('greenleaf_event_my_v1', JSON.stringify(mine));
+            } catch (e) { }
+            window.dispatchEvent(new CustomEvent('event:booked', { detail: { id: data.event_id } }));
+          }
+          if (data.type === 'partner' && window.Partners) {
+            window.Partners.addStoreFromForm(data);
+          }
+        })
+        .catch(function () {
+          markError(form);
+        })
+        .finally(function () {
+          if (btn) { btn.disabled = false; btn.innerHTML = prev; }
+        });
+    }
+
+    submitOrder(data.type === 'order' ? 1 : 0);
   });
 })();
