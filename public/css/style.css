@@ -1904,6 +1904,10 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   .logo img { width: 34px; height: 34px; }
   .logo-text { font-size: 17px; }
   .admin-user-badge { display: none; }
+  /* «Мои заказы» есть в бургер-меню — в шапке прячем, чтобы кнопка
+     аккаунта не ужималась и имя («СЦ Greenleaf Астана») было видно целиком */
+  .header-actions .my-orders-link { display: none; }
+  #scAuthBtn { flex-shrink: 0; }
   .delivery { flex-direction: column; }
   .delivery-date { width: 100%; min-width: 0; flex-direction: row; justify-content: center; gap: 8px; }
   .modal { padding: 24px 18px; }
