@@ -46,7 +46,7 @@ fi
 
 # 4. Кеширование каталога
 CC=$(curl -sI "$SITE/data/products.json" | tr -d '\r' | grep -i '^cache-control:' | head -1 | sed 's/^[Cc]ache-[Cc]ontrol: *//')
-echo "$CC" | grep -q 'max-age=3600' && echo "✅ Кеш каталога: $CC" || { echo "⚠️ Кеш каталога не установлен: ${CC:-нет}"; }
+echo "$CC" | grep -q 'max-age=300' && echo "✅ Кеш каталога: $CC" || { echo "⚠️ Кеш каталога не установлен: ${CC:-нет}"; }
 
 # 5. Версия на продакшене == git HEAD (защита от деплоя из устаревшей копии)
 LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
