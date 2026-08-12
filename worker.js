@@ -137,6 +137,15 @@ async function decryptSecret(env, value) {
   }
 }
 
+// Сброс кешированного ответа на edge после правок суперадмина/СЦ:
+// долгий кеш остаётся, но свежие изменения видны сразу (без ожидания TTL)
+async function purgeCache(request, path) {
+  try {
+    const origin = new URL(request.url).origin;
+    await caches.default.delete(origin + path);
+  } catch (e) { /* Workers Cache недоступен — ничего страшного */ }
+}
+
 // ---------------- Остатки: база − продажи − активные брони ----------------
 
 const RESERVE_TTL_MS = 120 * 1000; // 2 минуты
@@ -190,6 +199,7 @@ async function handleStockSave(request, env) {
   });
   if (!Object.keys(edits[scId]).length) delete edits[scId];
   await kvPut(env, 'stock_edits', edits);
+  await purgeCache(request, '/api/stock');
   return jsonResponse({ ok: true });
 }
 
@@ -344,6 +354,7 @@ async function handleEventsSave(request, env, auth) {
     scEv[auth.storeId] = events;
     await kvPut(env, 'sc_events', scEv);
   }
+  await purgeCache(request, '/api/events');
   return jsonResponse({ ok: true });
 }
 
@@ -486,6 +497,7 @@ async function handleOrdersAction(request, env, auth) {
     order.readyAt = new Date().toISOString();
     if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
+    await purgeCache(request, '/api/stock');
     return jsonResponse({ ok: true, order });
   }
 
@@ -497,6 +509,7 @@ async function handleOrdersAction(request, env, auth) {
     order.confirmedAt = new Date().toISOString();
     if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
+    await purgeCache(request, '/api/stock');
     return jsonResponse({ ok: true, order });
   }
 
@@ -508,6 +521,7 @@ async function handleOrdersAction(request, env, auth) {
     order.cancelledAt = new Date().toISOString();
     if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
+    await purgeCache(request, '/api/stock');
     return jsonResponse({ ok: true, order });
   }
 
@@ -525,6 +539,7 @@ async function handleOrdersAction(request, env, auth) {
     }
     // Удаление не меняет физический остаток: для new/ready резерв снимается (заказа больше
     // нет — товар снова доступен), для confirmed продажа остаётся продажей.
+    await purgeCache(request, '/api/stock');
     return jsonResponse({ ok: true, deleted: true, returned: wasNew });
   }
 
@@ -586,6 +601,7 @@ async function handleMyOrdersAction(request, env) {
     order.cancelledAt = new Date().toISOString();
     order.managerNote = order.managerNote || 'Отменён клиентом';
     await kvPut(env, 'orders', orders);
+    await purgeCache(request, '/api/stock');
     return jsonResponse({ ok: true, order });
   }
   return jsonResponse({ ok: false, error: 'unknown action' }, 400);
@@ -923,6 +939,7 @@ async function handleScStore(request, env, auth) {
   };
   stores[storeId] = record;
   await kvPut(env, 'stores', stores);
+  await purgeCache(request, '/api/stores');
   // Пароль парсера и кабинета СЦ не отдаём в ответе
   const publicRecord = Object.assign({}, record, { portalPassword: undefined, authPassword: undefined });
   return jsonResponse({ ok: true, store: publicRecord });
@@ -1164,6 +1181,7 @@ async function handleAdminProducts(request, env) {
       }
     });
     await kvPut(env, 'product_overrides', overrides);
+    await purgeCache(request, '/data/products.json');
     return jsonResponse({ ok: true });
   }
 
@@ -1184,6 +1202,7 @@ async function handleAdminProducts(request, env) {
       }
     }
     await kvPut(env, 'product_overrides', overrides);
+    await purgeCache(request, '/data/products.json');
     return jsonResponse({ ok: true });
   }
 
@@ -1212,6 +1231,7 @@ async function handleAdminProducts(request, env) {
       created: (custom[sku] && custom[sku].created) || new Date().toISOString()
     };
     await kvPut(env, 'custom_products', custom);
+    await purgeCache(request, '/data/products.json');
     return jsonResponse({ ok: true });
   }
 
@@ -1229,6 +1249,7 @@ async function handleAdminProducts(request, env) {
       delete overrides[sku];
       await kvPut(env, 'product_overrides', overrides);
     }
+    await purgeCache(request, '/data/products.json');
     return jsonResponse({ ok: true });
   }
 
@@ -1236,6 +1257,7 @@ async function handleAdminProducts(request, env) {
     // Вернуть исходные (парсинговые) данные: убрать все оверрайды
     await kvPut(env, 'product_overrides', {});
     await kvPut(env, 'sc_product_overrides', {});
+    await purgeCache(request, '/data/products.json');
     return jsonResponse({ ok: true });
   }
 
@@ -1246,6 +1268,7 @@ async function handleAdminProducts(request, env) {
     const map = await kvGet(env, 'sc_product_overrides');
     delete map[storeId];
     await kvPut(env, 'sc_product_overrides', map);
+    await purgeCache(request, '/data/products.json');
     return jsonResponse({ ok: true });
   }
 
@@ -1270,6 +1293,7 @@ async function handleAdminProducts(request, env) {
       }
     });
     await kvPut(env, 'sc_product_overrides', map);
+    await purgeCache(request, '/data/products.json');
     return jsonResponse({ ok: true });
   }
 
@@ -1279,6 +1303,7 @@ async function handleAdminProducts(request, env) {
     if (Array.isArray(body.categories)) settings.categories = body.categories;
     if (body.clearCategories === true) delete settings.categories;
     await kvPut(env, 'site_settings', settings);
+    await purgeCache(request, '/data/products.json');
     return jsonResponse({ ok: true });
   }
 
@@ -1346,13 +1371,14 @@ async function handleProductsJson(request, env, url) {
   data.overrides = overrides;
   data.scOverrides = scOverrides;
   data.settings = settings;
-  // Кеш 60с на edge: бейджи, цены и новые товары суперадмина/парсера
-  // должны появляться на сайте быстро (не дольше минуты). SWR 5 мин —
-  // перевыпуск фона. ETag: повторные запросы ботов уходят по 304 без тела.
+  // Кеш 1 час на edge: каталог меняется только парсером (4 раза в день) и ручными
+  // оверрайдами; stale-while-revalidate перевыпускает фоном. Свежие правки
+  // суперадмина видны сразу: сохранение оверрайдов сбрасывает кеш (purgeCatalogCache).
+  // ETag: повторные запросы ботов/краулеров уходят по 304 без тела.
   const body = JSON.stringify(data);
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
   const etag = '"' + bytesToHex(digest) + '"';
-  const cacheHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300', 'ETag': etag };
+  const cacheHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=7200', 'ETag': etag };
   if (request.headers.get('If-None-Match') === etag) {
     return new Response(null, { status: 304, headers: cacheHeaders });
   }

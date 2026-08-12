@@ -68,7 +68,11 @@
                 <input name="name" placeholder="ФИО / Имя представителя *" required>
                 <input name="phone" type="tel" placeholder="Телефон для связи *" required>
                 <input name="email" type="email" placeholder="Email (необязательно)" autocomplete="email">
-                <input name="storeName" placeholder="Название магазина / проекта *" required>
+                <div class="form-group">
+                  <label for="regStoreId">ID магазина *</label>
+                  <input id="regStoreId" name="storeName" placeholder="Например: s240555" required>
+                  <p class="form-note">Ваш код магазина/филиала — его укажет администратор, если не знаете.</p>
+                </div>
                 <select name="city" class="city-select" required>
                   <option value="" selected disabled>Город *</option>
                 </select>

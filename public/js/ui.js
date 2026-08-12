@@ -366,15 +366,14 @@
       var closeSel = '<select class="sched-close" data-day="' + d[0] + '">' + scheduleTimeOptions(v ? v.close : '20:00') + '</select>';
       return '<div class="sched-row' + (v ? '' : ' has-off') + '">' +
         '<span class="sched-day">' + d[1] + '</span>' +
-        '<label class="form-checkbox sched-off"><input type="checkbox" data-sched-off="' + d[0] + '"' + (v ? '' : ' checked') + '> Выходной</label>' +
+        '<label class="form-checkbox sched-off"><input type="checkbox" data-sched-off="' + d[0] + '"' + (v ? '' : ' checked') + '> Выходной — закрыто</label>' +
         '<span class="sched-times">' + openSel + ' – ' + closeSel + '</span>' +
         '</div>';
     });
-    return '<div class="form-group">' +
-      '<label>Расписание работы (дни и время) *</label>' +
+    return '<p class="form-note">Укажите часы работы по дням недели. Отметьте <b>«Выходной — закрыто»</b>, если в этот день не работаете (время скрывается).</p>' +
       '<div class="sched-grid">' + rows.join('') + '</div>' +
       '<input type="hidden" name="hours" value="' + esc(scheduleToText(sch)) + '">' +
-      '</div>';
+      '<input type="hidden" name="schedule_json" value="' + esc(JSON.stringify(sch)) + '">';
   }
 
   // Собрать расписание из DOM-селекторов

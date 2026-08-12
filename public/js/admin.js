@@ -376,7 +376,9 @@
       '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
       '<strong style="font-size:14px;">🔐 Доступ к кабинету сайта</strong>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">' +
-      '<div class="form-group"><label>Логин (для входа, менять нельзя)</label><input name="authLogin" value="' + h(store.authLogin || '') + '" readonly style="background:#f2f4f7;color:#555;"></div>' +
+      (isSuper()
+        ? '<div class="form-group"><label>Логин для входа в кабинет</label><input name="authLogin" value="' + h(store.authLogin || '') + '" placeholder="s240534"></div>'
+        : '<div class="form-group"><label>Логин для входа (менять нельзя)</label><input name="authLogin" value="' + h(store.authLogin || '') + '" readonly style="background:#f2f4f7;color:#555;"></div>') +
       (isSuper()
         ? '<div class="form-group"><label>Пароль кабинета</label><input name="authPassword" type="text" value="' + h(store.authPassword || '') + '" placeholder="••••••••"></div>'
         : '<div class="form-group"><label>Новый пароль кабинета (пусто — не менять)</label><input name="authPassword" type="password" value="" placeholder="Новый пароль"></div>') +
