@@ -828,17 +828,16 @@
     var mStr = dt.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
     var st = moveStatusLabel(d);
     var pct = Math.round(moveProgress(d) * 100);
-    var sumHtml = d.sum ? ' · ' + Utils.fmtPrice(Math.round(d.sum)) : '';
     var itemsHtml = '';
     if (d.items && d.items.length) {
       var names = d.items.map(function (it) {
+        // Товар ищется строго по артикулу (sku — это ID товара). Если артикула нет в базе —
+        // плейсхолдер + наименование из накладной, без подстановки «похожих» товаров.
         var p = products.find(function (x) { return x.id === it.sku; });
-        // Наименование из накладной (как в модалке состава) — по нему ищется фото;
-        // артикул — только если названия нет вовсе
         var label = it.name || (p && p.name) || it.sku || '';
-        return Utils.deliveryItemHtml(products, label, it.qty > 1 ? it.qty : '');
+        return Utils.deliveryItemHtml(products, label, it.qty > 1 ? it.qty : '', p || null);
       });
-      var shown = names.slice(0, 4);
+      var shown = names.slice(0, 5);
       var more = names.length - shown.length;
       itemsHtml = '<div class="delivery-items">Прибудет: ' + shown.join('') +
         (more > 0 ? '<span class="delivery-more" title="Открыть состав накладной">+' + more + '</span>' : '') +
@@ -851,7 +850,7 @@
       '<div class="delivery-main">' +
       '<div class="move-top">' +
       '<span class="move-status ' + st.cls + '">' + st.text + '</span>' +
-      '<span class="move-num">№' + Utils.esc(d.number || '') + sumHtml + '</span>' +
+      '<span class="move-num">№' + Utils.esc(d.number || '') + '</span>' +
       '</div>' +
       moveRoadHtml(d, pct) +
       moveEtaText(d) +
@@ -944,7 +943,7 @@
     if (Array.isArray(raw)) {
       raw.forEach(function (it) {
         var label = it && (it.name || it.sku || '');
-        if (label) lines.push({ label: String(label).trim(), qty: it.qty ? ' × ' + it.qty : '' });
+        if (label) lines.push({ label: String(label).trim(), qty: it.qty ? ' × ' + it.qty : '', sku: it && it.sku });
       });
     } else if (typeof raw === 'string') {
       String(raw).split(/[;,]/).forEach(function (t) {
@@ -958,7 +957,10 @@
       if (st) storeName = st.name;
     }
     var rows = lines.map(function (l) {
-      var p = Utils.productByLabel(products, l.label);
+      // Накладные: товар строго по артикулу (sku — ID товара), без угадывания по названию
+      var p = null;
+      if (l.sku) p = products.find(function (x) { return x.id === l.sku; }) || null;
+      if (!p) p = Utils.productByArticle(products, l.label);
       var img = p ? (p.thumb || p.image || 'assets/images/products/placeholder.svg') : 'assets/images/products/placeholder.svg';
       return '<div class="delivery-detail-item">' +
         '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +

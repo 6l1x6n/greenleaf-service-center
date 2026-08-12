@@ -106,12 +106,37 @@
     return null;
   }
 
+  // Строгий поиск товара для поставок: артикул → точное имя → вхождение строки.
+  // Без «угадывания» по токенам: товары могут иметь одинаковые названия,
+  // а артикулы всегда уникальны — неверный товар не подставляется.
+  function productByArticle(products, label) {
+    if (!products || !products.length) return null;
+    var q = String(label || '').trim();
+    if (!q) return null;
+    var ql = q.toLowerCase().replace(/ё/g, 'е');
+    var i, p;
+    // 1. Артикул (по sku/id) — точное совпадение
+    for (i = 0; i < products.length; i++) {
+      if (String(products[i].sku || products[i].id || '').toLowerCase() === ql) return products[i];
+    }
+    // 2. Точное имя
+    for (i = 0; i < products.length; i++) {
+      if (String(products[i].name || '').trim().toLowerCase().replace(/ё/g, 'е') === ql) return products[i];
+    }
+    // 3. Вхождение строки в название
+    for (i = 0; i < products.length; i++) {
+      if (String(products[i].name || '').toLowerCase().indexOf(ql) !== -1) return products[i];
+    }
+    return null;
+  }
+
   // Миниатюра товара для позиции поставки; наведение — название, клик — модалка товара.
-  // Всегда рисует картинку (фото товара или плейсхолдер) — артикул/текст вместо
-  // изображения не выводится; при ошибке загрузки фото подменяется плейсхолдером.
-  function deliveryItemHtml(products, label, qty) {
+  // exactProduct — товар, уже найденный по артикулу (накладные): используется ТОЛЬКО он,
+  // без повторного матчинга по названию. Всегда рисуется картинка (фото или плейсхолдер),
+  // при ошибке загрузки фото подменяется плейсхолдером.
+  function deliveryItemHtml(products, label, qty, exactProduct) {
     var txt = Utils.esc(String(label == null ? '' : label));
-    var p = productByLabel(products, label);
+    var p = exactProduct || productByArticle(products, label);
     var img = 'assets/images/products/placeholder.svg';
     var dataAttr = '';
     var cls = 'delivery-item';
@@ -407,6 +432,7 @@
     fmtDate: fmtDate,
     esc: esc,
     productByLabel: productByLabel,
+    productByArticle: productByArticle,
     deliveryItemHtml: deliveryItemHtml,
     clientToken: clientToken,
     openMyOrdersModal: openMyOrdersModal,

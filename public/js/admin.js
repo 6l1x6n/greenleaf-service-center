@@ -921,9 +921,12 @@
     if (Array.isArray(srcItems)) {
       srcItems.forEach(function (it) {
         var name = typeof it === 'object' ? (it.name || '') : String(it);
+        var sku = typeof it === 'object' ? (it.sku || '') : '';
         var qty = typeof it === 'object' ? (it.qty || '') : '';
         itemRows += '<div class="delivery-item-row">' +
-          '<input class="delivery-item-name" list="deliveryProductList" placeholder="Позиция — начните вводить название или артикул" value="' + h(name) + '">' +
+          (sku ? '<code class="delivery-item-sku" title="Артикул">' + h(sku) + '</code>' : '') +
+          '<input class="delivery-item-name" list="deliveryProductList" placeholder="Позиция — начните вводить название или артикул" value="' + h(name) + '"' +
+          (sku ? ' data-sku="' + h(sku) + '" data-name="' + h(name) + '"' : '') + '>' +
           '<input class="delivery-item-qty" type="number" min="1" placeholder="Кол-во" value="' + h(qty) + '">' +
           '<button type="button" class="btn btn-outline btn-sm delivery-item-del">✕</button>' +
           '</div>';
@@ -1007,7 +1010,10 @@
           itemsHtml = '<div class="delivery-items-list">' + d.items.map(function (it) {
             var name = typeof it === 'object' ? (it.name || '') : String(it);
             var qty = typeof it === 'object' ? (it.qty ? it.qty + ' шт' : '') : '';
-            var p = Utils.productByLabel(state.products, name);
+            // Поставка/накладная: товар строго по артикулу (sku — ID товара)
+            var p = null;
+            if (typeof it === 'object' && it.sku) p = state.products.find(function (x) { return x.id === it.sku; }) || null;
+            if (!p) p = Utils.productByArticle(state.products, name);
             var chip = '';
             if (p) {
               var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
@@ -1070,11 +1076,21 @@
       var noteVal = form.note.value.trim();
       var itemsList = [];
       itemsWrap.querySelectorAll('.delivery-item-row').forEach(function (row) {
-        var name = row.querySelector('.delivery-item-name').value.trim();
+        var nameInput = row.querySelector('.delivery-item-name');
+        var name = nameInput.value.trim();
         if (!name) return;
         var qty = parseInt(row.querySelector('.delivery-item-qty').value, 10);
         if (isNaN(qty) || qty <= 0) qty = 1;
-        itemsList.push({ name: name, qty: qty });
+        // Артикул сохраняем: (а) у существующей позиции, если название не менялось;
+        // (б) если введён артикул, совпавший со sku в каталоге
+        var savedSku = nameInput.getAttribute('data-sku');
+        var savedName = nameInput.getAttribute('data-name');
+        if (savedSku && savedName === name) {
+          itemsList.push({ sku: savedSku, name: name, qty: qty });
+          return;
+        }
+        var m = state.products.find(function (x) { return String(x.sku).toLowerCase() === name.toLowerCase(); });
+        itemsList.push(m ? { sku: m.sku, name: m.name, qty: qty } : { name: name, qty: qty });
       });
       if (!itemsList.length) {
         Utils.showToast('⚠️ Добавьте хотя бы одну позицию поставки');
