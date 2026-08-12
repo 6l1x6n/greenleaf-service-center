@@ -425,7 +425,13 @@
 
   function storeSchedule() {
     var st = stores.find(function (s) { return s.id === state.storeId; });
-    return (st && st.schedule) || null;
+    if (st && st.schedule && typeof st.schedule === 'object' && st.schedule.mon !== undefined) return st.schedule;
+    // Расписания нет — пробуем распарсить текстовые часы («Пн–Вс 10:00 – 20:00»)
+    if (st && window.Utils && Utils.scheduleDefault) {
+      var parsed = Utils.scheduleDefault(st);
+      if (parsed && parsed.mon) return parsed;
+    }
+    return null;
   }
 
   function dayKeyOf(d) {
@@ -937,12 +943,13 @@
     } catch (e) { }
     await StoreStock.load();
 
-    initPickupSelectors();
-
     var saved = savedStore();
     if (saved && saved.id) state.storeId = saved.id;
 
     render();
+    // Селекторы даты/времени строим ПОСЛЕ выбора филиала (иначе расписание
+    // не подхватывается и предлагается общее время 9:00–19:30)
+    initPickupSelectors();
     scheduleReserve();
   }
 

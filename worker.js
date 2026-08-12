@@ -291,6 +291,23 @@ function scheduleMinutes(t) {
   return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
 }
 
+// Расписание из текстовой строки часов («Пн–Вс 10:00 – 20:00», «Пн–Пт 9:00 – 18:00»).
+// Используется как откат, если у филиала не заполнен объект schedule, а только hours.
+function scheduleFromText(hours) {
+  const hrs = String(hours || '');
+  const m = /(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})/.exec(hrs);
+  if (!m) return null; // нет диапазона времени — ограничение не применяем
+  const open = m[1] + ':' + m[2];
+  const close = m[3] + ':' + m[4];
+  const off = {};
+  if (/Пн\s*[-–—]\s*Пт/.test(hrs)) { off.sat = true; off.sun = true; }
+  else if (/Пн\s*[-–—]\s*Сб/.test(hrs) || /Сб\s*[-–—]\s*Вс/.test(hrs)) { off.sun = true; }
+  const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const sch = {};
+  DAYS.forEach(function (d) { sch[d] = off[d] ? null : { open: open, close: close }; });
+  return sch;
+}
+
 // Общий часовой пояс сайта — Астана (UTC+5): расписание филиалов задаётся и проверяется
 // в этом времени. Единая зона для всех филиалов (решение владельца). Cloudflare Workers
 // работает в UTC — без пересчёта «сегодня»/часы работы съезжали бы на границе суток
@@ -1706,7 +1723,10 @@ async function validatePickupSchedule(env, data) {
   if (!storeId || !pDate || !pTime) return null;
   const stores = await kvGet(env, 'stores');
   const store = (stores && typeof stores === 'object') ? stores[storeId] : null;
-  const sch = store && store.schedule;
+  let sch = null;
+  if (store) {
+    sch = (store.schedule && typeof store.schedule === 'object') ? store.schedule : scheduleFromText(store.hours);
+  }
   if (!sch) return null;
   const d = new Date(pDate + 'T00:00:00');
   if (isNaN(d.getTime())) return null;
