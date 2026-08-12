@@ -2300,7 +2300,7 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 
 /* «Мои заказы» — собранный вид (SVG-иконки, спокойная иерархия) */
 .ico { vertical-align: -3px; margin-right: 4px; flex: none; }
-.my-orders-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.my-orders-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding-right: 40px; }
 .my-orders-head h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
 .my-orders-refresh {
   display: inline-flex;
@@ -2316,18 +2316,21 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .my-orders-refresh:hover { color: var(--green); background: var(--green-soft); }
 .my-orders-info { display: flex; align-items: flex-start; gap: 8px; }
 .my-orders-info .ico { margin-top: 2px; }
+.my-orders-list { padding-bottom: 4px; }
 .my-orders-list li {
   display: block !important;
   width: 100%;
+  border-bottom: 0 !important;
 }
+.my-orders-list li:last-child { margin-bottom: 4px; }
 .order-card {
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 14px 16px 12px;
+  padding: 16px 20px 14px;
   margin-bottom: 12px;
   background: #fff;
 }
-.order-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.order-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .order-id-chip {
   display: inline-flex;
   align-items: center;
@@ -2364,7 +2367,7 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   opacity: 0.9;
 }
 .order-cancel-link:hover { background: #fdf2f2; border-color: #e5b9b9; opacity: 1; }
-.my-orders-foot { display: flex; justify-content: center; margin-top: 12px; }
+.my-orders-foot { display: flex; justify-content: center; margin: 16px 0 4px; }
 .badge-st-new { background: #fff3cd; color: #8a6d00; }
 .badge-st-ready { background: #cce5ff; color: #004085; }
 .badge-st-confirmed { background: #d4edda; color: #155724; }

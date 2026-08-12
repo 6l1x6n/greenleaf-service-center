@@ -200,6 +200,15 @@
     return { label: '—', sub: '', icon: 'info', cls: 'badge' };
   }
 
+  // Единый формат даты в модалке: «13 авг · 09:00» (без запятых и точек после месяца)
+  function orderDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var date = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace(/\./g, '');
+    var time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return date + ' · ' + time;
+  }
+
   // Модалка со списком заказов этого устройства. Данные грузятся только при открытии
   // (1 запрос); позиции/фото подтягиваются из уже загруженного каталога (0 запросов).
   function openMyOrdersModal() {
@@ -251,14 +260,14 @@
             var pkg = Number(o.package) || 0;
             var goodsTotal = Number(o.total) || 0;
             if (pkg > 0 && goodsTotal > pkg) {
-              summaryParts.push('<span class="sum-goods">' + icon('money', 15) + 'Товары: ' + fmtPrice(goodsTotal - pkg) + '</span>');
-              summaryParts.push('<span class="sum-pkg">' + icon('box', 14) + 'Пакет: ' + fmtPrice(pkg) + '</span>');
+              summaryParts.push('<span class="sum-goods">Товары: ' + fmtPrice(goodsTotal - pkg) + '</span>');
+              summaryParts.push('<span class="sum-pkg">Пакет: ' + fmtPrice(pkg) + '</span>');
             }
             if (goodsTotal) {
-              summaryParts.push('<span class="sum-total">' + icon('card', 15) + 'Итого: <b>' + fmtPrice(goodsTotal) + '</b></span>');
+              summaryParts.push('<span class="sum-total">Итого: <b>' + fmtPrice(goodsTotal) + '</b></span>');
             }
-            if (o.payment) summaryParts.push('<span class="sum-pay">' + icon('card', 14) + esc(o.payment) + '</span>');
-            if (o.pickupDate) summaryParts.push('<span class="sum-pickup">' + icon('calendar', 15) + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' })) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : '') + '</span>');
+            if (o.payment) summaryParts.push('<span class="sum-pay">' + esc(o.payment) + '</span>');
+            if (o.pickupDate) summaryParts.push('<span class="sum-pickup">' + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' }).replace(/\./g, '')) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : '') + '</span>');
             var noteTxt = o.managerNote ? '<div class="order-manager-note">' + icon('info', 14) + '<span><b>Сообщение менеджера:</b> ' + esc(o.managerNote) + '</span></div>' : '';
             return '<li class="order-card">' +
               '<div class="order-card-head">' +
@@ -266,7 +275,7 @@
               '<button class="btn btn-outline btn-sm" type="button" data-copy-order="' + esc(oid) + '" title="Скопировать номер">' + icon('copy', 14) + '</button></span>' +
               '<span class="' + st.cls + '">' + icon(st.icon, 14) + ' ' + st.label + (st.sub ? '<small> · ' + st.sub + '</small>' : '') + '</span>' +
               '</div>' +
-              '<div class="order-meta">' + icon('store', 14) + ' <span>' + esc(o.storeName || '—') + ' · ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Almaty' })) + '</span></div>' +
+              '<div class="order-meta">' + icon('store', 14) + ' <span>' + esc(o.storeName || '—') + ' · ' + esc(orderDate(o.createdAt)) + '</span></div>' +
               '<div class="order-receipt">' + itemsHtml + '</div>' +
               '<div class="order-summary">' + summaryParts.map(function (s) { return '<span>' + s + '</span>'; }).join('') + '</div>' +
               noteTxt +
