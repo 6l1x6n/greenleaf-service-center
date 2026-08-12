@@ -29,6 +29,7 @@
         <a class="btn btn-primary btn-sm cart-link" href="cart.html" aria-label="Корзина">
           🛒 <span class="cart-badge" id="cartCount"></span>
         </a>
+        <button class="btn btn-outline btn-sm my-orders-link" type="button" aria-label="Мои заказы">📦 Мои заказы</button>
         <button class="btn btn-outline btn-sm" id="scAuthBtn">Войти</button>
         <button class="burger" id="burger" aria-label="Открыть меню"><span></span><span></span><span></span></button>
       </div>
@@ -48,10 +49,19 @@
         </div>
 
         <div id="cartSuccess" class="cart-success hidden">
-          <div class="cart-success-ico">✅</div>
-          <h3>Заказ отправлен!</h3>
-          <p>Менеджер подтвердит заказ и свяжется с вами. Оплату по Kaspi проверим по оповещению — заказ будет готов к указанному времени.</p>
-          <a class="btn btn-primary" href="index.html#catalog">Вернуться в каталог</a>
+          <div class="form-success-panel cart-success-panel">
+            <div class="fsp-icon">✅</div>
+            <div class="fsp-title">Заказ отправлен!</div>
+            <p class="cart-success-order">Номер заказа: <b id="successOrderId">—</b>
+              <button class="btn btn-outline btn-sm" type="button" id="successCopyBtn" title="Скопировать номер">📋</button>
+            </p>
+            <p class="fsp-text" id="successPayText">Менеджер подтвердит заказ и свяжется с вами.</p>
+            <p class="fsp-text" id="successTrackHint" style="font-size:13px;">Отслеживать заказ можно в разделе «📦 Мои заказы» — там же видно его статус.</p>
+            <div class="admin-actions" style="justify-content:center; margin-top:14px; flex-wrap:wrap;">
+              <a class="btn btn-outline" href="#" id="successMyOrdersBtn">📦 Мои заказы</a>
+              <a class="btn btn-primary" href="index.html#catalog">Вернуться в каталог</a>
+            </div>
+          </div>
         </div>
 
         <div id="cartView" class="cart-layout hidden">
@@ -114,6 +124,7 @@
               <input type="hidden" name="order_partner_mode" id="orderPartnerMode">
               <input type="hidden" name="partner_id" id="orderPartnerId">
               <input type="hidden" name="order_store" id="orderStore">
+              <input type="hidden" name="clientToken" id="orderClientToken">
               <input name="name" placeholder="Ваше имя *" required>
               <input name="phone" type="tel" placeholder="+7 (___) ___-__-__ *" required>
               <div class="cash-fields hidden" data-cash-fields>

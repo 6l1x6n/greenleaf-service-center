@@ -106,18 +106,127 @@
     return null;
   }
 
-  // Миниатюра товара для позиции поставки; наведение — название, клик — модалка товара
+  // Миниатюра товара для позиции поставки; наведение — название, клик — модалка товара.
+  // Всегда рисует картинку (фото товара или плейсхолдер) — артикул/текст вместо
+  // изображения не выводится; при ошибке загрузки фото подменяется плейсхолдером.
   function deliveryItemHtml(products, label, qty) {
+    var txt = Utils.esc(String(label == null ? '' : label));
     var p = productByLabel(products, label);
-    var txt = Utils.esc(label);
+    var img = 'assets/images/products/placeholder.svg';
+    var dataAttr = '';
+    var cls = 'delivery-item';
     if (p) {
-      var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
-      return '<span class="delivery-item" data-del-open="' + Utils.esc(p.id) + '" title="' + txt + '" style="cursor:pointer;">' +
-        '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" onerror="this.style.display=\'none\'">' +
-        (qty ? ' × ' + qty : '') + '</span>';
+      img = p.thumb || p.image || img;
+      dataAttr = ' data-del-open="' + Utils.esc(p.id) + '"';
+      cls += ' has-prod';
     }
-    return '<span class="delivery-item" title="' + txt + '">' + txt + (qty ? ' × ' + qty : '') + '</span>';
+    return '<span class="' + cls + '"' + dataAttr + ' title="' + txt + '" style="cursor:pointer;">' +
+      '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
+      (qty ? ' <b class="delivery-item-qty">× ' + Utils.esc(String(qty).replace(/^×\s*/, '')) + '</b>' : '') +
+      '</span>';
   }
+
+  // ---------------- «Мои заказы» клиента (без кабинетов) ----------------
+
+  var CLIENT_TOKEN_KEY = 'greenleaf_client_token_v1';
+
+  // Токен устройства: привязывает заказы к этому браузеру (localStorage)
+  function clientToken() {
+    try {
+      var t = localStorage.getItem(CLIENT_TOKEN_KEY);
+      if (!t) {
+        t = 'ct_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+        localStorage.setItem(CLIENT_TOKEN_KEY, t);
+      }
+      return t;
+    } catch (e) { return ''; }
+  }
+
+  function orderStatusMeta(status) {
+    if (status === 'new') return { label: '⏳ Новый — ждём подтверждения', cls: 'badge' };
+    if (status === 'ready') return { label: '🟦 Готов к выдаче — можно забирать', cls: 'badge' };
+    if (status === 'confirmed') return { label: '✅ Подтверждён — выдан', cls: 'badge' };
+    if (status === 'cancelled') return { label: '🚫 Отменён', cls: 'badge' };
+    return { label: '—', cls: 'badge' };
+  }
+
+  // Модалка со списком заказов этого устройства. Данные грузятся только при открытии
+  // (1 запрос); позиции подтягиваются из уже загруженного каталога.
+  function openMyOrdersModal() {
+    var token = clientToken();
+    if (!token) { showToast('Не удалось определить устройство'); return; }
+    openModal('<h3>📦 Мои заказы</h3><p class="modal-product">Заказы, оформленные с этого устройства.</p><div id="myOrdersList">Загружаем…</div>');
+    var listEl = document.getElementById('myOrdersList');
+    var render = function () {
+      listEl.innerHTML = 'Загружаем…';
+      fetch('/api/my-orders?token=' + encodeURIComponent(token))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var orders = (d && d.orders) || [];
+          if (!orders.length) {
+            listEl.innerHTML = '<div class="owner-req-empty">У вас пока нет заказов.<br><a href="catalog.html">Перейти в каталог →</a></div>';
+            return;
+          }
+          var byId = {};
+          (window.CatalogProducts || []).forEach(function (p) { byId[p.id] = p; });
+          listEl.innerHTML = '<ul class="admin-list">' + orders.map(function (o) {
+            var st = orderStatusMeta(o.status);
+            var itemsHtml = (o.items || []).map(function (i) {
+              var p = byId[i.productId];
+              var img = p ? (p.thumb || p.image) : '';
+              var name = p ? p.name : i.productId;
+              return '<span class="delivery-item-row">' +
+                (img ? '<img class="delivery-item-img" src="' + esc(img) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '') +
+                esc(name) + ' × ' + esc(i.qty) + '</span>';
+            }).join('');
+            var totalTxt = o.total ? ' · 💰 ' + esc(o.total) + ' ₸' : '';
+            var payTxt = o.payment ? ' · ' + esc(o.payment) : '';
+            var noteTxt = o.managerNote ? '<p class="form-note" style="margin-top:6px;">💬 ' + esc(o.managerNote) + '</p>' : '';
+            return '<li>' +
+              '<div class="admin-list-main">' +
+              '<strong>' + esc(o.id) + ' <span class="' + st.cls + '">' + st.label + '</span></strong>' +
+              '<span>🏬 ' + esc(o.storeName || '—') + ' · 🕐 ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
+              '<div class="delivery-items" style="margin:6px 0 0;">' + itemsHtml + '</div>' +
+              '<span style="font-size:13px;color:var(--muted);">' + (totalTxt || '') + (payTxt || '') + '</span>' +
+              noteTxt +
+              '</div>' +
+              (o.status === 'new' ? '<div class="admin-actions"><button class="btn btn-outline btn-sm danger-btn" data-my-cancel="' + esc(o.id) + '">🚫 Отменить заказ</button></div>' : '') +
+              '</li>';
+          }).join('') + '</ul>' +
+          '<div class="admin-actions" style="margin-top:12px;"><button class="btn btn-outline btn-sm" type="button" id="myOrdersRefreshBtn">🔄 Обновить</button></div>';
+
+          listEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-my-cancel]');
+            if (!btn) return;
+            var oid = btn.getAttribute('data-my-cancel');
+            if (!confirm('Отменить заказ «' + oid + '»? Зарезервированный товар вернётся в наличие. Отменить можно только пока заказ ещё «Новый».')) return;
+            fetch('/api/my-orders/action', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: oid, token: token, action: 'cancel' })
+            }).then(function (r) { return r.json(); }).then(function (res) {
+              showToast(res && res.ok ? '🚫 Заказ отменён' : ((res && res.error) || '⚠️ Не удалось отменить заказ'));
+              render();
+            }).catch(function () { showToast('⚠️ Нет связи — попробуйте ещё раз'); });
+          });
+          var ref = document.getElementById('myOrdersRefreshBtn');
+          if (ref) ref.addEventListener('click', render);
+        })
+        .catch(function () {
+          listEl.innerHTML = '<div class="owner-req-empty">Не удалось загрузить заказы. Проверьте соединение и попробуйте ещё раз.</div>';
+        });
+    };
+    render();
+  }
+
+  // Кнопка «📦 Мои заказы» в шапке — открывает модалку
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.my-orders-link');
+    if (btn) {
+      e.preventDefault();
+      openMyOrdersModal();
+    }
+  });
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -292,6 +401,8 @@
     esc: esc,
     productByLabel: productByLabel,
     deliveryItemHtml: deliveryItemHtml,
+    clientToken: clientToken,
+    openMyOrdersModal: openMyOrdersModal,
     getStore: function () { return store; },
     waLink: waLink,
     iconX: iconX,

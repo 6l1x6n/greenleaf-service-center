@@ -35,6 +35,19 @@
     return reserve.orderId;
   }
 
+  // Токен устройства для «Моих заказов»: привязывает заказы к этому браузеру
+  function clientToken() {
+    if (window.Utils && Utils.clientToken) return Utils.clientToken();
+    try {
+      var t = localStorage.getItem('greenleaf_client_token_v1');
+      if (!t) {
+        t = 'ct_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+        localStorage.setItem('greenleaf_client_token_v1', t);
+      }
+      return t;
+    } catch (e) { return ''; }
+  }
+
   function availableCount(l) {
     if (!state.storeId) return null;
     return StoreStock.count(state.storeId, l.p.id);
@@ -735,6 +748,8 @@
       }
       setField('orderId', orderId());
       setField('orderStoreId', state.storeId || '');
+      var ctInput = document.getElementById('orderClientToken');
+      if (ctInput) ctInput.value = clientToken();
       setField('orderItemsJson', JSON.stringify(t.lines.map(function (l) {
         return { productId: l.p.id, sku: l.p.sku, name: l.p.name, qty: l.qty, price: l.price };
       })));
@@ -775,6 +790,32 @@
     emptyEl.classList.add('hidden');
     viewEl.classList.add('hidden');
     successEl.classList.remove('hidden');
+
+    // Номер заказа + текст в зависимости от способа оплаты
+    var oidEl = document.getElementById('successOrderId');
+    if (oidEl) oidEl.textContent = orderId();
+    var payEl = document.getElementById('successPayText');
+    if (payEl) {
+      payEl.textContent = state.payment === 'cash'
+        ? 'Оплата наличными при получении — ничего предоплачивать не нужно. Менеджер подтвердит заказ и свяжется с вами.'
+        : 'Оплату по Kaspi проверим по оповещению. Менеджер подтвердит заказ и свяжется с вами.';
+    }
+    var copyBtn = document.getElementById('successCopyBtn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(orderId()).then(function () { Utils.showToast('📋 Номер заказа скопирован'); });
+        }
+      });
+    }
+    var myBtn = document.getElementById('successMyOrdersBtn');
+    if (myBtn) {
+      myBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (window.Utils) Utils.openMyOrdersModal();
+      });
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 

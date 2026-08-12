@@ -1390,8 +1390,9 @@
         state.stores.forEach(function (s) { storeName[s.id] = s.name; });
         listEl.innerHTML = '<ul class="admin-list">' + orders.map(function (o) {
           var statusBadge = o.status === 'new' ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">⏳ Новый</span>'
-            : (o.status === 'confirmed' ? '<span class="badge" style="background:#d4edda;color:#155724;">✅ Подтверждён</span>'
-              : '<span class="badge" style="background:#f8d7da;color:#721c24;">🚫 Отменён</span>');
+            : (o.status === 'ready' ? '<span class="badge" style="background:#cce5ff;color:#004085;">🟦 Готов к выдаче</span>'
+              : (o.status === 'confirmed' ? '<span class="badge" style="background:#d4edda;color:#155724;">✅ Подтверждён</span>'
+                : '<span class="badge" style="background:#f8d7da;color:#721c24;">🚫 Отменён</span>'));
           var itemsHtml = (o.items || []).map(function (i) {
             var p = byId[i.productId];
             return '<li><span>' + h(i.productId) + (p ? ' · ' + h(p.name) : '') + '</span><b>× ' + h(i.qty) + '</b></li>';
@@ -1399,6 +1400,8 @@
           var totalTxt = o.total ? '<span>💰 ' + h(o.total) + ' ₸</span>' : '';
           var payTxt = o.payment ? '<span>💳 ' + h(o.payment) + '</span>' : '';
           var pickupTxt = o.pickupDate ? '<span>📅 ' + h(o.pickupDate) + (o.pickupTime ? ' в ' + h(o.pickupTime) : '') + '</span>' : '';
+          var noteTxt = o.managerNote ? '<span style="color:var(--muted);">💬 Менеджер: ' + h(o.managerNote) + '</span>' : '';
+          var canResolve = o.status === 'new' || o.status === 'ready';
           return '<li>' +
             '<div class="admin-list-main">' +
             '<strong>' + h(o.id) + ' ' + statusBadge + '</strong>' +
@@ -1406,26 +1409,37 @@
             '<span>🏬 ' + h(storeName[o.storeId] || o.storeId || '—') + ' · 🕐 ' + h(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
             '<ul style="margin:6px 0 0 18px;">' + itemsHtml + '</ul>' +
             (totalTxt || payTxt || pickupTxt ? '<span>' + [totalTxt, payTxt, pickupTxt].filter(Boolean).join(' · ') + '</span>' : '') +
-            (o.comment ? '<span style="color:var(--muted);">💬 ' + h(o.comment) + '</span>' : '') +
+            (o.comment ? '<span style="color:var(--muted);">💬 Клиент: ' + h(o.comment) + '</span>' : '') +
+            noteTxt +
             '</div>' +
             '<div class="admin-actions" style="flex-wrap:wrap;">' +
-            (o.status === 'new' ? '<button class="btn btn-primary btn-sm" data-order-confirm="' + h(o.id) + '">✅ Подтвердить</button>' : '') +
-            (o.status === 'new' ? '<button class="btn btn-outline btn-sm" data-order-cancel="' + h(o.id) + '">🚫 Отменить</button>' : '') +
+            (o.status === 'new' ? '<button class="btn btn-outline btn-sm" data-order-ready="' + h(o.id) + '">🟦 Готов к выдаче</button>' : '') +
+            (canResolve ? '<button class="btn btn-primary btn-sm" data-order-confirm="' + h(o.id) + '">✅ Подтвердить</button>' : '') +
+            (canResolve ? '<button class="btn btn-outline btn-sm" data-order-cancel="' + h(o.id) + '">🚫 Отменить</button>' : '') +
             '<button class="btn btn-outline btn-sm danger-btn" data-order-delete="' + h(o.id) + '">🗑 Удалить</button>' +
             '</div></li>';
         }).join('') + '</ul>';
 
         listEl.addEventListener('click', function (e) {
-          var btn = e.target.closest('[data-order-confirm],[data-order-cancel],[data-order-delete]');
+          var btn = e.target.closest('[data-order-confirm],[data-order-cancel],[data-order-delete],[data-order-ready]');
           if (!btn) return;
-          var oid = btn.getAttribute('data-order-' + (btn.hasAttribute('data-order-confirm') ? 'confirm' : (btn.hasAttribute('data-order-cancel') ? 'cancel' : 'delete')));
-          var action = btn.hasAttribute('data-order-confirm') ? 'confirm' : (btn.hasAttribute('data-order-cancel') ? 'cancel' : 'delete');
-          var label = action === 'confirm' ? 'Подтвердить заказ «' + oid + '»? Товар считается проданным и не вернётся в остаток.' :
-            (action === 'cancel' ? 'Отменить заказ «' + oid + '»? Зарезервированный товар вернётся в доступное.' : 'Удалить заказ «' + oid + '»? Подтверждённый заказ удаляется без возврата товара.');
+          var oid = btn.hasAttribute('data-order-ready') ? btn.getAttribute('data-order-ready')
+            : btn.getAttribute('data-order-' + (btn.hasAttribute('data-order-confirm') ? 'confirm' : (btn.hasAttribute('data-order-cancel') ? 'cancel' : 'delete')));
+          var action = btn.hasAttribute('data-order-ready') ? 'ready' : (btn.hasAttribute('data-order-confirm') ? 'confirm' : (btn.hasAttribute('data-order-cancel') ? 'cancel' : 'delete'));
+          var label = action === 'ready' ? 'Отметить заказ «' + oid + '» готовым к выдаче? Клиент увидит статус в «Моих заказах».' :
+            (action === 'confirm' ? 'Подтвердить заказ «' + oid + '»? Товар считается проданным и не вернётся в остаток.' :
+              (action === 'cancel' ? 'Отменить заказ «' + oid + '»? Зарезервированный товар вернётся в доступное.' : 'Удалить заказ «' + oid + '»? Подтверждённый заказ удаляется без возврата товара.'));
           if (!confirm(label)) return;
-          Auth.api('/api/orders/action', { method: 'POST', body: JSON.stringify({ id: oid, action: action }) }).then(function (res) {
+          // Необязательный комментарий для клиента (виден в «Моих заказах»)
+          var comment = '';
+          if (action !== 'delete') {
+            comment = prompt('Комментарий для клиента (необязательно):', '') || '';
+          }
+          var payload = { id: oid, action: action };
+          if (comment) payload.comment = comment.trim();
+          Auth.api('/api/orders/action', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
             if (res && res.ok) {
-              Utils.showToast(action === 'confirm' ? '✅ Заказ подтверждён' : (action === 'cancel' ? '🚫 Заказ отменён' : '🗑 Заказ удалён'));
+              Utils.showToast(action === 'ready' ? '🟦 Заказ готов к выдаче' : (action === 'confirm' ? '✅ Заказ подтверждён' : (action === 'cancel' ? '🚫 Заказ отменён' : '🗑 Заказ удалён')));
             } else {
               Utils.showToast((res && res.error) || '⚠️ Не удалось выполнить. Войдите заново (сессия истекла).');
             }

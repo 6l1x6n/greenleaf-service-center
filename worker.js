@@ -419,6 +419,8 @@ async function createOrder(env, data) {
     name: String(data.name || '').trim(),
     phone: String(data.phone || '').trim(),
     comment: String(data.comment || data.order_comment || '').trim(),
+    clientToken: String(data.clientToken || '').trim(),
+    managerNote: '',
     total: Number(data.order_total) || 0,
     payment: String(data.payment || ''),
     pickupDate: String(data.pickup_date || data.pickupDate || ''),
@@ -451,11 +453,13 @@ async function handleOrdersGet(request, env, auth) {
   return jsonResponse({ ok: true, orders: list, archive: history });
 }
 
-// POST /api/orders/action {id, action: confirm|cancel|delete}
-//   confirm — new → confirmed: резерв переходит в продажу, остаток не меняется.
-//   cancel  — new → cancelled: резерв снимается, товар возвращается в доступное.
-//   delete  — удаление из списка: для new возвращает резерв (как отмена),
-//             для confirmed НЕ возвращает товар (продажа уже состоялась).
+// POST /api/orders/action {id, action: ready|confirm|cancel|delete, comment?}
+//   ready    — new → ready (заказ упакован, готов к выдаче): резерв сохраняется.
+//   confirm  — new/ready → confirmed: резерв переходит в продажу, остаток не меняется.
+//   cancel   — new/ready → cancelled: резерв снимается, товар возвращается в доступное.
+//   delete   — удаление из списка: для new/ready возвращает резерв (как отмена),
+//              для confirmed НЕ возвращает товар (продажа уже состоялась).
+//   comment  — опционально, сообщение для клиента (managerNote, виден в «Моих заказах»).
 async function handleOrdersAction(request, env, auth) {
   let body;
   try {
@@ -465,6 +469,7 @@ async function handleOrdersAction(request, env, auth) {
   }
   const id = String(body.id || '').trim();
   const action = String(body.action || '').trim();
+  const note = String(body.comment || '').trim();
   const orders = await loadOrders(env);
   const order = orders[id];
   if (!order) return jsonResponse({ ok: false, error: 'Заказ не найден' }, 404);
@@ -473,28 +478,41 @@ async function handleOrdersAction(request, env, auth) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403);
   }
 
-  if (action === 'confirm') {
+  if (action === 'ready') {
     if (order.status !== 'new') {
-      return jsonResponse({ ok: false, error: 'Подтвердить можно только новый заказ' }, 400);
+      return jsonResponse({ ok: false, error: 'Отметить «готов» можно только новый заказ' }, 400);
+    }
+    order.status = 'ready';
+    order.readyAt = new Date().toISOString();
+    if (note) order.managerNote = note;
+    await kvPut(env, 'orders', orders);
+    return jsonResponse({ ok: true, order });
+  }
+
+  if (action === 'confirm') {
+    if (order.status !== 'new' && order.status !== 'ready') {
+      return jsonResponse({ ok: false, error: 'Подтвердить можно только новый или готовый заказ' }, 400);
     }
     order.status = 'confirmed';
     order.confirmedAt = new Date().toISOString();
+    if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
     return jsonResponse({ ok: true, order });
   }
 
   if (action === 'cancel') {
-    if (order.status !== 'new') {
-      return jsonResponse({ ok: false, error: 'Отменить можно только новый заказ' }, 400);
+    if (order.status !== 'new' && order.status !== 'ready') {
+      return jsonResponse({ ok: false, error: 'Отменить можно только новый или готовый заказ' }, 400);
     }
     order.status = 'cancelled';
     order.cancelledAt = new Date().toISOString();
+    if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
     return jsonResponse({ ok: true, order });
   }
 
   if (action === 'delete') {
-    const wasNew = order.status === 'new';
+    const wasNew = order.status === 'new' || order.status === 'ready';
     delete orders[id];
     await kvPut(env, 'orders', orders);
     // Суперадмин может удалять и архивные заказы
@@ -505,11 +523,71 @@ async function handleOrdersAction(request, env, auth) {
         await kvPut(env, 'orders_history', history);
       }
     }
-    // Удаление не меняет физический остаток: для new резерв снимается (заказа больше
+    // Удаление не меняет физический остаток: для new/ready резерв снимается (заказа больше
     // нет — товар снова доступен), для confirmed продажа остаётся продажей.
     return jsonResponse({ ok: true, deleted: true, returned: wasNew });
   }
 
+  return jsonResponse({ ok: false, error: 'unknown action' }, 400);
+}
+
+// ---------------- «Мои заказы» клиента (без аккаунтов) ----------------
+// Клиент отслеживает заказы по clientToken, сохранённому в localStorage устройства.
+// Токен генерируется на клиенте и передаётся с каждым заказом.
+
+// GET /api/my-orders?token=... — свои заказы (активные + архив по токену)
+async function handleMyOrders(request, env) {
+  const url = new URL(request.url);
+  const token = String(url.searchParams.get('token') || '').trim();
+  if (!token || token.length < 16) {
+    return jsonResponse({ ok: false, error: 'token required' }, 400);
+  }
+  const stores = await kvGet(env, 'stores');
+  const active = await loadOrders(env);
+  const history = await kvGet(env, 'orders_history');
+  const list = [];
+  const push = function (o, archived) {
+    if (!o || String(o.clientToken || '') !== token) return;
+    const store = stores[o.storeId];
+    list.push(Object.assign({}, o, {
+      storeName: store ? store.name : (o.storeId || ''),
+      archived: !!archived
+    }));
+  };
+  Object.keys(active).forEach(function (id) { push(active[id], false); });
+  Object.keys(history).forEach(function (id) { push(history[id], true); });
+  list.sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+  return jsonResponse({ ok: true, orders: list });
+}
+
+// POST /api/my-orders/action {id, token, action: 'cancel'} — отмена своего заказа
+// (только пока заказ «Новый»; отменённый заказ возвращает зарезервированный товар)
+async function handleMyOrdersAction(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const id = String(body.id || '').trim();
+  const token = String(body.token || '').trim();
+  const action = String(body.action || '').trim();
+  if (!id || !token) return jsonResponse({ ok: false, error: 'id и token обязательны' }, 400);
+  const orders = await loadOrders(env);
+  const order = orders[id];
+  if (!order || String(order.clientToken || '') !== token) {
+    return jsonResponse({ ok: false, error: 'Заказ не найден' }, 404);
+  }
+  if (action === 'cancel') {
+    if (order.status !== 'new') {
+      return jsonResponse({ ok: false, error: 'Отменить можно только заказ в статусе «Новый»' }, 400);
+    }
+    order.status = 'cancelled';
+    order.cancelledAt = new Date().toISOString();
+    order.managerNote = order.managerNote || 'Отменён клиентом';
+    await kvPut(env, 'orders', orders);
+    return jsonResponse({ ok: true, order });
+  }
   return jsonResponse({ ok: false, error: 'unknown action' }, 400);
 }
 
@@ -1268,13 +1346,13 @@ async function handleProductsJson(request, env, url) {
   data.overrides = overrides;
   data.scOverrides = scOverrides;
   data.settings = settings;
-  // Кеш 1 час на edge: каталог меняется только парсером (раз в 3 часа) и
-  // ручными оверрайдами; stale-while-revalidate перевыпускает фоном.
-  // ETag: повторные запросы ботов/краулеров уходят по 304 без тела.
+  // Кеш 60с на edge: бейджи, цены и новые товары суперадмина/парсера
+  // должны появляться на сайте быстро (не дольше минуты). SWR 5 мин —
+  // перевыпуск фона. ETag: повторные запросы ботов уходят по 304 без тела.
   const body = JSON.stringify(data);
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
   const etag = '"' + bytesToHex(digest) + '"';
-  const cacheHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=7200', 'ETag': etag };
+  const cacheHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300', 'ETag': etag };
   if (request.headers.get('If-None-Match') === etag) {
     return new Response(null, { status: 304, headers: cacheHeaders });
   }
@@ -1308,6 +1386,7 @@ function buildText(data) {
 
   const blocks = {
     order: [
+      '🆔 Номер заказа: ' + (data.order_id || data.orderId || '—'),
       '💳 Оплата: ' + (data.payment || '—'),
       data.partner_id ? '🎫 ID партнёра: ' + data.partner_id + (data.order_partner_mode === '1' ? ' (партнёрские цены)' : '') : null,
       data.order_store ? '🏬 Филиал: ' + data.order_store : null,
@@ -1511,6 +1590,14 @@ export default {
     }
     if (path === '/api/event-book' && request.method === 'POST') {
       return handleEventBook(request, env);
+    }
+
+    // 1.4.4 «Мои заказы» клиента (по clientToken устройства, без кеша)
+    if (path === '/api/my-orders' && request.method === 'GET') {
+      return handleMyOrders(request, env);
+    }
+    if (path === '/api/my-orders/action' && request.method === 'POST') {
+      return handleMyOrdersAction(request, env);
     }
 
     // 1.5 Админские API (суперадмин по токену; /api/sc-stores, /api/orders — суперадмин или свой СЦ)

@@ -833,7 +833,9 @@
     if (d.items && d.items.length) {
       var names = d.items.map(function (it) {
         var p = products.find(function (x) { return x.id === it.sku; });
-        var label = p ? p.name : (it.sku || '');
+        // Наименование из накладной (как в модалке состава) — по нему ищется фото;
+        // артикул — только если названия нет вовсе
+        var label = it.name || (p && p.name) || it.sku || '';
         return Utils.deliveryItemHtml(products, label, it.qty > 1 ? it.qty : '');
       });
       var shown = names.slice(0, 4);
