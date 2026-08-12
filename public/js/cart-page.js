@@ -45,6 +45,14 @@
     return max === null || l.qty <= max;
   }
 
+  // Дата сегодня в формате YYYY-MM-DD (местное время)
+  function dateStr() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
   function hideTimer() {
     if (reserveTimerEl) reserveTimerEl.classList.add('hidden');
     if (reserve.interval) { clearInterval(reserve.interval); reserve.interval = null; }
@@ -89,7 +97,12 @@
     if (!state.storeId || !t.lines.length) {
       reserve.expired = false;
       reserve.signature = '';
-      hideTimer();
+      if (!state.storeId && t.lines.length && reserveTimerEl) {
+        reserveTimerEl.innerHTML = '🛒 Выберите Сервис-Центр в каталоге, чтобы зарезервировать товары.';
+        reserveTimerEl.classList.remove('hidden');
+      } else {
+        hideTimer();
+      }
       return;
     }
     var signature = state.storeId + '|' + t.lines.map(function (l) { return l.p.id + ':' + l.qty; }).join(',');
@@ -117,9 +130,31 @@
         expiredState();
         return;
       }
-      reserve.expiresAt = Number(d.expiresAt) || (Date.now() + RESERVE_TTL * 1000);
+      reserve.expiresAt = Number(d.expiresAt) || 0;
+      // Ответ пришёл, но срок брони уже прошёл — перебронируем заново
+      if (reserve.expiresAt <= Date.now()) {
+        reserve.expiresAt = 0;
+        retryReserve(500);
+        return;
+      }
       startTimer();
-    }).catch(function () { expiredState(); });
+    }).catch(function () {
+      // Ошибка сети: бронь не снимаем, пробуем ещё раз через 3 секунды
+      if (reserveTimerEl) {
+        reserveTimerEl.innerHTML = '⚠️ Не удалось зарезервировать — проверьте соединение. Повтор через 3 с…';
+        reserveTimerEl.classList.remove('hidden');
+      }
+      retryReserve(3000);
+    });
+  }
+
+  var reserveRetryTimer = null;
+  function retryReserve(delay) {
+    if (reserveRetryTimer) clearTimeout(reserveRetryTimer);
+    reserveRetryTimer = setTimeout(function () {
+      reserveRetryTimer = null;
+      scheduleReserve();
+    }, delay);
   }
 
   function updateSubmitGate() {
@@ -139,10 +174,37 @@
     return totalQty >= 4 ? 30 : 15;
   }
 
+  // Оверрайды суперадмина (глобальные и по Сервис-Центру) для корзины:
+  // цены, скидки и скрытие применяются и при оплате
+  function productOverrides() {
+    try { return window.__productOverrides || {}; } catch (e) { return {}; }
+  }
+  function scOverrides() {
+    try { return window.__scOverrides || {}; } catch (e) { return {}; }
+  }
+  function scOverrideFor(p) {
+    try {
+      var all = scOverrides();
+      if (state.storeId && all[state.storeId] && all[state.storeId][p.id]) return all[state.storeId][p.id];
+    } catch (e) { }
+    return {};
+  }
+  function effectivePrice(p) {
+    var g = productOverrides()[p.id] || {};
+    var so = scOverrideFor(p);
+    var price = so.price != null ? so.price : (g.price != null ? g.price : p.price);
+    var disc = so.discount_price != null ? so.discount_price : (g.discount_price != null ? g.discount_price : p.discount_price);
+    return { price: price, discount: disc };
+  }
+
   function unitPrice(p) {
-    return state.partnerMode
-      ? (p.partner_price != null ? p.partner_price : Math.round(p.price / 2))
-      : p.price;
+    var ep = effectivePrice(p);
+    if (state.partnerMode) {
+      return p.partner_price != null ? p.partner_price : Math.round(ep.price / 2);
+    }
+    // Скидочная цена, если включена и реально ниже обычной
+    if (ep.discount != null && ep.discount > 0 && ep.discount < ep.price) return ep.discount;
+    return ep.price;
   }
 
   function cartLines() {
@@ -325,6 +387,101 @@
     setField('orderPartnerMode', state.partnerMode ? '1' : '0');
   }
 
+  function pickupDateLabel(d) {
+    var today = new Date();
+    var base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    var diff = Math.round((d.getTime() - base.getTime()) / 86400000);
+    if (diff === 0) return 'Сегодня, ' + d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    if (diff === 1) return 'Завтра, ' + d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    return d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' });
+  }
+
+  function storeSchedule() {
+    var st = stores.find(function (s) { return s.id === state.storeId; });
+    return (st && st.schedule) || null;
+  }
+
+  function dayKeyOf(d) {
+    return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][d.getDay()];
+  }
+
+  function slotMinutes(t) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ''));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+  }
+
+  // Ближайший рабочий слот выдачи: следующий рабочий день + время открытия
+  function nextPickupSlot() {
+    var sch = storeSchedule();
+    if (!sch) return null;
+    var d = new Date();
+    d.setDate(d.getDate() + 1);
+    for (var i = 0; i < 9; i++) {
+      var s = sch[dayKeyOf(d)];
+      if (s && s.open) return { date: new Date(d.getFullYear(), d.getMonth(), d.getDate()), open: s.open };
+      d.setDate(d.getDate() + 1);
+    }
+    return null;
+  }
+
+  function pickupHintText() {
+    var sch = storeSchedule();
+    if (!sch) return '';
+    var now = new Date();
+    var slot = sch[dayKeyOf(now)];
+    var curMin = now.getHours() * 60 + now.getMinutes();
+    var workingNow = slot && curMin >= slotMinutes(slot.open) && curMin <= slotMinutes(slot.close) - 30;
+    var slot2 = nextPickupSlot();
+    if (!slot2) return '';
+    var dateLabel = pickupDateLabel(slot2.date);
+    return '⏰ ' + (workingNow ? 'Оплатите сейчас — товар будет готов к выдаче ' : 'Сейчас филиал не работает — ближайшая выдача ') +
+      dateLabel + ' к ' + slot2.open;
+  }
+
+  function initPickupSelectors() {
+    var date = document.getElementById('pickupDate');
+    var time = document.getElementById('pickupTime');
+    var hint = document.getElementById('pickupHint');
+    if (!date || !time) return;
+    var sch = storeSchedule();
+    var opts = [];
+    var now = new Date();
+    var base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var picked = 0;
+    for (var i = 0; picked < 7 && i < 14; i++) {
+      var d = new Date(base.getTime() + i * 86400000);
+      if (sch && !sch[dayKeyOf(d)]) continue; // выходной — пропускаем
+      var iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      opts.push('<option value="' + iso + '">' + pickupDateLabel(d) + '</option>');
+      picked++;
+    }
+    date.innerHTML = opts.join('');
+    function buildTimes() {
+      var minMin = 9 * 60;
+      var maxMin = 19 * 60 + 30;
+      if (sch) {
+        var slot = sch[dayKeyOf(new Date(date.value + 'T00:00:00'))];
+        if (slot) {
+          var oM = slotMinutes(slot.open);
+          var cM = slotMinutes(slot.close);
+          if (oM >= 0) minMin = oM;
+          if (cM > 0) maxMin = Math.min(cM, 21 * 60);
+        }
+      }
+      if (date.value === dateStr()) minMin = Math.max(minMin, now.getHours() * 60 + now.getMinutes() + 30);
+      var out = [];
+      for (var m = minMin; m <= maxMin; m += 30) {
+        var hh = String(Math.floor(m / 60)).padStart(2, '0');
+        var mm = String(m % 60).padStart(2, '0');
+        out.push('<option value="' + hh + ':' + mm + '">' + hh + ':' + mm + '</option>');
+      }
+      time.innerHTML = out.join('');
+    }
+    date.addEventListener('change', buildTimes);
+    buildTimes();
+    if (hint) hint.textContent = pickupHintText();
+  }
+
   function setPayment(method) {
     state.payment = method;
     setField('orderPayment', method === 'cash' ? 'Наличные при получении' : 'Kaspi');
@@ -460,6 +617,7 @@
         } catch (err) { }
       }
       render();
+      initPickupSelectors();
       scheduleReserve();
       return;
     }
@@ -550,6 +708,31 @@
         if (payBtn) blink(payBtn);
         return;
       }
+      // Дата и время приезда (для самовывоза): дата не раньше сегодня, время — корректное
+      var pDate = orderForm.pickup_date ? orderForm.pickup_date.value : '';
+      var pTime = orderForm.pickup_time ? orderForm.pickup_time.value : '';
+      if (pDate) {
+        var todayS = dateStr();
+        if (pDate < todayS) {
+          e.preventDefault();
+          Utils.showToast('⚠️ Дата приезда не может быть раньше сегодняшнего дня');
+          var dateInp = orderForm.pickup_date;
+          if (dateInp) blink(dateInp);
+          return;
+        }
+        if (pDate === todayS && pTime) {
+          var hm = /^([0-9]{2}):([0-9]{2})$/.exec(pTime);
+          var now = new Date();
+          var curMin = now.getHours() * 60 + now.getMinutes();
+          if (hm && (Number(hm[1]) * 60 + Number(hm[2])) < curMin + 30) {
+            e.preventDefault();
+            Utils.showToast('⚠️ Время приезда уже прошло — выберите время не раньше, чем через 30 минут');
+            var timeInp = orderForm.pickup_time;
+            if (timeInp) blink(timeInp);
+            return;
+          }
+        }
+      }
       setField('orderId', orderId());
       setField('orderStoreId', state.storeId || '');
       setField('orderItemsJson', JSON.stringify(t.lines.map(function (l) {
@@ -608,19 +791,41 @@
 
   async function init() {
     try {
-      var res = await fetch('data/products.json?t=' + Date.now());
+      var res = await fetch('data/products.json');
       var data = await res.json();
       products = data.products || [];
+      // Серверные оверрайды суперадмина (цены, скидки, скрытие по СЦ) —
+      // отдаются вместе с каталогом и применяются и при оплате
+      window.__productOverrides = data.overrides || {};
+      window.__scOverrides = data.scOverrides || {};
+      window.__siteSettings = Object.assign({ showDiscountPrices: true, categories: [] }, data.settings || {});
+      if (typeof data.showDiscountPrices === 'boolean') window.__siteSettings.showDiscountPrices = data.showDiscountPrices;
     } catch (e) {
       products = [];
     }
     try {
-      var sRes = await fetch('data/stores.json?t=' + Date.now());
+      var sRes = await fetch('data/stores.json');
       stores = await sRes.json();
     } catch (e) {
       stores = [];
     }
+    // СЦ из KV (Worker) — приоритетнее статики; удалённые суперадмином — убираем
+    try {
+      var apiRes = await fetch('/api/stores');
+      var apiData = await apiRes.json();
+      var kvStores = (apiData && apiData.stores) || [];
+      var deletedIds = (apiData && apiData.deletedIds) || [];
+      var byId = {};
+      kvStores.forEach(function (s) { byId[s.id] = s; });
+      stores = stores.filter(function (s) { return deletedIds.indexOf(s.id) === -1; })
+        .map(function (s) { return byId[s.id] ? Object.assign({}, s, byId[s.id]) : s; });
+      kvStores.forEach(function (s) {
+        if (!stores.some(function (x) { return x.id === s.id; })) stores.push(s);
+      });
+    } catch (e) { }
     await StoreStock.load();
+
+    initPickupSelectors();
 
     var saved = savedStore();
     if (saved && saved.id) state.storeId = saved.id;

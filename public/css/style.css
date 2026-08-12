@@ -731,7 +731,31 @@ a:hover { text-decoration: none; }
   animation: fadeUp 0.3s ease both;
 }
 .product-row:hover { box-shadow: var(--shadow-lg); border-color: var(--green); }
-.row-media { grid-area: media; }
+.row-media { grid-area: media; position: relative; }
+.badge-hot {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  z-index: 3;
+  background: linear-gradient(135deg, #ff6b35, #ff3d2e);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(255, 61, 46, 0.35);
+  pointer-events: none;
+  white-space: nowrap;
+  line-height: 1.35;
+}
+.badge-hot.badge-p2 {
+  background: linear-gradient(135deg, #5b8def, #4a5fd0);
+  box-shadow: 0 2px 8px rgba(74, 95, 208, 0.35);
+}
+.badge-hot.badge-p3 {
+  background: linear-gradient(135deg, #8a94a6, #5f6b7d);
+  box-shadow: 0 2px 8px rgba(95, 107, 125, 0.35);
+}
 .row-media img {
   width: 64px;
   height: 64px;
@@ -918,6 +942,18 @@ a:hover { text-decoration: none; }
 .st-low { background: #fdf0dd; color: #b26a00; border-color: #f7dfb5; }
 .st-exp { background: #e3efff; color: #1f5fbf; border-color: #c5dcfb; }
 .st-out { background: #f3e9e9; color: #9c3b3b; border-color: #e6d2d2; }
+.admin-sc-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2f6bb3;
+  border: 1px solid #d6e4f8;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+  margin-left: 4px;
+}
 .eta-line { font-size: 13.5px; color: var(--muted); }
 .eta-line b { color: var(--ink); }
 
@@ -987,6 +1023,10 @@ a:hover { text-decoration: none; }
   border-radius: 999px;
 }
 .delivery-items { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--muted); }
+.delivery-detail-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-height: 46vh; overflow-y: auto; }
+.delivery-detail-item { display: flex; align-items: center; gap: 10px; background: var(--card, #fff); border: 1px solid #e5e9f0; border-radius: 10px; padding: 8px 10px; }
+.delivery-item-img { width: 44px; height: 44px; object-fit: contain; flex: none; border-radius: 6px; background: #fff; border: 1px solid #edf0f5; }
+.delivery-detail-name { flex: 1; font-size: 14px; color: var(--ink); line-height: 1.3; }
 .delivery-item {
   background: var(--green-soft);
   border: 1px solid #d5e8d8;
@@ -1002,6 +1042,8 @@ a:hover { text-decoration: none; }
 .move-status.mv-new { background: #eef0f3; color: #5b6472; }
 .move-status.mv-prep { background: #fdf3d7; color: #9a6b00; }
 .move-status.mv-transit { background: #dbeafe; color: #1d4ed8; }
+.move-status.mv-warehouse { background: #f3e8ff; color: #7c3aed; }
+.move-status.mv-arrived { background: #d9f2e3; color: #116b34; }
 .move-num { font-size: 12px; color: var(--muted); font-weight: 600; }
 .move-road { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin: 12px 0 8px; }
 .move-point { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
@@ -1010,6 +1052,9 @@ a:hover { text-decoration: none; }
 .move-progress { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--green); border-radius: 999px; transition: width 0.6s ease; }
 .move-truck { position: absolute; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; color: var(--green-dark); z-index: 2; pointer-events: none; transition: left 0.6s ease; line-height: 1; }
 .move-eta { font-size: 13px; font-weight: 700; color: var(--green-darker); margin-bottom: 4px; }
+.move-stage { margin: 12px 0 8px; font-size: 22px; letter-spacing: 2px; line-height: 1.4; text-align: center; background: #f4f7f4; border: 1px dashed #d5e8d8; border-radius: 10px; padding: 6px 10px; }
+.move-stage-arrived { background: #f0faf4; border-color: #bfe6cd; }
+.delivery-more { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
 
 /* ---------- Мероприятия ---------- */
 .events-grid {
@@ -1657,8 +1702,27 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 }
 
 .admin-form { max-width: 780px; }
-.admin-toolbar { margin-bottom: 14px; }
-.admin-toolbar .search { max-width: 480px; }
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #f4f8f5;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+.admin-toolbar .search { max-width: 480px; flex: 1 1 220px; }
+.admin-toolbar select { flex: 0 1 auto; }
+.admin-add-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 12px;
+}
+.admin-add-buttons .btn { margin: 0; }
 
 /* Кнопки остатков всегда на виду при прокрутке таблицы */
 .stock-actions {
@@ -1700,6 +1764,14 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .admin-table select:focus { outline: 2px solid rgba(27, 107, 63, 0.3); border-color: var(--green); }
 
 .admin-list { list-style: none; }
+.admin-list-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  justify-content: flex-end;
+}
+.admin-list-footer .btn { margin: 0; }
 .admin-list li {
   display: flex;
   align-items: center;
@@ -2005,3 +2077,58 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   .sub-intro { padding: 24px 0 50px; }
   .plan-body { padding: 18px 18px 22px; }
 }
+
+/* ---------------- Суперадмин: миниатюры, превью, чипы поставок, скрытые строки ---------------- */
+.admin-thumb { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: var(--green-soft); }
+.store-img-preview {
+  display: block;
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--green-soft);
+  margin-top: 8px;
+}
+.delivery-item-row {
+  display: grid;
+  grid-template-columns: 1fr 150px auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.delivery-item-row .btn { white-space: nowrap; }
+.delivery-items-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.delivery-item-chip {
+  display: inline-block;
+  background: var(--green-soft);
+  border: 1px solid var(--line);
+  color: var(--green-dark);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.admin-table tr.row-hidden td { opacity: 0.55; background: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(0,0,0,0.03) 8px, rgba(0,0,0,0.03) 16px); }
+.badge.st-out { background: #f3e2e2; color: #b03a3a; }
+.checkbox-line { display: inline-flex; align-items: center; gap: 6px; }
+.sc-layout { display: grid; grid-template-columns: 360px 1fr; gap: 16px; align-items: start; margin-top: 4px; }
+.sc-layout-list { min-width: 0; }
+.sc-layout-form { min-width: 0; position: sticky; top: 12px; }
+@keyframes scSlideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+.sc-layout-form > * { animation: scSlideInRight .28s ease; }
+@media (max-width: 980px) {
+  .sc-layout { grid-template-columns: 1fr; }
+  .sc-layout-form { position: static; }
+}
+.delivery-item-img { width: 26px; height: 26px; object-fit: cover; border-radius: 6px; vertical-align: middle; border: 1px solid #e2e8e2; background: #f7faf7; }
+.delivery-items .delivery-item { display: inline-flex; align-items: center; gap: 5px; }
+.delivery-item-chip img.delivery-item-img { margin-right: 5px; }
+
+/* ---------- Расписание работы СЦ (селекторы дней и времени) ---------- */
+.sched-grid { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.sched-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fafbfc; border: 1px solid #eef1f5; border-radius: 8px; padding: 6px 10px; }
+.sched-day { font-weight: 800; font-size: 13px; min-width: 30px; color: var(--ink); }
+.sched-off { margin: 0; min-width: 120px; }
+.sched-times { display: inline-flex; align-items: center; gap: 6px; }
+.sched-times select { padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.sched-row.has-off .sched-times { opacity: 0.4; pointer-events: none; }

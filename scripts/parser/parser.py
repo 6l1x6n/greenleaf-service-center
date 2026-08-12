@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
-PRODUCTS_PATH = os.path.join(ROOT_DIR, "public", "data", "products.json")
+PRODUCTS_PATH = os.path.join(ROOT_DIR, "public", "data", "products.base.json")
 MOVES_PATH = os.path.join(ROOT_DIR, "public", "data", "moves.json")
 STORE_STOCK_PATH = os.path.join(ROOT_DIR, "public", "data", "store-stock.json")
 CATALOG_CACHE_PATH = os.path.join(BASE_DIR, ".catalog_cache.json")

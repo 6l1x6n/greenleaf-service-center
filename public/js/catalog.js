@@ -13,10 +13,10 @@
   var products = [];
   var stores = [];
   var categories = [];
-  var state = { category: 'all', query: '', stockOnly: false, selectedStoreId: 'all', cityFilter: 'all', storeQuery: '', showAllCatalog: false };
+  var state = { category: 'all', query: '', stockOnly: true, selectedStoreId: 'all', cityFilter: 'all', storeQuery: '', showAllCatalog: false };
 
   var isCatalogPage = document.body && document.body.dataset.catalogPage === '1';
-  var MAIN_PAGE_LIMIT = 24;
+  var MAIN_PAGE_LIMIT = 10;
   var FILTERS_KEY = 'greenleaf_catalog_filters_v1';
 
   var grid = document.getElementById('grid');
@@ -25,19 +25,78 @@
   var stockOnly = document.getElementById('stockOnly');
   var scActiveBannerContainer = document.getElementById('scActiveBannerContainer');
 
-  function statusInfo(p) {
-    var meta = STATUS[p.status] || STATUS.out;
-    var extra = '';
-    if (p.status === 'low') {
-      extra = '<p class="eta-line">📦 ' + (p.incoming ? 'Завоз: <b>' + Utils.fmtDate(p.incoming, { day: 'numeric', month: 'short' }) + '</b>' : 'Возьмём в работу — напишите нам') + '</p>';
-    } else if (p.status === 'expected') {
-      extra = '<p class="eta-line">Поставка: <b>' + Utils.fmtDate(p.eta, { day: 'numeric', month: 'long' }) + '</b></p>';
-    } else if (p.status === 'out') {
-      extra = '<p class="eta-line">Следующая поставка: <b>' + Utils.fmtDate(p.eta, { day: 'numeric', month: 'long' }) + '</b></p>';
-    } else if (p.incoming) {
-      extra = '<p class="eta-line">Завоз в пути: <b>' + Utils.fmtDate(p.incoming, { day: 'numeric', month: 'short' }) + '</b></p>';
+  // Оверрайды из Worker: глобальные правки товаров и правки по Сервис-Центрам.
+  // Устанавливаются в init() из /api/products.
+  var productOverrides = {};
+  var scOverrides = {};
+  var siteSettings = { showDiscountPrices: true, categories: [] };
+
+  // Оверрайд товара в выбранном СЦ (или пустой объект)
+  function scOverrideFor(p) {
+    if (!p) return {};
+    if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+      var o = scOverrides[state.selectedStoreId];
+      if (o && o[p.id]) return o[p.id];
     }
-    return { meta: meta, extra: extra };
+    return {};
+  }
+
+  // Товар скрыт в выбранном СЦ суперадмином
+  function scHidden(p) {
+    return !!scOverrideFor(p).hidden;
+  }
+
+  // Приоритет товара: 1 🔥 Хит, 2 ✨ Новинка, 3 🚀 Топ (0 — без приоритета)
+  function priorityRank(p) {
+    if (p.priority != null && p.priority !== '') return Number(p.priority);
+    return p.hit ? 1 : 0;
+  }
+
+  function priorityBadge(p) {
+    var pr = priorityRank(p);
+    if (pr === 1) return '<span class="badge-hot badge-p1">🔥 Хит</span>';
+    if (pr === 2) return '<span class="badge-hot badge-p2">✨ Новинка</span>';
+    if (pr === 3) return '<span class="badge-hot badge-p3">🚀 Топ</span>';
+    return '';
+  }
+
+  // Актуальный статус: оверрайд СЦ → глобальный → базовый
+  function effectiveStatus(p) {
+    var so = scOverrideFor(p);
+    if (so.status) return so.status;
+    return p.status;
+  }
+
+  function statusInfo(p) {
+    var st = STATUS[effectiveStatus(p)] || STATUS.out;
+    var so = scOverrideFor(p);
+    var eta = so.eta || p.eta;
+    var incoming = so.incoming || p.incoming;
+    var extra = '';
+    if (st === STATUS.low) {
+      extra = '<p class="eta-line">📦 ' + (incoming ? 'Завоз: <b>' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' }) + '</b>' : 'Возьмём в работу — напишите нам') + '</p>';
+    } else if (st === STATUS.expected) {
+      extra = '<p class="eta-line">Поставка: <b>' + Utils.fmtDate(eta, { day: 'numeric', month: 'long' }) + '</b></p>';
+    } else if (st === STATUS.out) {
+      extra = '<p class="eta-line">Следующая поставка: <b>' + Utils.fmtDate(eta, { day: 'numeric', month: 'long' }) + '</b></p>';
+    } else if (incoming) {
+      extra = '<p class="eta-line">Завоз в пути: <b>' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' }) + '</b></p>';
+    }
+    return { meta: st, extra: extra };
+  }
+
+  // Актуальная цена и скидочная цена: оверрайд СЦ → глобальный оверрайд → базовый товар
+  function effectivePrices(p) {
+    var so = scOverrideFor(p);
+    var global = productOverrides[p.id] || {};
+    var price = so.price != null ? so.price : (global.price != null ? global.price : p.price);
+    var discount = so.discount_price != null ? so.discount_price : (global.discount_price != null ? global.discount_price : p.discount_price);
+    return { price: price, discount: discount };
+  }
+
+  function scAppliedTo(storeId) {
+    var o = scOverrides[storeId];
+    return !!(o && Object.keys(o).length);
   }
 
   function rowCartControl(p) {
@@ -55,11 +114,7 @@
 
   function rowHtml(p) {
     var st = statusInfo(p);
-    var img = p.image || 'assets/images/products/placeholder.svg';
-    var qtyHtml = '';
-    if (typeof p.quantity === 'number' && p.quantity > 0) {
-      qtyHtml = '<div class="eta-line qty-line' + (p.status === 'low' ? ' qty-line-low' : '') + '">📦 Доступно: <b>' + p.quantity + ' шт.</b></div>';
-    }
+    var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
     var stockInSelectedStore = '';
     if (state.selectedStoreId && state.selectedStoreId !== 'all') {
       var storeStock = StoreStock.text(state.selectedStoreId, p.id);
@@ -68,9 +123,36 @@
       }
     }
 
+    // Глобальный остаток показываем только когда СЦ не выбран — при выбранном филиале
+    // единственный показатель — наличие именно в нём (два числа вводят в заблуждение)
+    var qtyHtml = '';
+    if (!(state.selectedStoreId && state.selectedStoreId !== 'all')) {
+      // Сумма живых остатков по всем СЦ из /api/stock; при недоступности данных — статичное число
+      var totalQty = StoreStock.totalCount ? StoreStock.totalCount(p.id) : null;
+      var qtyNum = totalQty !== null ? totalQty : p.quantity;
+      if (typeof qtyNum === 'number' && qtyNum > 0) {
+        qtyHtml = '<div class="eta-line qty-line' + (p.status === 'low' ? ' qty-line-low' : '') + '">📦 Доступно: <b>' + qtyNum + ' шт.</b></div>';
+      }
+    }
+
+    // Скидочные цены: оверрайды СЦ/глобальные уже учтены в effectivePrices
+    var prices = effectivePrices(p);
+    var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
+    var priceHtml;
+    if (disc) {
+      priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
+        '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>' +
+        '<span class="badge-sale">−' + Math.round((1 - prices.discount / prices.price) * 100) + '%</span>';
+    } else {
+      priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
+        '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
+        '<span class="badge-sale">-50%</span>';
+    }
+
     return '' +
       '<article class="product-row" data-product-id="' + Utils.esc(p.id) + '">' +
       '<div class="row-media" data-open-detail="' + Utils.esc(p.id) + '">' +
+      priorityBadge(p) +
       '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
       '</div>' +
       '<div class="row-body">' +
@@ -87,9 +169,7 @@
       '</div>' +
       '<div class="row-prices">' +
       '<div class="card-prices">' +
-      '<span class="price-old">' + Utils.fmtPrice(p.price) + '</span>' +
-      '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
-      '<span class="badge-sale">-50%</span>' +
+      priceHtml +
       '</div>' +
       '<a class="partner-link" href="podpiska.html">Как стать партнёром →</a>' +
       '</div>' +
@@ -202,7 +282,7 @@
 
     var hasDataHere = StoreStock.hasData(store.id);
     var inStockHere = hasDataHere ? products.filter(function (p) {
-      return StoreStock.available(p, store.id);
+      return !p.hidden && !scHidden(p) && StoreStock.available(p, store.id);
     }).length : 0;
 
     var filtered = !state.showAllCatalog;
@@ -280,6 +360,19 @@
   // ---------------- Товар: модалка, корзина ----------------
 
   function openProductDetailModal(p) {
+    var st = statusInfo(p);
+    var prices = effectivePrices(p);
+    var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
+    var priceHtml;
+    if (disc) {
+      priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
+        '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>' +
+        '<span class="badge-sale">−' + Math.round((1 - prices.discount / prices.price) * 100) + '%</span>';
+    } else {
+      priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
+        '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
+        '<span class="badge-sale">-50%</span>';
+    }
     var qtyLine = '';
     var sel = selectedStore();
     if (sel && StoreStock.hasData(sel.id)) {
@@ -317,9 +410,7 @@
       '</div>' +
       '<div class="product-detail-body">' +
       '<div class="card-prices" style="margin-top:6px;">' +
-      '<span class="price-old">' + Utils.fmtPrice(p.price) + '</span>' +
-      '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
-      '<span class="badge-sale">-50%</span>' +
+      priceHtml +
       '</div>' +
       '<a class="partner-link" href="podpiska.html">Партнёрская цена для подписчиков · Как стать партнёром →</a>' +
       '<div class="product-detail-desc">' + Utils.esc(p.description || 'Высококачественная экологичная продукция Greenleaf.') + '</div>' +
@@ -338,12 +429,16 @@
 
   function render() {
     var list = products.filter(function (p) {
+      if (p.hidden) return false;
       var okCat = state.category === 'all' || p.category === state.category;
-      var okStock = !state.stockOnly || p.status === 'in_stock' || p.status === 'low';
+      var effSt = effectiveStatus(p);
+      var okStock = !state.stockOnly || effSt === 'in_stock' || effSt === 'low';
       var q = state.query.trim().toLowerCase();
       var okQ = !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1;
       var okStore = true;
       if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+        // Скрытые суперадмином товары в этом СЦ не показываем вовсе
+        if (scHidden(p)) return false;
         // Филиал без данных каталога — в нём нет товаров; с данными — фильтр остатков
         okStore = StoreStock.hasData(state.selectedStoreId)
           ? (state.showAllCatalog || StoreStock.available(p, state.selectedStoreId))
@@ -352,7 +447,9 @@
       return okCat && okStock && okQ && okStore;
     });
     list.sort(function (a, b) {
-      return (ORDER[a.status] - ORDER[b.status]) || (a.name.localeCompare(b.name, 'ru'));
+      var ha = priorityRank(a) || 9;
+      var hb = priorityRank(b) || 9;
+      return (ha - hb) || (ORDER[effectiveStatus(a)] - ORDER[effectiveStatus(b)]) || (a.name.localeCompare(b.name, 'ru'));
     });
     if (!isCatalogPage && list.length > MAIN_PAGE_LIMIT) {
       list = list.slice(0, MAIN_PAGE_LIMIT);
@@ -373,10 +470,28 @@
   }
 
   function renderChips() {
-    var all = { name: 'all', label: 'Все', count: products.length };
-    var html = [chipHtml(all)];
+    var scId = (state.selectedStoreId && state.selectedStoreId !== 'all') ? state.selectedStoreId : null;
+    var scMode = !!scId && !state.showAllCatalog;
+    function countFor(cat) {
+      if (!scMode) {
+        if (cat === 'all') return products.length;
+        var c = null;
+        for (var i = 0; i < categories.length; i++) {
+          if (categories[i].name === cat) { c = categories[i]; break; }
+        }
+        return c ? c.count : 0;
+      }
+      var n = 0;
+      products.forEach(function (p) {
+        if (cat !== 'all' && p.category !== cat) return;
+        if (scHidden(p)) return;
+        if (StoreStock.hasData(scId) && StoreStock.available(p, scId)) n++;
+      });
+      return n;
+    }
+    var html = [chipHtml({ name: 'all', label: 'Все', count: countFor('all') })];
     categories.forEach(function (c) {
-      html.push(chipHtml(c));
+      html.push(chipHtml({ name: c.name, label: c.label, count: countFor(c.name) }));
     });
     chips.innerHTML = html.join('');
   }
@@ -446,9 +561,25 @@
     var openDetailEl = e.target.closest('[data-open-detail]');
     if (openDetailEl) {
       var pId = openDetailEl.getAttribute('data-open-detail');
-      var p = products.find(function (x) { return x.id === pId; });
+      var p = products.find(function (x) { return x.id === pId && !x.hidden; });
       if (p) openProductDetailModal(p);
       return;
+    }
+
+    var delOpenEl = e.target.closest('[data-del-open]');
+    if (delOpenEl) {
+      var delP = products.find(function (x) { return x.id === delOpenEl.getAttribute('data-del-open') && !x.hidden; });
+      if (delP) openProductDetailModal(delP);
+      return;
+    }
+
+    var delCard = e.target.closest('[data-delivery-detail]');
+    if (delCard) {
+      var di = Number(delCard.getAttribute('data-delivery-detail'));
+      if (!isNaN(di) && lastRenderedDeliveries && lastRenderedDeliveries[di]) {
+        deliveryDetailModal(lastRenderedDeliveries[di]);
+        return;
+      }
     }
 
     var storeChip = e.target.closest('[data-select-store]');
@@ -464,10 +595,12 @@
           localStorage.removeItem('greenleaf_sc_selected_v1');
         }
       } catch (err) { }
+      syncStockToggle();
       renderStoresSection();
       renderActiveStoreBanner();
       renderContacts();
       render();
+      renderChips();
       renderDeliveries(lastDeliveries);
       return;
     }
@@ -475,8 +608,10 @@
     var catalogAllBtn = e.target.closest('[data-catalog-all]');
     if (catalogAllBtn) {
       state.showAllCatalog = true;
+      syncStockToggle();
       renderActiveStoreBanner();
       render();
+      renderChips();
       return;
     }
 
@@ -530,9 +665,15 @@
     saveFilters();
   });
 
+  function syncStockToggle() {
+    if (stockOnly) stockOnly.checked = !state.showAllCatalog;
+  }
+
   stockOnly.addEventListener('change', function () {
     state.stockOnly = stockOnly.checked;
+    state.showAllCatalog = !stockOnly.checked;
     render();
+    renderChips();
     saveFilters();
   });
 
@@ -549,8 +690,14 @@
         state.query = saved.q || '';
         state.category = saved.cat || 'all';
         state.stockOnly = !!saved.stock;
+        state.showAllCatalog = !state.stockOnly;
         if (search) search.value = state.query;
         if (stockOnly) stockOnly.checked = state.stockOnly;
+      } else {
+        // Галочка «Только в наличии» автовыбрана по умолчанию
+        state.stockOnly = true;
+        state.showAllCatalog = false;
+        if (stockOnly) stockOnly.checked = true;
       }
     } catch (e) { }
   }
@@ -572,6 +719,7 @@
   // ---------------- Поставки (общие + по филиалам) ----------------
 
   var lastDeliveries = [];
+  var lastRenderedDeliveries = [];
   var moveSkuMap = {};
 
   // Действующие поставщики: «Астана поставщик "новый"», «Астана поставщик», «Алматы поставщик».
@@ -603,6 +751,16 @@
     return /Алматы/i.test(String(source || '')) ? 2 : 1;
   }
 
+  // Диапазон прибытия для «Оформлена · на складе»: минимум — только путь (Астана 1 / Алматы 2 дня),
+  // максимум — ещё до 3 дней товар может лежать на складе поставщика
+  function moveEtaRange(d) {
+    var min = new Date();
+    min.setDate(min.getDate() + transitDays(d.source));
+    var max = new Date(min);
+    max.setDate(max.getDate() + 3);
+    return { min: min, max: max };
+  }
+
   function moveEta(d) {
     var start;
     if (d.statusCode === 0) {
@@ -618,6 +776,7 @@
   // Позиция фуры на дороге: Новый — у склада (0%), дальше — по времени в пути
   function moveProgress(d) {
     if (d.statusCode === 0) return 0;
+    if (d.statusCode === 7) return 1;
     var start = new Date(d.date + 'T00:00:00').getTime();
     if (isNaN(start)) return 0.5;
     var elapsed = (Date.now() - start) / 86400000;
@@ -626,48 +785,74 @@
   }
 
   function moveStatusLabel(d) {
-    if (d.statusCode === 0) return { text: 'Оформлена · на складе', cls: 'mv-new' };
-    if (d.statusCode === 4) return { text: '🚚 В пути', cls: 'mv-transit' };
-    return { text: 'Готовится к отправке', cls: 'mv-prep' };
+    if (d.statusCode === 0) return { text: '🏭 На складе поставщика', cls: 'mv-warehouse', arrived: false };
+    if (d.statusCode === 4) return { text: '🚚 В пути', cls: 'mv-transit', arrived: false };
+    if (d.statusCode === 7) return { text: '✅ Прибыла', cls: 'mv-arrived', arrived: true };
+    return { text: 'Готовится к отправке', cls: 'mv-prep', arrived: false };
   }
 
-  function moveCardHtml(d) {
+  function moveEtaText(d) {
+    if (d.statusCode === 7) return '<div class="move-eta">✅ Прибыла — товары уже на складе СЦ</div>';
+    if (d.statusCode === 0) {
+      var r = moveEtaRange(d);
+      var mMin = Utils.fmtDate(r.min, { day: 'numeric', month: 'short' });
+      var mMax = Utils.fmtDate(r.max, { day: 'numeric', month: 'short' });
+      return '<div class="move-eta">📅 Прибудет ≈ ' + mMin + ' – ' + mMax + '</div>';
+    }
+    var eta = moveEta(d);
+    var etaStr = eta.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    return '<div class="move-eta">📅 Прибудет ≈ ' + etaStr + '</div>';
+  }
+
+  // Визуал «фуры» по стадии: на складе → в пути → прибыла
+  function moveRoadHtml(d, pct) {
+    if (d.statusCode === 0) {
+      return '<div class="move-stage">🏭 📦📦📦 → 🚚</div>';
+    }
+    if (d.statusCode === 7) {
+      return '<div class="move-stage move-stage-arrived">🚚 → 🏢 Наш ЦС</div>';
+    }
+    return '<div class="move-road">' +
+      '<span class="move-point move-point-start">' + Utils.esc(String(d.source || '').replace(/поставщик.*/i, '').replace(/["']/g, '').trim() || 'Склад') + '</span>' +
+      '<div class="move-track">' +
+      '<div class="move-progress" style="width:' + pct + '%"></div>' +
+      '<span class="move-truck" style="left:clamp(10px,' + pct + '%,calc(100% - 10px))">' + Utils.iconTruck(22) + '</span>' +
+      '</div>' +
+      '<span class="move-point move-point-end">Наш СЦ</span>' +
+      '</div>';
+  }
+
+  function moveCardHtml(d, di) {
     var dt = new Date(d.date + 'T00:00:00');
     var dNum = dt.toLocaleDateString('ru-RU', { day: 'numeric' });
     var mStr = dt.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
     var st = moveStatusLabel(d);
     var pct = Math.round(moveProgress(d) * 100);
-    var eta = moveEta(d);
-    var etaStr = eta.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-    var srcShort = String(d.source || '').replace(/поставщик.*/i, '').replace(/["']/g, '').trim() || d.source || 'Склад';
     var sumHtml = d.sum ? ' · ' + Utils.fmtPrice(Math.round(d.sum)) : '';
     var itemsHtml = '';
     if (d.items && d.items.length) {
       var names = d.items.map(function (it) {
         var p = products.find(function (x) { return x.id === it.sku; });
         var label = p ? p.name : (it.sku || '');
-        return '<span class="delivery-item">' + Utils.esc(label) + (it.qty > 1 ? ' × ' + it.qty : '') + '</span>';
+        return Utils.deliveryItemHtml(products, label, it.qty > 1 ? it.qty : '');
       });
-      itemsHtml = '<div class="delivery-items">Прибудет: ' + names.join('') + '</div>';
+      var shown = names.slice(0, 4);
+      var more = names.length - shown.length;
+      itemsHtml = '<div class="delivery-items">Прибудет: ' + shown.join('') +
+        (more > 0 ? '<span class="delivery-more" title="Открыть состав накладной">+' + more + '</span>' : '') +
+        '</div>';
     } else if (d.itemsParsed === false) {
       itemsHtml = '<div class="delivery-items">Состав накладной уточняется</div>';
     }
-    return '<div class="delivery move-card">' +
+    return '<div class="delivery move-card" data-delivery-detail="' + di + '" style="cursor:pointer;">' +
       '<div class="delivery-date"><span class="d">' + dNum + '</span><span class="m">' + mStr + '</span></div>' +
       '<div class="delivery-main">' +
       '<div class="move-top">' +
       '<span class="move-status ' + st.cls + '">' + st.text + '</span>' +
       '<span class="move-num">№' + Utils.esc(d.number || '') + sumHtml + '</span>' +
       '</div>' +
-      '<div class="move-road">' +
-      '<span class="move-point move-point-start">' + Utils.esc(srcShort) + '</span>' +
-      '<div class="move-track">' +
-      '<div class="move-progress" style="width:' + pct + '%"></div>' +
-      '<span class="move-truck" style="left:clamp(10px,' + pct + '%,calc(100% - 10px))">' + Utils.iconTruck(22) + '</span>' +
-      '</div>' +
-      '<span class="move-point move-point-end">Наш СЦ</span>' +
-      '</div>' +
-      '<div class="move-eta">📅 Прибудет ≈ ' + etaStr + '</div>' +
+      moveRoadHtml(d, pct) +
+      moveEtaText(d) +
       itemsHtml +
       '</div>' +
       '</div>';
@@ -693,12 +878,24 @@
       list = list.filter(function (d) {
         if (!VALID_MOVE_SOURCE_RE.test(d.source || '')) return false;
         var code = d.statusCode;
-        if (code === 7 || code === 9 || code === -1) return false;
+        if (code === 9 || code === -1) return false; // отменённые не показываем
+        if (code === 7) {
+          // Прибывшие показываем только первые сутки после прибытия
+          if (!d.time) return false;
+          var tArr = new Date(d.time.replace(' ', 'T')).getTime();
+          return !isNaN(tArr) && Date.now() - tArr < 86400000;
+        }
         if (!d.time) return true;
         var t = new Date(d.time.replace(' ', 'T')).getTime();
         return !isNaN(t) && t >= cutoff;
       });
+    } else {
+      // Прошедшие поставки не показываем («Прибудет 10-го» при сегодняшнем 11-м — убираем)
+      var todayS = todayDateStr();
+      list = list.filter(function (d) { return String(d.date || '') >= todayS; });
     }
+
+    lastRenderedDeliveries = list;
 
     if (!list.length) {
       el.innerHTML = scopeNote + '<div class="delivery"><span class="delivery-note">' +
@@ -709,8 +906,8 @@
       return;
     }
 
-    el.innerHTML = scopeNote + list.map(function (d) {
-      if (isMoves) return moveCardHtml(d);
+    el.innerHTML = scopeNote + list.map(function (d, di) {
+      if (isMoves) return moveCardHtml(d, di);
       var dt = new Date(d.date + 'T00:00:00');
       var dNum = dt.toLocaleDateString('ru-RU', { day: 'numeric' });
       var mStr = dt.toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '');
@@ -722,9 +919,12 @@
         storeTag = '<span class="delivery-store">Общая поставка</span>';
       }
       var itemsHtml = d.items
-        ? '<div class="delivery-items">Прибудет: ' + d.items.split(/[;,]/).map(function (i) { return '<span class="delivery-item">' + Utils.esc(i.trim()) + '</span>'; }).join('') + '</div>'
+        ? '<div class="delivery-items">Прибудет: ' + d.items.split(/[;,]/).map(function (i) {
+          var t = String(i).trim();
+          return t ? Utils.deliveryItemHtml(products, t, '') : '';
+        }).join('') + '</div>'
         : '';
-      return '<div class="delivery">' +
+      return '<div class="delivery" data-delivery-detail="' + di + '" style="cursor:pointer;">' +
         '<div class="delivery-date"><span class="d">' + dNum + '</span><span class="m">' + mStr + '</span></div>' +
         '<div class="delivery-main">' +
         storeTag +
@@ -735,8 +935,45 @@
     }).join('');
   }
 
-  function buildMoveSkuMap(moves) {
-    moveSkuMap = {};
+  // Модалка состава поставки: картинки + наименования каждой позиции
+  function deliveryDetailModal(d) {
+    var lines = [];
+    var raw = d.items;
+    if (Array.isArray(raw)) {
+      raw.forEach(function (it) {
+        var label = it && (it.name || it.sku || '');
+        if (label) lines.push({ label: String(label).trim(), qty: it.qty ? ' × ' + it.qty : '' });
+      });
+    } else if (typeof raw === 'string') {
+      String(raw).split(/[;,]/).forEach(function (t) {
+        var s = String(t).trim();
+        if (s) lines.push({ label: s, qty: '' });
+      });
+    }
+    var storeName = '';
+    if (d.storeId) {
+      var st = stores.find(function (x) { return x.id === d.storeId; });
+      if (st) storeName = st.name;
+    }
+    var rows = lines.map(function (l) {
+      var p = Utils.productByLabel(products, l.label);
+      var img = p ? (p.thumb || p.image || 'assets/images/products/placeholder.svg') : 'assets/images/products/placeholder.svg';
+      return '<div class="delivery-detail-item">' +
+        '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+        '<span class="delivery-detail-name">' + Utils.esc(l.label) + '</span>' +
+        (l.qty ? '<span class="muted-sku">' + Utils.esc(l.qty) + '</span>' : '') +
+        '</div>';
+    }).join('');
+    var dt = d.date ? Utils.fmtDate(String(d.date) + 'T00:00:00', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    Utils.openModal(
+      '<h3>🚚 Поставка' + (dt ? ' · ' + dt : '') + '</h3>' +
+      (storeName ? '<p class="modal-product"><b>' + Utils.esc(storeName) + '</b></p>' : '') +
+      (d.note ? '<p>' + Utils.esc(d.note) + '</p>' : '') +
+      (rows ? '<div class="delivery-detail-list">' + rows + '</div>' : '<p class="modal-product">Состав накладной уточняется</p>')
+    );
+  }
+
+  function buildMoveSkuMap(moves) {    moveSkuMap = {};
     moves.forEach(function (mv) {
       if (!VALID_MOVE_SOURCE_RE.test(mv.source || '')) return;
       var code = mv.statusCode;
@@ -784,7 +1021,17 @@
   }
 
   function eventBookings() {
-    try { return JSON.parse(localStorage.getItem('greenleaf_event_bookings_v1') || '{}'); } catch (e) { return {}; }
+    try { return window.__eventBookings || {}; } catch (e) { return {}; }
+  }
+
+  function refreshEventBookings() {
+fetch('/api/event-bookings')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        window.__eventBookings = (d && d.bookings) || {};
+        renderEvents(lastEvents);
+      })
+      .catch(function () { });
   }
 
   function eventMyBooked(id) {
@@ -856,7 +1103,7 @@
     }).join('');
   }
 
-  window.addEventListener('event:booked', function () { renderEvents(lastEvents); });
+  window.addEventListener('event:booked', function () { refreshEventBookings(); });
 
   function eventModal(ev) {
     if (eventMyBooked(ev.id)) {
@@ -888,11 +1135,19 @@
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-event]');
     if (!btn) return;
-    fetch('data/events.json?t=' + Date.now())
+    fetch('/api/events')
       .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var ev = applyEventsOverrides(data.events || []).find(function (x) { return String(x.id) === btn.getAttribute('data-event'); });
+      .then(function (d) {
+        var ev = applyEventsOverrides((d && d.events) || []).find(function (x) { return String(x.id) === btn.getAttribute('data-event'); });
         if (ev) eventModal(ev);
+      })
+      .catch(function () {
+        fetch('data/events.json')
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            var ev = applyEventsOverrides(data.events || []).find(function (x) { return String(x.id) === btn.getAttribute('data-event'); });
+            if (ev) eventModal(ev);
+          });
       });
   });
 
@@ -980,7 +1235,7 @@
 
   async function init() {
     try {
-      var storesRes = await fetch('data/stores.json?t=' + Date.now());
+      var storesRes = await fetch('data/stores.json');
       stores = await storesRes.json();
     } catch (e) {
       console.warn('Could not load stores.json', e);
@@ -988,12 +1243,14 @@
 
     // Сервис-Центры из KV (зарегистрированные суперадмином) — приоритетнее статичного списка
     try {
-      var apiRes = await fetch('/api/stores?t=' + Date.now());
+      var apiRes = await fetch('/api/stores');
       var apiData = await apiRes.json();
       var kvStores = (apiData && apiData.stores) || [];
+      var deletedIds = (apiData && apiData.deletedIds) || [];
       var byId = {};
       kvStores.forEach(function (s) { byId[s.id] = s; });
-      stores = stores.map(function (s) { return byId[s.id] ? Object.assign({}, s, byId[s.id]) : s; });
+      stores = stores.filter(function (s) { return deletedIds.indexOf(s.id) === -1; })
+        .map(function (s) { return byId[s.id] ? Object.assign({}, s, byId[s.id]) : s; });
       kvStores.forEach(function (s) {
         if (!stores.some(function (x) { return x.id === s.id; })) stores.push(s);
       });
@@ -1004,15 +1261,39 @@
     await StoreStock.load();
 
     try {
-      var res = await fetch('data/products.json?t=' + Date.now());
+      var res = await fetch('data/products.json');
       var data = await res.json();
       products = data.products || [];
 
+      // Серверные оверрайды из Worker (отдаются вместе с каталогом):
+      // глобальные правки уже применены к товарам, raw-карта и правки по СЦ — ниже
+      if (data.overrides) productOverrides = data.overrides || {};
+      if (data.scOverrides) scOverrides = data.scOverrides || {};
+      siteSettings = Object.assign({ showDiscountPrices: true, categories: [] }, data.settings || {});
+      if (typeof data.showDiscountPrices === 'boolean') siteSettings.showDiscountPrices = data.showDiscountPrices;
+      window.__productOverrides = productOverrides;
+      window.__scOverrides = scOverrides;
+      window.__siteSettings = siteSettings;
+
+      // Единый счётчик броней мест на мероприятия (Worker KV)
+      try {
+        var ebRes = await fetch('/api/event-bookings');
+        var ebData = await ebRes.json();
+        window.__eventBookings = (ebData && ebData.bookings) || {};
+      } catch (e) {
+        window.__eventBookings = {};
+      }
+
       var byCat = {};
       products.forEach(function (p) {
+        if (p.hidden) return;
         byCat[p.category] = (byCat[p.category] || 0) + 1;
       });
       categories = Object.keys(byCat).map(function (k) { return { name: k, label: k, count: byCat[k] }; });
+      // Порядок категорий: сначала заданный суперадмином, затем остальные по алфавиту
+      var catOrder = (siteSettings.categories || []).filter(function (c) { return byCat[c]; });
+      var extra = Object.keys(byCat).filter(function (c) { return catOrder.indexOf(c) === -1; }).sort(function (a, b) { return a.localeCompare(b, 'ru'); });
+      categories = catOrder.concat(extra).map(function (k) { return { name: k, label: k, count: byCat[k] }; });
 
       var updatedEl = document.getElementById('catalogUpdated');
       if (updatedEl) {
@@ -1021,7 +1302,7 @@
           new Date(data.updated).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
       }
 
-      var inStock = products.filter(function (p) { return p.status === 'in_stock' || p.status === 'low'; }).length;
+      var inStock = products.filter(function (p) { return !p.hidden && (p.status === 'in_stock' || p.status === 'low'); }).length;
       var heroStockEl = document.getElementById('heroStock');
       if (heroStockEl) {
         heroStockEl.textContent = 'В наличии: ' + inStock + ' ' + plural(inStock, ['позиция', 'позиции', 'позиций']);
@@ -1061,7 +1342,7 @@
     renderContacts();
     if (!isCatalogPage) maybeAskCity();
 
-    fetch('data/moves.json?t=' + Date.now())
+    fetch('data/moves.json')
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var moves = d.moves || [];
@@ -1071,16 +1352,21 @@
         render();
       })
       .catch(function () {
-        fetch('data/deliveries.json?t=' + Date.now())
+        fetch('data/deliveries.json')
           .then(function (r) { return r.json(); })
           .then(function (d) { renderDeliveries(applyDeliveriesOverrides(d.deliveries || [])); })
           .catch(function () { renderDeliveries(applyDeliveriesOverrides([])); });
       });
 
-    fetch('data/events.json?t=' + Date.now())
+    fetch('/api/events')
       .then(function (r) { return r.json(); })
-      .then(function (d) { renderEvents(applyEventsOverrides(d.events || [])); })
-      .catch(function () { renderEvents(applyEventsOverrides([])); });
+      .then(function (d) { renderEvents(applyEventsOverrides((d && d.events) || [])); })
+      .catch(function () {
+        fetch('data/events.json')
+          .then(function (r) { return r.json(); })
+          .then(function (d) { renderEvents(applyEventsOverrides(d.events || [])); })
+          .catch(function () { renderEvents(applyEventsOverrides([])); });
+      });
   }
 
   window.CatalogReload = function () {

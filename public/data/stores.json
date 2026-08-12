@@ -33,7 +33,7 @@
     "hours": "Пн–Сб 09:00 – 19:00",
     "phone": "+7 (701) 987-65-43",
     "phoneRaw": "+77019876543",
-    "whatsapp": "7019876543",
+    "whatsapp": "77019876543",
     "image": "assets/images/stores/shymkent.jpg",
     "description": "Официальный региональный пункт Greenleaf на юге Казахстана. Опт и розница продукции iLife, Nilrich, SEALUX.",
     "cityKey": "shymkent"
@@ -46,7 +46,7 @@
     "hours": "Пн–Сб 10:00 – 19:00",
     "phone": "+7 (721) 234-56-78",
     "phoneRaw": "+77212345678",
-    "whatsapp": "7212345678",
+    "whatsapp": "77212345678",
     "image": "assets/images/stores/karaganda.jpg",
     "description": "Региональный сервис-центр в Караганде. Бытовые приборы Greenleaf, эко-химия и сервисное обслуживание.",
     "cityKey": "karaganda"
@@ -112,7 +112,7 @@
     "hours": "Пн–Вс 10:00 – 20:00",
     "phone": "+7 (708) 111-22-33",
     "phoneRaw": "+77081112233",
-    "whatsapp": "7081112233",
+    "whatsapp": "77081112233",
     "image": "assets/images/stores/astana.jpg",
     "description": "Филиал на левом берегу: эко-порошки, средства для дома и сервисное обслуживание техники."
   },
@@ -125,7 +125,7 @@
     "hours": "Пн–Пт 09:00 – 19:00",
     "phone": "+7 (708) 222-33-44",
     "phoneRaw": "+77082223344",
-    "whatsapp": "7082223344",
+    "whatsapp": "77082223344",
     "image": "assets/images/stores/astana.jpg",
     "description": "Деловой филиал: косметика SEALUX, презентации для партнёров и корпоративные заказы."
   },
@@ -138,7 +138,7 @@
     "hours": "Пн–Сб 09:00 – 20:00",
     "phone": "+7 (701) 111-22-33",
     "phoneRaw": "+77011112233",
-    "whatsapp": "7011112233",
+    "whatsapp": "77011112233",
     "image": "assets/images/stores/shymkent.jpg",
     "description": "Второй филиал в Шымкенте рядом с базаром: популярные позиции iLife и CARICH в наличии."
   },
@@ -151,7 +151,7 @@
     "hours": "Пн–Сб 10:00 – 19:00",
     "phone": "+7 (721) 345-67-89",
     "phoneRaw": "+77213456789",
-    "whatsapp": "7213456789",
+    "whatsapp": "77213456789",
     "image": "assets/images/stores/karaganda.jpg",
     "description": "Филиал в районе Строителей: бытовая химия, уход и мелкая бытовая техника Greenleaf."
   }

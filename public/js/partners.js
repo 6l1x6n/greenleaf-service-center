@@ -108,13 +108,16 @@
       form.classList.add('show-error');
       return;
     }
-    var hasCabinet = !!(data.officeCode || data.portalLogin || data.portalPassword);
-    data.type = hasCabinet ? 'sc_registration' : 'partner';
-    if (hasCabinet && (!data.officeCode || !data.portalLogin || !data.portalPassword)) {
+    data.type = 'sc_registration';
+    var schedule = window.Utils && Utils.collectSchedule ? Utils.collectSchedule(form) : null;
+    if (!schedule) {
       form.classList.remove('show-success');
       form.classList.add('show-error');
+      if (window.Utils) Utils.showToast('⚠️ Укажите хотя бы один рабочий день в расписании');
       return;
     }
+    data.schedule = schedule;
+    if (!data.hours) data.hours = Utils.scheduleToText(schedule);
 
     var btn = form.querySelector('button[type="submit"]');
     var prev = btn ? btn.innerHTML : '';
@@ -155,13 +158,18 @@
     });
   }
 
-  function submitClientRegistration(form) {
-    var data = { type: 'client_registration' };
+  function submitClientRequest(form) {
+    var data = {};
     form.querySelectorAll('input, select, textarea').forEach(function (el) {
       if (!el.name || el.type === 'radio' || el.type === 'checkbox') return;
       data[el.name] = el.value;
     });
-    if (!data.name || !data.phone || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email || '')) {
+    if (!data.name || !data.phone) {
+      form.classList.remove('show-success');
+      form.classList.add('show-error');
+      return;
+    }
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       form.classList.remove('show-success');
       form.classList.add('show-error');
       return;
@@ -170,29 +178,20 @@
     var prev = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Отправляем…'; }
 
-    fetch('/api/register', {
+    fetch('/api/client-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(function (r) { return r.json(); }).then(function (res) {
       if (!res || !res.ok) throw new Error((res && res.error) || 'HTTP error');
       form.classList.add('show-success');
-      if (window.Utils) Utils.showToast('📧 Логин и пароль отправлены на почту');
+      if (window.Utils) Utils.showToast('📨 Заявка отправлена! Администратор свяжется с вами');
     }).catch(function (err) {
       form.classList.remove('show-success');
       form.classList.add('show-error');
       if (window.Utils && err && err.message) Utils.showToast(err.message);
     }).then(function () {
       if (btn) { btn.disabled = false; btn.innerHTML = prev; }
-    });
-  }
-
-  function bindCabinetToggle() {
-    var toggle = document.getElementById('ownerCabinetToggle');
-    var block = document.getElementById('ownerCabinetBlock');
-    if (!toggle || !block) return;
-    toggle.addEventListener('change', function () {
-      block.classList.toggle('hidden', !toggle.checked);
     });
   }
 
@@ -206,18 +205,24 @@
     var clientForm = e.target.closest('form[data-register-client]');
     if (clientForm) {
       e.preventDefault();
-      submitClientRegistration(clientForm);
+      submitClientRequest(clientForm);
     }
   });
 
   document.addEventListener('DOMContentLoaded', function () {
     populateCitySelect();
     renderStores();
-    bindCabinetToggle();
+    var ownerSchedule = document.getElementById('ownerScheduleBlock');
+    if (ownerSchedule && window.Utils && Utils.scheduleFormHtml) {
+      ownerSchedule.innerHTML = Utils.scheduleFormHtml({});
+    }
   });
   if (document.readyState === 'interactive' || document.readyState === 'complete') {
     populateCitySelect();
     renderStores();
-    bindCabinetToggle();
+    var ownerScheduleReady = document.getElementById('ownerScheduleBlock');
+    if (ownerScheduleReady && window.Utils && Utils.scheduleFormHtml) {
+      ownerScheduleReady.innerHTML = Utils.scheduleFormHtml({});
+    }
   }
 })();

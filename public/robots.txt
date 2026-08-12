@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /assets/
+Disallow: /data/
+Disallow: /cabinet.html
+
+Sitemap: https://mygreenleaf.postalarchive.workers.dev/sitemap.xml

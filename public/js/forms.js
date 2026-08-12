@@ -139,11 +139,12 @@
           window.dispatchEvent(new CustomEvent('order:sent', { detail: data }));
         }
         if (data.type === 'event' && data.event_id) {
-          try {
-            var bookings = JSON.parse(localStorage.getItem('greenleaf_event_bookings_v1') || '{}');
-            bookings[data.event_id] = (Number(bookings[data.event_id]) || 0) + 1;
-            localStorage.setItem('greenleaf_event_bookings_v1', JSON.stringify(bookings));
-          } catch (e) { }
+          // Бронь места в единой БД (Worker KV) + защита от дублей на этом устройстве
+          fetch('/api/event-book', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId: data.event_id, qty: 1 })
+          }).catch(function () { });
           try {
             var mine = JSON.parse(localStorage.getItem('greenleaf_event_my_v1') || '{}');
             mine[data.event_id] = Date.now();

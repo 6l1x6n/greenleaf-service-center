@@ -21,12 +21,31 @@ mkdir -p "$LOCK_DIR"
 echo "$$" > "$LOCK_FILE"
 trap 'rm -rf "$LOCK_DIR"' EXIT
 
-SESSIONS=$(pgrep -f "opencode" | wc -l | tr -d ' ')
+SESSIONS=$(pgrep -f "opencode" 2>/dev/null || true | wc -l | tr -d ' ')
 if [ "$SESSIONS" -gt 1 ]; then
   echo "⚠️ ВНИМАНИЕ: запущено $SESSIONS процессов opencode."
   echo "   Вторая сессия может деплоить старый код. Лучше закрыть её."
 fi
 
+# Гард от деплоя из устаревшей рабочей копии: такой деплой затирает
+# продакшен старым билдом (пропадают бейджи/оверрайды товаров).
+if ! grep -q "handleProductsJson" worker.js; then
+  echo "❌ worker.js не содержит handleProductsJson — это старая версия кода." >&2
+  echo "   Выполните git pull (и обновите копию на машине, которая делает деплой после парсинга)." >&2
+  exit 1
+fi
+if [ ! -f public/data/products.base.json ]; then
+  echo "❌ Нет public/data/products.base.json — база товаров старая (products.json)." >&2
+  exit 1
+fi
+echo "✅ Гард версии пройден: worker.js v2 + products.base.json"
+
 echo "🚀 Деплой mygreenleaf (блокировка: $LOCK_DIR)..."
 npx wrangler deploy "$@"
 echo "✅ Готово."
+
+# Пост-деплой проверка: убеждаемся, что на продакшене новый билд
+if [ -f scripts/verify.sh ]; then
+  echo "🔎 Проверка продакшена..."
+  bash scripts/verify.sh || echo "⚠️ Внимание: проверка продакшена не пройдена — проверьте вручную."
+fi

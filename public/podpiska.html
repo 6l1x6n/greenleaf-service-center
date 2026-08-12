@@ -21,7 +21,7 @@
       </a>
       <nav class="nav" id="nav">
         <a href="index.html#sc">Сервис-центры</a>
-        <a href="index.html">Каталог</a>
+        <a href="catalog.html">Каталог</a>
         <a href="index.html#deliveries">Поставки</a>
         <a href="index.html#events">Презентации</a>
         <a href="index.html#contacts">Контакты</a>
@@ -31,7 +31,7 @@
         <a class="btn btn-outline btn-sm cart-link" href="cart.html" aria-label="Корзина">
           🛒 <span class="cart-badge" id="cartCount"></span>
         </a>
-        <button class="btn btn-outline btn-sm" onclick="location.href='cabinet.html'">Войти</button>
+        <button class="btn btn-outline btn-sm" id="scAuthBtn">Войти</button>
         <button class="burger" id="burger" aria-label="Открыть меню"><span></span><span></span><span></span></button>
       </div>
     </div>
@@ -277,6 +277,7 @@
   <div class="toast hidden" id="toast"></div>
 
   <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/cities.js"></script>
   <script src="js/forms.js"></script>
   <script src="js/podpiska.js"></script>

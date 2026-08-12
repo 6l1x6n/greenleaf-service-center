@@ -18,10 +18,10 @@
         <span class="logo-text">Greenleaf<small>Аутентификация</small></span>
       </a>
       <nav class="nav">
-        <a href="index.html">🏠 На сайт</a>
       </nav>
       <div class="header-actions">
         <span class="admin-user-badge" id="adminUserBadge"></span>
+        <a class="btn btn-outline btn-sm" href="index.html">🏠 На сайт</a>
         <button class="btn btn-outline btn-sm" id="adminLogoutBtn">🚪 Выйти</button>
       </div>
     </div>
@@ -47,34 +47,49 @@
               <input id="adminPass" name="password" type="password" placeholder="••••••" required autocomplete="current-password">
             </div>
 
-            <a href="#" id="forgotPassLink" class="auth-link" target="_blank" rel="noopener">Забыли пароль?</a>
+            <button type="button" id="forgotPassLink" class="auth-link" style="background:none;border:0;cursor:pointer;padding:0;text-align:left;font-family:var(--font);">Забыли пароль?</button>
 
             <button class="btn btn-primary btn-lg" type="submit" style="margin-top:8px; width:100%;">Войти в панель</button>
 
             <div class="form-error" id="adminLoginErr" style="margin-top:10px;">Неверный логин или пароль. Попробуйте еще раз.</div>
 
-            <button class="btn btn-outline btn-lg" type="button" id="authRegBtn" style="width:100%;">Регистрация</button>
+            <button class="btn btn-outline btn-lg" type="button" id="authRegBtn" style="width:100%;">Оставить заявку</button>
           </form>
         </div>
 
-        <!-- Регистрация клиента -->
+        <!-- Восстановление пароля — заявка администратору -->
+        <div id="authForgotView" class="hidden">
+          <h3 style="margin-bottom:6px;">🔑 Восстановление пароля</h3>
+          <p class="modal-product">Укажите email кабинета — администратор восстановит доступ и свяжется с вами.</p>
+
+          <form class="form" id="forgotForm">
+            <input name="email" type="email" placeholder="Email кабинета *" required autocomplete="email">
+            <button class="btn btn-primary btn-lg" type="submit">Отправить заявку</button>
+            <p class="form-note" id="forgotMsg" style="margin-top:8px;"></p>
+            <p class="form-error">Проверьте email — он должен быть корректным.</p>
+          </form>
+
+          <button class="auth-switch-link" type="button" id="forgotBackBtn">← Назад ко входу</button>
+        </div>
+
+        <!-- Заявка клиента -->
         <div id="authRegView" class="hidden">
-          <h3 style="margin-bottom:6px;">📝 Регистрация</h3>
-          <p class="modal-product">Создайте аккаунт — логин и пароль придут на почту.</p>
+          <h3 style="margin-bottom:6px;">📝 Оставить заявку</h3>
+          <p class="modal-product">Оставьте контакты — администратор свяжется с вами.</p>
 
           <form class="form" data-register-client="1">
             <input name="name" placeholder="Ваше имя *" required>
             <input name="phone" type="tel" placeholder="Телефон для связи *" required>
-            <input name="email" type="email" placeholder="Email — на него придёт логин и пароль *" required autocomplete="email">
-            <select name="city" class="city-select" required>
+            <input name="email" type="email" placeholder="Email (необязательно)" autocomplete="email">
+            <select name="city" class="city-select">
               <option value="" selected disabled>Город</option>
             </select>
             <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
             <input class="hp" name="company" tabindex="-1" autocomplete="off">
-            <button class="btn btn-primary btn-lg" type="submit">Зарегистрироваться</button>
-            <p class="form-note">🔒 Логин и пароль придут на указанную почту. Письмо ни к чему не обязывает.</p>
-            <p class="form-success">Аккаунт создан! Проверьте почту — мы отправили логин и пароль.</p>
-            <p class="form-error">Проверьте обязательные поля, email должен быть корректным.</p>
+            <button class="btn btn-primary btn-lg" type="submit">Отправить заявку</button>
+            <p class="form-note">🔒 Ваши контакты увидят только администраторы Greenleaf.</p>
+            <p class="form-success">Заявка отправлена! Администратор свяжется с вами.</p>
+            <p class="form-error">Проверьте обязательные поля: имя и телефон.</p>
           </form>
 
           <button class="auth-switch-link" type="button" id="authOwnerBtn">Я владелец магазина</button>
@@ -97,21 +112,17 @@
                   <option value="" selected disabled>Город *</option>
                 </select>
                 <input name="address" placeholder="Точный адрес *" required>
+                <div id="ownerScheduleBlock"></div>
                 <select name="experience">
                   <option value="active">🏬 Уже действующий магазин</option>
                   <option value="opening">🌱 Только планирую открытие</option>
                 </select>
                 <textarea name="message" placeholder="Описание или комментарий"></textarea>
 
-                <label class="form-checkbox">
-                  <input type="checkbox" id="ownerCabinetToggle">
-                  <span>🔌 У меня есть кабинет поставщика — хочу автосинхронизацию остатков</span>
-                </label>
-                <div id="ownerCabinetBlock" class="hidden">
+                <div id="ownerCabinetBlock">
                   <p class="form-note">🔐 Данные передаются только администратору и используются исключительно для автоматической синхронизации остатков. На сайте не публикуются.</p>
-                  <input name="officeCode" placeholder="Код личного кабинета (например: S240-534)">
-                  <input name="portalLogin" placeholder="Логин кабинета поставщика" autocomplete="off">
-                  <input name="portalPassword" type="password" placeholder="Пароль кабинета поставщика" autocomplete="new-password">
+                  <input name="portalLogin" placeholder="Логин кабинета СЦ (для парсера)" autocomplete="off">
+                  <input name="portalPassword" type="password" placeholder="Пароль кабинета СЦ (для парсера)" autocomplete="new-password">
                 </div>
 
                 <input class="hp" name="company" tabindex="-1" autocomplete="off">
