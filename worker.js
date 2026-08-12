@@ -486,6 +486,7 @@ async function createOrder(env, data) {
     clientToken: String(data.clientToken || '').trim(),
     managerNote: '',
     total: Number(data.order_total) || 0,
+    package: Number(data.order_package) || 0,
     payment: String(data.payment || ''),
     partnerMode: data.order_partner_mode === '1',
     pickupDate: String(data.pickup_date || data.pickupDate || ''),

@@ -2155,7 +2155,17 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 /* Чек-строки заказа (Мои заказы / админка) */
 .order-receipt-row { display: flex; align-items: center; gap: 10px; width: 100%; }
 .order-receipt-img { width: 40px; height: 40px; object-fit: contain; flex: none; border-radius: 8px; background: #fff; border: 1px solid #edf0f5; }
-.order-receipt-name { font-size: 13.5px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-receipt-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
 .order-receipt-qty { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .order-receipt-sum { font-size: 13.5px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .order-receipt-price { font-size: 13px; color: var(--muted); white-space: nowrap; }
@@ -2306,7 +2316,17 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .my-orders-refresh:hover { color: var(--green); background: var(--green-soft); }
 .my-orders-info { display: flex; align-items: flex-start; gap: 8px; }
 .my-orders-info .ico { margin-top: 2px; }
-.order-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 12px; margin-bottom: 12px; background: #fff; }
+.my-orders-list li {
+  display: block !important;
+  width: 100%;
+}
+.order-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  margin-bottom: 12px;
+  background: #fff;
+}
 .order-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .order-id-chip {
   display: inline-flex;
@@ -2328,9 +2348,23 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .order-summary span { display: inline-flex; align-items: center; gap: 4px; }
 .order-summary .ico { margin-right: 0; }
 .order-summary b { color: var(--ink); }
-.order-card-footer { display: flex; justify-content: flex-end; padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--line); }
-.order-cancel-link { font-size: 13px; font-weight: 600; color: var(--danger); text-decoration: none; opacity: 0.8; }
-.order-cancel-link:hover { opacity: 1; text-decoration: underline; }
+.order-card-footer { display: flex; justify-content: flex-end; padding-top: 10px; }
+.order-cancel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b23b3b;
+  border: 1px solid #efd2d2;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  text-decoration: none;
+  opacity: 0.9;
+}
+.order-cancel-link:hover { background: #fdf2f2; border-color: #e5b9b9; opacity: 1; }
+.my-orders-foot { display: flex; justify-content: center; margin-top: 12px; }
 .badge-st-new { background: #fff3cd; color: #8a6d00; }
 .badge-st-ready { background: #cce5ff; color: #004085; }
 .badge-st-confirmed { background: #d4edda; color: #155724; }

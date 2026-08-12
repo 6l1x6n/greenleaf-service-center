@@ -208,10 +208,10 @@
     openModal(
       '<div class="my-orders-head">' +
       '<h3 style="margin:0;">' + icon('box', 20) + ' Мои заказы</h3>' +
-      '<a href="#" class="my-orders-refresh" id="myOrdersRefreshBtn">' + icon('refresh', 14) + ' Обновить</a>' +
       '</div>' +
       '<div class="my-orders-info">' + icon('info', 16) + '<span>Заказы, оформленные с этого устройства. Когда статус «Готов к выдаче» — товары можно забирать.</span></div>' +
-      '<div id="myOrdersList">Загружаем…</div>',
+      '<div id="myOrdersList">Загружаем…</div>' +
+      '<div class="my-orders-foot"><a href="#" class="my-orders-refresh" id="myOrdersRefreshBtn">' + icon('refresh', 14) + ' Обновить</a></div>',
       true
     );
     var listEl = document.getElementById('myOrdersList');
@@ -248,9 +248,17 @@
                 '</div>';
             }).join('');
             var summaryParts = [];
-            if (o.total) summaryParts.push(icon('money', 15) + '<b>' + fmtPrice(o.total) + '</b>');
-            if (o.payment) summaryParts.push(icon('card', 15) + esc(o.payment));
-            if (o.pickupDate) summaryParts.push(icon('calendar', 15) + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' })) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : ''));
+            var pkg = Number(o.package) || 0;
+            var goodsTotal = Number(o.total) || 0;
+            if (pkg > 0 && goodsTotal > pkg) {
+              summaryParts.push('<span class="sum-goods">' + icon('money', 15) + 'Товары: ' + fmtPrice(goodsTotal - pkg) + '</span>');
+              summaryParts.push('<span class="sum-pkg">' + icon('box', 14) + 'Пакет: ' + fmtPrice(pkg) + '</span>');
+            }
+            if (goodsTotal) {
+              summaryParts.push('<span class="sum-total">' + icon('card', 15) + 'Итого: <b>' + fmtPrice(goodsTotal) + '</b></span>');
+            }
+            if (o.payment) summaryParts.push('<span class="sum-pay">' + icon('card', 14) + esc(o.payment) + '</span>');
+            if (o.pickupDate) summaryParts.push('<span class="sum-pickup">' + icon('calendar', 15) + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' })) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : '') + '</span>');
             var noteTxt = o.managerNote ? '<div class="order-manager-note">' + icon('info', 14) + '<span><b>Сообщение менеджера:</b> ' + esc(o.managerNote) + '</span></div>' : '';
             return '<li class="order-card">' +
               '<div class="order-card-head">' +
@@ -258,12 +266,10 @@
               '<button class="btn btn-outline btn-sm" type="button" data-copy-order="' + esc(oid) + '" title="Скопировать номер">' + icon('copy', 14) + '</button></span>' +
               '<span class="' + st.cls + '">' + icon(st.icon, 14) + ' ' + st.label + (st.sub ? '<small> · ' + st.sub + '</small>' : '') + '</span>' +
               '</div>' +
-              '<div class="admin-list-main">' +
-              '<span class="order-meta">' + icon('store', 14) + ' ' + esc(o.storeName || '—') + ' · ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Almaty' })) + '</span>' +
+              '<div class="order-meta">' + icon('store', 14) + ' <span>' + esc(o.storeName || '—') + ' · ' + esc(new Date(o.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Almaty' })) + '</span></div>' +
               '<div class="order-receipt">' + itemsHtml + '</div>' +
               '<div class="order-summary">' + summaryParts.map(function (s) { return '<span>' + s + '</span>'; }).join('') + '</div>' +
               noteTxt +
-              '</div>' +
               (o.status === 'new' ? '<div class="order-card-footer"><a href="#" class="order-cancel-link" data-my-cancel="' + esc(o.id) + '">Отменить заказ</a></div>' : '') +
               '</li>';
           }).join('') + '</ul>';
