@@ -1433,7 +1433,7 @@ export default {
           return handleScStoresAdmin(env, auth);
         }
         if (path === '/api/orders' && request.method === 'GET') {
-          return handleOrdersGet(env, auth);
+          return handleOrdersGet(request, env, auth);
         }
         return jsonResponse({ ok: false, error: 'method not allowed' }, 405);
       }
