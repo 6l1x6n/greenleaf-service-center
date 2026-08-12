@@ -139,8 +139,7 @@
         orderId: orderId(),
         storeId: state.storeId,
         items: t.lines.map(function (l) { return { productId: l.p.id, qty: l.qty }; }),
-        ttlSeconds: RESERVE_TTL,
-        tz_offset: -new Date().getTimezoneOffset()
+        ttlSeconds: RESERVE_TTL
       })
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d || !d.ok) {
