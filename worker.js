@@ -435,9 +435,16 @@ async function archiveConfirmedOrders(env, url) {
 
 // Последовательный номер заказа (#10001, #10002, …) — красивый номер для клиента;
 // внутренний id (o_…/GL-…) остаётся для техники и связи.
+// Страховка от KV-лага счётчика: номер не ниже максимума среди существующих заказов,
+// чтобы два заказа не получили одинаковый #N.
 async function nextOrderNumber(env) {
-  const counter = await kvGet(env, 'order_counter');
-  const next = Math.max(10000, (Number(counter) || 9999) + 1);
+  const counter = Number(await kvGet(env, 'order_counter')) || 0;
+  let next = Math.max(10000, counter + 1);
+  const orders = await loadOrders(env);
+  Object.keys(orders).forEach(function (oid) {
+    const n = Number(orders[oid] && orders[oid].number) || 0;
+    if (n >= next) next = n + 1;
+  });
   await kvPut(env, 'order_counter', next);
   return next;
 }
