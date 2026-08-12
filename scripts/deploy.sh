@@ -40,6 +40,25 @@ if [ ! -f public/data/products.base.json ]; then
 fi
 echo "✅ Гард версии пройден: worker.js v2 + products.base.json"
 
+# Гард от деплоя из копии, отстающей от origin/main: авто-деплой по пушам
+# (и парсер раз в 3 часа) перезальёт origin/main поверх любого ручного деплоя.
+# Правильный флоу: git push → GitHub Actions деплоит ровно git HEAD.
+git fetch origin main --quiet 2>/dev/null || true
+LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
+REMOTE=$(git rev-parse origin/main 2>/dev/null || echo "")
+if [ -n "$LOCAL" ] && [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
+  echo "❌ Локальная main ($(echo $LOCAL | cut -c1-8)) ≠ origin/main ($(echo $REMOTE | cut -c1-8))." >&2
+  echo "   Деплой вручную затирается авто-деплоем — запушите изменения: git push, затем deploy через GitHub Actions." >&2
+  exit 1
+fi
+echo "✅ main совпадает с origin/main — деплой не будет перезатёрт"
+
+# Маркер версии на сайте: /version.json отдаёт задеплоенный коммит
+if [ -n "$LOCAL" ]; then
+  echo "{\"commit\":\"$LOCAL\",\"short\":\"$(echo $LOCAL | cut -c1-8)\",\"deployedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > public/version.json
+  echo "✅ version.json: $(echo $LOCAL | cut -c1-8)"
+fi
+
 echo "🚀 Деплой mygreenleaf (блокировка: $LOCK_DIR)..."
 npx wrangler deploy "$@"
 echo "✅ Готово."

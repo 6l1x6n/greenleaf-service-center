@@ -48,6 +48,25 @@ fi
 CC=$(curl -sI "$SITE/data/products.json" | tr -d '\r' | grep -i '^cache-control:' | head -1 | sed 's/^[Cc]ache-[Cc]ontrol: *//')
 echo "$CC" | grep -q 'max-age=3600' && echo "✅ Кеш каталога: $CC" || { echo "⚠️ Кеш каталога не установлен: ${CC:-нет}"; }
 
+# 5. Версия на продакшене == git HEAD (защита от деплоя из устаревшей копии)
+LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
+PROD=$(curl -s "$SITE/version.json" | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin); print(d.get('commit',''))
+except Exception: print('')
+" 2>/dev/null)
+if [ -n "$LOCAL" ] && [ -n "$PROD" ]; then
+  if [ "$LOCAL" = "$PROD" ]; then
+    echo "✅ Продакшен = git HEAD ($(echo $LOCAL | cut -c1-8))"
+  else
+    echo "❌ Продакшен ($(echo $PROD | cut -c1-8)) ≠ git HEAD ($(echo $LOCAL | cut -c1-8)) — задеплоена старая версия!" >&2
+    FAIL=1
+  fi
+else
+  echo "⚠️ Не удалось сравнить версию (локально: ${LOCAL:-нет}, продакшен: ${PROD:-нет})"
+fi
+
 if [ "$FAIL" -ne 0 ]; then
   echo "❌ Проверка не пройдена — смотрите ошибки выше."
   exit 1
