@@ -19,6 +19,16 @@
     ['out', '— Нет в наличии']
   ];
 
+  // Карточки полного каталога пока могут ссылаться на remote-миниатюры портала
+  // (-small 60×60) — в таблицах берём веб-версию -shop (600×600)
+  function adminImgUrl(p) {
+    var img = (p && (p.thumb || p.image)) || 'assets/images/products/placeholder.svg';
+    if (img.indexOf('http') === 0 && img.indexOf('-small.') !== -1) {
+      img = img.replace('-small.', '-shop.');
+    }
+    return img;
+  }
+
   var state = {
     user: null,
     stores: [],
@@ -851,7 +861,7 @@
         if (stFilter && statusOf(p, scId) !== stFilter) return false;
         return true;
       }).map(function (p) {
-        var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
+        var img = adminImgUrl(p);
         var st = statusOf(p, scId);
         var stBadge = st === 'in_stock' ? '<span class="badge st-in">✅ В наличии</span>'
           : st === 'zero' ? '<span class="badge st-out">— Нет</span>'
@@ -1087,7 +1097,7 @@
           var s = st[m.statusCode] || { t: 'Готовится к отправке', c: '#6b5410', b: '#fff8e6' };
           var itemsHtml = (m.items || []).map(function (it) {
             var p = state.products.find(function (x) { return x.id === it.sku; });
-            var img = p ? (p.thumb || p.image) : '';
+            var img = p ? adminImgUrl(p) : '';
             return '<span class="delivery-item-chip">' +
               (img ? '<img class="delivery-item-img" src="' + h(img) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
               h(it.sku) + ' · ' + h(String(it.name || '').slice(0, 40)) + (it.qty ? ' · ' + h(it.qty) + ' шт' : '') +
@@ -1140,7 +1150,7 @@
             if (!p) p = Utils.productByArticle(state.products, name);
             var chip = '';
             if (p) {
-              var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
+              var img = adminImgUrl(p);
               chip = '<img class="delivery-item-img" src="' + h(img) + '" alt="' + h(p.name) + '" onerror="this.style.display=\'none\'">';
             } else {
               chip = '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
@@ -1545,7 +1555,7 @@
                 : '<span class="badge" style="background:#f8d7da;color:#721c24;">🚫 Отменён</span>'));
           var itemsHtml = (o.items || []).map(function (i) {
             var p = byId[i.productId];
-            var img = p ? (p.thumb || p.image) : '';
+            var img = p ? adminImgUrl(p) : '';
             var name = i.name || (p ? p.name : '') || i.sku || i.productId;
             var unit = Number(i.price) || 0;
             var subtotal = unit ? (unit * (Number(i.qty) || 1)) : 0;
@@ -1712,7 +1722,7 @@
         var changed = Object.keys(o).some(function (k) { return k !== 'hidden' && k !== 'discount_price'; }) ? ' style="outline:1px solid var(--green); outline-offset:-1px;"' : '';
         var isHidden = !!p.hidden;
         var isCustom = !!p.custom;
-        var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
+        var img = adminImgUrl(p);
         var delBtn = isCustom
           ? '<button class="btn btn-outline btn-sm" data-prod-del="' + h(p.id) + '" title="Удалить карточку из базы">🗑</button>'
           : (isHidden

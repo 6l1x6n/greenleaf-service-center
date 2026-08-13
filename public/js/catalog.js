@@ -124,10 +124,20 @@
     return '<button class="btn btn-primary btn-sm" data-cart-add="' + Utils.esc(p.id) + '">🛒 В корзину</button>';
   }
 
+  // Для карточек полного каталога фото пока remote-миниатюры портала (-small, 60×60).
+  // На лету берём веб-версию -shop (600×600) — парсер позже заменит на локальный файл.
+  function imgUrl(p) {
+    var img = (p && p.image) || 'assets/images/products/placeholder.svg';
+    if (img.indexOf('http') === 0 && img.indexOf('-small.') !== -1) {
+      img = img.replace('-small.', '-shop.');
+    }
+    return img;
+  }
+
   function rowHtml(p) {
     var st = statusInfo(p);
     var outCls = st.meta === STATUS.out ? ' product-row-out' : '';
-    var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
+    var img = p.thumb || imgUrl(p);
     var stockInSelectedStore = '';
     if (state.selectedStoreId && state.selectedStoreId !== 'all') {
       var storeStock = StoreStock.text(state.selectedStoreId, p.id);
@@ -413,23 +423,18 @@
     }
     Utils.openModal(
       '<div class="modal-product-detail">' +
-      '<div style="display:flex; justify-content:space-between; align-items:flex-start;">' +
-      '<div>' +
-      '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
-      '<h3 style="margin-top:2px;">' + Utils.esc(p.name) + '</h3>' +
-      '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      '</div>' +
-      '</div>' +
       '<div class="product-detail-grid">' +
       '<div class="product-detail-media">' +
-      '<img src="' + Utils.esc(p.image || 'assets/images/products/placeholder.svg') + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+      '<img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
       '</div>' +
       '<div class="product-detail-body">' +
+      '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
+      '<h3 style="margin:2px 0 0;">' + Utils.esc(p.name) + '</h3>' +
+      '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
       '<div class="card-prices" style="margin-top:6px;">' +
       priceHtml +
       '</div>' +
       '<a class="partner-link" href="podpiska.html">Партнёрская цена для подписчиков · Как стать партнёром →</a>' +
-      '<div class="product-detail-desc">' + Utils.esc(p.description || 'Высококачественная экологичная продукция Greenleaf.') + '</div>' +
       qtyLine +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
@@ -438,6 +443,7 @@
       '</div>' +
       '</div>' +
       '</div>' +
+      '<div class="product-detail-desc">' + Utils.esc(p.description || 'Высококачественная экологичная продукция Greenleaf.') + '</div>' +
       '</div>',
       true
     );
