@@ -1459,6 +1459,13 @@ a:hover { text-decoration: none; }
   animation: modalIn 0.28s cubic-bezier(0.16, 0.84, 0.44, 1);
 }
 @keyframes modalIn { from { opacity: 0; transform: translateY(18px) scale(0.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* Скроллбар модалки: отступ сверху/снизу, чтобы не «вылезать» за скруглённые углы */
+.modal { scrollbar-width: thin; scrollbar-color: rgba(27, 107, 63, 0.3) transparent; }
+.modal::-webkit-scrollbar { width: 10px; }
+.modal::-webkit-scrollbar-track { margin: 12px 0; }
+.modal::-webkit-scrollbar-thumb { border-radius: 999px; border: 2px solid var(--bg); }
+
 .modal.modal-wide { max-width: 720px; }
 .modal-close {
   position: absolute;
