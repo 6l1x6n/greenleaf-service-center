@@ -892,14 +892,19 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
             by_code[code] = card
             created += 1
         else:
-            # Инкрементальный режим: существующие карточки трогаем только по количеству
-            if full:
+            # Инкрементальный режим: существующие карточки трогаем только по количеству.
+            # Исключение — заглушка из накладной (pending): достраиваем её полными
+            # данными один раз, как только артикул появился в каталоге продажи.
+            if full or card.get("pending"):
                 card["name"] = it["name"]
                 card["category"] = category
                 card["price"] = price
                 card["partner_price"] = partner_price
                 if img:
                     card["image"] = img
+                if card.get("pending"):
+                    card.pop("pending", None)
+                    card["hidden"] = False
             updated += 1
         card["stock"][sc_id] = it["quantity"]
 
@@ -994,6 +999,128 @@ def extract_public_description(html):
         return ""
     blocks = [b for b in parser.blocks if not b.startswith("Другие товары из категории")]
     return "\n".join(blocks)
+
+
+def extract_og_image(html):
+    """Фото товара с публичной карточки: og:image, фолбэк — первый настоящий <img>."""
+    for m in re.finditer(r"<meta[^>]*>", html, re.IGNORECASE):
+        tag = m.group(0)
+        if "og:image" not in tag.lower():
+            continue
+        cm = re.search(r'content=["\']([^"\']+)["\']', tag, re.IGNORECASE)
+        if cm:
+            url = cm.group(1).strip()
+            if url and not PLACEHOLDER_RE.search(url):
+                return url.split()[0]
+    for m in re.finditer(r'<img[^>]+src=["\']([^"\']+)["\']', html, re.IGNORECASE):
+        url = m.group(1).strip()
+        if not url or PLACEHOLDER_RE.search(url):
+            continue
+        return url.split()[0]
+    return ""
+
+
+def fetch_move_card_data(code, goods, config):
+    """Публичная страница товара: описание + og:image одним запросом (для накладных)."""
+    if not goods.get("path") or not goods.get("name"):
+        return "", ""
+    url = (
+        config["portal_url"]
+        + "/shop/"
+        + goods["path"].strip("/")
+        + "/"
+        + goods["name"].strip("/")
+        + "/"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            html = resp.read().decode("utf-8", "ignore")
+        return extract_public_description(html), extract_og_image(html)
+    except Exception:
+        return "", ""
+
+
+def ensure_cards_from_moves(page, base_products, moves, config):
+    """Создаёт карточки-заглушки для артикулов из активных накладных, которых ещё нет в базе.
+
+    «Умный» режим: карточка создаётся один раз (название, фото, описание с публичной
+    страницы портала); цена из накладной неизвестна, поэтому карточка скрыта из
+    каталога (hidden, price 0) до появления артикула в каталоге продажи — тогда
+    merge_sc_items достроит её полными данными (pending снимается, hidden выключается).
+    """
+    known = {p["sku"] for p in base_products if p.get("sku")}
+    new_skus = []
+    seen = set()
+    for mv in moves:
+        # Пропускаем только отменённые/оспоренные/ошибки: карточки создаём и для
+        # активных, и для прибывших накладных (товар уже у нас — фото нужно сразу)
+        if mv.get("statusCode") in (5, 9, 101, -1):
+            continue
+        for it in mv.get("items") or []:
+            sku = it.get("sku")
+            if sku and sku not in known and sku not in seen:
+                seen.add(sku)
+                new_skus.append((sku, it.get("name") or ""))
+    if not new_skus:
+        print("Карточки из накладных: новых артикулов нет")
+        return base_products
+
+    print(f"Карточки из накладных: новых артикулов {len(new_skus)} — создаю заглушки")
+    goods_map = {}
+    try:
+        goods = fetch_goods_map(page, config, ids=[s for s, _ in new_skus])
+        for g in goods:
+            if g.get("code"):
+                goods_map.setdefault(g["code"], []).append(g)
+    except Exception as e:
+        print(f"Карточки из накладных: карта портала недоступна ({e}) — заглушки без фото")
+
+    categories = config.get("categories", [])
+    by_code = base_index(base_products)
+    created = 0
+    for sku, move_name in new_skus:
+        if sku in by_code:
+            continue
+        goods_list = goods_map.get(sku) or []
+        goods = goods_list[0] if goods_list else {}
+        title = (goods.get("title") or "").strip()
+        name = clean_product_name(title or move_name) or sku
+        desc = (goods.get("description") or "").strip()
+        img_url = ""
+        if goods:
+            page_desc, og = fetch_move_card_data(sku, goods, config)
+            if page_desc:
+                desc = page_desc
+            img_url = og
+        img_rel = None
+        if img_url:
+            urls = image_variant_urls(img_url, config)
+            path = image_local_path(sku, urls[0])
+            if fetch_image(path, urls, page.request):
+                img_rel = os.path.relpath(path, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
+        category = classify_category(name, categories)
+        card = {
+            "id": sku,
+            "sku": sku,
+            "name": name,
+            "category": category,
+            "price": 0,
+            "partner_price": 0,
+            "quantity": 0,
+            "image": img_rel or image_for_category(category, categories),
+            "status": "out",
+            "eta": None,
+            "incoming": None,
+            "description": desc,
+            "stock": {},
+            "hidden": True,
+            "pending": True,
+        }
+        by_code[sku] = card
+        created += 1
+    print(f"Карточки из накладных: создано заглушек {created} из {len(new_skus)}")
+    return list(by_code.values())
 
 
 def fetch_public_description(code, goods, config):
@@ -1193,6 +1320,10 @@ def main():
                 login(page, store_config)
                 moves = scrape_moves(page, store_config)
                 write_moves(moves)
+                # Карточки для артикулов накладных создаются и в режиме «только поступления»
+                base_products = load_base_products()
+                base_products = ensure_cards_from_moves(page, base_products, moves, store_config)
+                write_products(base_products, active_store_ids(config))
                 browser.close()
             return
         with sync_playwright() as p:
@@ -1214,6 +1345,10 @@ def main():
                     try:
                         moves = scrape_moves(page, store_config)
                         write_moves(moves)
+                        # Карточки-заглушки для артикулов накладных, которых нет в каталоге:
+                        # фото/имя появляются в «Поставках» сразу, цена достроится при
+                        # появлении артикула в каталоге продажи (pending в merge_sc_items)
+                        base_products = ensure_cards_from_moves(page, base_products, moves, store_config)
                     except Exception as e:
                         print(f"Перемещения товаров: не удалось ({e}) — продолжаем без них")
             write_products(base_products, active_ids)
