@@ -1307,7 +1307,10 @@ async function handleStores(env) {
   const deletedIds = Object.values(stores)
     .filter(s => s.deleted || s.status === 'deleted')
     .map(s => s.id);
-  return jsonResponse({ ok: true, stores: list, deletedIds }, 200, 1800);
+  // Кеш 60с: смена методов оплаты / карточки СЦ должна быть видна на сайте
+  // быстро (раньше 30 мин держался старый список — отключённый Kaspi ещё
+  // долго оставался активным у покупателей)
+  return jsonResponse({ ok: true, stores: list, deletedIds }, 200, 60);
 }
 
 // ---------------- Конфиг для парсера (по API-ключу) ----------------

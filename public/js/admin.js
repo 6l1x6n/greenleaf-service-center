@@ -409,9 +409,17 @@
       '<p class="form-note" style="max-width:360px;">🕐 Часы работы — по времени Астаны (UTC+5), общий часовой пояс для всех филиалов. Бронь и выдача проверяются по нему.</p>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
       '<div class="form-group"><label>Методы оплаты</label>' +
-      '<label style="display:flex; align-items:center; gap:8px; margin:4px 0; font-size:14px;"><input type="checkbox" name="pay_kaspi" value="1"' + (pm.indexOf('kaspi') !== -1 ? ' checked' : '') + '> 💳 Kaspi</label>' +
-      '<label style="display:flex; align-items:center; gap:8px; margin:4px 0; font-size:14px;"><input type="checkbox" name="pay_cash" value="1"' + (pm.indexOf('cash') !== -1 ? ' checked' : '') + '> 💵 Наличные</label>' +
-      '<p class="form-note">Отключённый метод станет недоступен при оформлении заказа (кнопка неактивна).</p></div>' +
+      '<div class="pay-methods-admin">' +
+      '<label class="pm-opt' + (pm.indexOf('kaspi') !== -1 ? ' checked' : '') + '">' +
+      '<input type="checkbox" name="pay_kaspi" value="1"' + (pm.indexOf('kaspi') !== -1 ? ' checked' : '') + '>' +
+      '<span class="pm-emoji">💳</span><span class="pm-name">Kaspi</span><span class="pm-hint">Оплата переводом онлайн</span>' +
+      '</label>' +
+      '<label class="pm-opt' + (pm.indexOf('cash') !== -1 ? ' checked' : '') + '">' +
+      '<input type="checkbox" name="pay_cash" value="1"' + (pm.indexOf('cash') !== -1 ? ' checked' : '') + '>' +
+      '<span class="pm-emoji">💵</span><span class="pm-name">Наличные</span><span class="pm-hint">Оплата при получении</span>' +
+      '</label>' +
+      '</div>' +
+      '<p class="form-note">Отключённый метод станет недоступен при оформлении заказа (кнопка неактивна с подсказкой).</p></div>' +
       '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."' + (store.image ? '' : '') + '>' + imagePreview + '</div>' +
       '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
       '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
@@ -473,6 +481,9 @@
         var row = off.closest('.sched-row');
         if (row) row.classList.toggle('has-off', off.checked);
       }
+      // Карточка-переключатель метода оплаты: подсвечиваем выбранное состояние
+      var pmOpt = e.target.closest('.pm-opt');
+      if (pmOpt) pmOpt.classList.toggle('checked', e.target.checked);
     });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
