@@ -1301,7 +1301,8 @@ def fetch_goods_map(page, config, ids=None):
                         path: g.path || '',
                         name: g.name || '',
                         title: (g.title && g.title['ru']) || '',
-                        description: (g.description && g.description['ru']) || ''
+                        description: (g.description && g.description['ru']) || '',
+                        photo: g.photo || ''
                     }));
                 }));
                 res.forEach(arr => out.push(...arr));
