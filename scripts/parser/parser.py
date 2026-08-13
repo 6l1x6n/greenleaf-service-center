@@ -9,6 +9,14 @@ from html.parser import HTMLParser
 
 from playwright.sync_api import sync_playwright
 
+# PNG портала содержат крупные текстовые чанки (метаданные/ICC) — Pillow
+# по умолчанию отказывается открывать их (MAX_TEXT_CHUNK = 1МБ)
+try:
+    import PIL.PngImagePlugin as _png_plugin
+    _png_plugin.MAX_TEXT_CHUNK = 64 * 1024 * 1024
+except Exception:
+    pass
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(os.path.dirname(BASE_DIR))
 PRODUCTS_PATH = os.path.join(ROOT_DIR, "public", "data", "products.base.json")
