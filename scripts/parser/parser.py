@@ -32,6 +32,8 @@ IMG_ATTR_RE = re.compile(
     r'<img[^>]+(?:data-src|data-original|data-lazy-src|srcset)="([^"]+)"', re.IGNORECASE
 )
 PLACEHOLDER_RE = re.compile(r"(placeholder|pixel|blank|\.gif$)", re.IGNORECASE)
+# Общие картинки портала, которые встречаются как og:image/дефолт вместо фото товара
+DEFAULT_IMG_RE = re.compile(r"(index\.jpe?g|nofoto|logo_white|/static/img/|/static/|default)", re.IGNORECASE)
 
 
 def extract_image_url(html):
@@ -1001,8 +1003,25 @@ def extract_public_description(html):
     return "\n".join(blocks)
 
 
-def extract_og_image(html):
-    """Фото товара с публичной карточки: og:image, фолбэк — первый настоящий <img>."""
+def extract_product_image(html):
+    """Фото товара с публичной карточки.
+
+    Первое <img itemProp="image"> в слайдере — это фото самого товара
+    (дальше в слайдере идут фото похожих товаров). og:image используем только
+    если это не общая картинка портала (/static/img/index.jpg — её портал
+    подставляет всем страницам, фото товара в ней нет).
+    """
+    for m in re.finditer(r"<img[^>]+>", html, re.IGNORECASE):
+        tag = m.group(0)
+        if 'itemprop="image"' not in tag.lower() and "itemprop='image'" not in tag.lower():
+            continue
+        sm = re.search(r'(?:data-src|src)=["\']([^"\']+)["\']', tag, re.IGNORECASE)
+        if not sm:
+            continue
+        url = sm.group(1).strip().split()[0]
+        if not url or PLACEHOLDER_RE.search(url) or DEFAULT_IMG_RE.search(url):
+            continue
+        return url
     for m in re.finditer(r"<meta[^>]*>", html, re.IGNORECASE):
         tag = m.group(0)
         if "og:image" not in tag.lower():
@@ -1010,18 +1029,13 @@ def extract_og_image(html):
         cm = re.search(r'content=["\']([^"\']+)["\']', tag, re.IGNORECASE)
         if cm:
             url = cm.group(1).strip()
-            if url and not PLACEHOLDER_RE.search(url):
+            if url and not PLACEHOLDER_RE.search(url) and not DEFAULT_IMG_RE.search(url):
                 return url.split()[0]
-    for m in re.finditer(r'<img[^>]+src=["\']([^"\']+)["\']', html, re.IGNORECASE):
-        url = m.group(1).strip()
-        if not url or PLACEHOLDER_RE.search(url):
-            continue
-        return url.split()[0]
     return ""
 
 
 def fetch_move_card_data(code, goods, config):
-    """Публичная страница товара: описание + og:image одним запросом (для накладных)."""
+    """Публичная страница товара: описание + фото товара одним запросом (для накладных)."""
     if not goods.get("path") or not goods.get("name"):
         return "", ""
     url = (
@@ -1036,21 +1050,24 @@ def fetch_move_card_data(code, goods, config):
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=20) as resp:
             html = resp.read().decode("utf-8", "ignore")
-        return extract_public_description(html), extract_og_image(html)
+        return extract_public_description(html), extract_product_image(html)
     except Exception:
         return "", ""
 
 
 def ensure_cards_from_moves(page, base_products, moves, config):
-    """Создаёт карточки-заглушки для артикулов из активных накладных, которых ещё нет в базе.
+    """Создаёт карточки-заглушки для артикулов из накладных, которых ещё нет в базе.
 
     «Умный» режим: карточка создаётся один раз (название, фото, описание с публичной
     страницы портала); цена из накладной неизвестна, поэтому карточка скрыта из
     каталога (hidden, price 0) до появления артикула в каталоге продажи — тогда
     merge_sc_items достроит её полными данными (pending снимается, hidden выключается).
+
+    Заглушки с «битым» фото (портал отдал общую картинку index.jpg) пересоздаются
+    в следующих прогонах, пока не получится настоящее фото товара.
     """
     known = {p["sku"] for p in base_products if p.get("sku")}
-    new_skus = []
+    todo = []
     seen = set()
     for mv in moves:
         # Пропускаем только отменённые/оспоренные/ошибки: карточки создаём и для
@@ -1059,17 +1076,28 @@ def ensure_cards_from_moves(page, base_products, moves, config):
             continue
         for it in mv.get("items") or []:
             sku = it.get("sku")
-            if sku and sku not in known and sku not in seen:
-                seen.add(sku)
-                new_skus.append((sku, it.get("name") or ""))
-    if not new_skus:
+            if not sku or sku in seen:
+                continue
+            seen.add(sku)
+            if sku not in known:
+                todo.append((sku, it.get("name") or ""))
+    refresh_seen = set()
+    for p in base_products:
+        if not p.get("pending"):
+            continue
+        src = p.get("image_src") or ""
+        if not src or DEFAULT_IMG_RE.search(src):
+            if p["sku"] not in refresh_seen:
+                refresh_seen.add(p["sku"])
+                todo.append((p["sku"], p.get("name") or ""))
+    if not todo:
         print("Карточки из накладных: новых артикулов нет")
         return base_products
 
-    print(f"Карточки из накладных: новых артикулов {len(new_skus)} — создаю заглушки")
+    print(f"Карточки из накладных: обработка артикулов {len(todo)} — создаю/обновляю заглушки")
     goods_map = {}
     try:
-        goods = fetch_goods_map(page, config, ids=[s for s, _ in new_skus])
+        goods = fetch_goods_map(page, config, ids=[s for s, _ in todo])
         for g in goods:
             if g.get("code"):
                 goods_map.setdefault(g["code"], []).append(g)
@@ -1079,9 +1107,8 @@ def ensure_cards_from_moves(page, base_products, moves, config):
     categories = config.get("categories", [])
     by_code = base_index(base_products)
     created = 0
-    for sku, move_name in new_skus:
-        if sku in by_code:
-            continue
+    refreshed = 0
+    for sku, move_name in todo:
         goods_list = goods_map.get(sku) or []
         goods = goods_list[0] if goods_list else {}
         title = (goods.get("title") or "").strip()
@@ -1089,10 +1116,10 @@ def ensure_cards_from_moves(page, base_products, moves, config):
         desc = (goods.get("description") or "").strip()
         img_url = ""
         if goods:
-            page_desc, og = fetch_move_card_data(sku, goods, config)
+            page_desc, img = fetch_move_card_data(sku, goods, config)
             if page_desc:
                 desc = page_desc
-            img_url = og
+            img_url = img
         img_rel = None
         if img_url:
             urls = image_variant_urls(img_url, config)
@@ -1100,6 +1127,16 @@ def ensure_cards_from_moves(page, base_products, moves, config):
             if fetch_image(path, urls, page.request):
                 img_rel = os.path.relpath(path, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
         category = classify_category(name, categories)
+        existing = by_code.get(sku)
+        if existing and existing.get("pending"):
+            existing["name"] = name
+            existing["category"] = category
+            existing["description"] = desc
+            if img_rel:
+                existing["image"] = img_rel
+            existing["image_src"] = img_url
+            refreshed += 1
+            continue
         card = {
             "id": sku,
             "sku": sku,
@@ -1116,10 +1153,11 @@ def ensure_cards_from_moves(page, base_products, moves, config):
             "stock": {},
             "hidden": True,
             "pending": True,
+            "image_src": img_url,
         }
         by_code[sku] = card
         created += 1
-    print(f"Карточки из накладных: создано заглушек {created} из {len(new_skus)}")
+    print(f"Карточки из накладных: создано {created}, обновлено фото/имя {refreshed}, всего {len(todo)}")
     return list(by_code.values())
 
 
