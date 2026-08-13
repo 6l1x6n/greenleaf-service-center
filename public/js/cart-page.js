@@ -15,8 +15,8 @@
 
   var SELECTED_KEY = 'greenleaf_sc_selected_v1';
 
-  // ---- Бронь товаров (2 минуты, как места в кинотеатре) ----
-  var RESERVE_TTL = 120;
+  // ---- Бронь товаров (5 минут, как места в кинотеатре) ----
+  var RESERVE_TTL = 300;
   var RESERVE_KEY = 'greenleaf_order_reservation_v1';
   var reserve = { orderId: '', expiresAt: 0, interval: null, signature: '', expired: false };
   var kaspiPaid = false;
@@ -77,7 +77,7 @@
     if (reserve.interval) { clearInterval(reserve.interval); reserve.interval = null; }
   }
 
-  // Истечение 2 минут: бронь снята, оплата на сайте технически невозможна,
+  // Истечение 5 минут: бронь снята, оплата на сайте технически невозможна,
   // нужно собрать корзину заново (как места в кинотеатре).
   function expiredState() {
     reserve.expired = true;
@@ -346,6 +346,36 @@
       '</div>';
   }
 
+  // Методы оплаты выбранного СЦ (по умолчанию Kaspi + наличные)
+  function paymentMethods() {
+    var st = selectedStoreObj();
+    var m = st && Array.isArray(st.payment_methods) && st.payment_methods.length
+      ? st.payment_methods
+      : ['kaspi', 'cash'];
+    return m;
+  }
+
+  // Обновляет доступность вкладок оплаты: отключённый у СЦ метод — неактивен,
+  // при наведении показывается подсказка; метод автопереключается на доступный
+  function updatePayTabs() {
+    var m = paymentMethods();
+    var hasKaspi = m.indexOf('kaspi') !== -1;
+    var hasCash = m.indexOf('cash') !== -1;
+    var st = selectedStoreObj();
+    var name = st ? st.name : '';
+    var tip = 'Данный метод оплаты у СЦ «' + name + '» временно недоступен';
+    var kaspiWrap = document.getElementById('payTabKaspi');
+    var cashWrap = document.getElementById('payTabCash');
+    var kaspiBtn = kaspiWrap ? kaspiWrap.querySelector('.pay-tab') : null;
+    var cashBtn = cashWrap ? cashWrap.querySelector('.pay-tab') : null;
+    if (kaspiBtn) kaspiBtn.disabled = !hasKaspi;
+    if (cashBtn) cashBtn.disabled = !hasCash;
+    if (kaspiWrap) kaspiWrap.setAttribute('data-tip', hasKaspi ? '' : tip);
+    if (cashWrap) cashWrap.setAttribute('data-tip', hasCash ? '' : tip);
+    if (!hasKaspi && state.payment === 'kaspi') setPayment('cash');
+    else if (!hasCash && state.payment === 'cash') setPayment('kaspi');
+  }
+
   function render() {
     var t = totals();
 
@@ -360,6 +390,7 @@
     viewEl.classList.remove('hidden');
 
     renderStoreSelect();
+    updatePayTabs();
 
     var storeObj = selectedStoreObj();
     var saved = savedStore();
@@ -542,6 +573,9 @@
   }
 
   function setPayment(method) {
+    var m = paymentMethods();
+    if (method === 'kaspi' && m.indexOf('kaspi') === -1) return;
+    if (method === 'cash' && m.indexOf('cash') === -1) return;
     state.payment = method;
     setField('orderPayment', method === 'cash' ? 'Наличные при получении' : 'Kaspi');
     document.querySelectorAll('.pay-tab').forEach(function (b) {
@@ -644,7 +678,7 @@
       return;
     }
     var payTab = e.target.closest('[data-pay]');
-    if (payTab) {
+    if (payTab && !payTab.disabled) {
       setPayment(payTab.getAttribute('data-pay'));
       return;
     }
@@ -954,6 +988,7 @@
   }
 
   setPayment('kaspi');
+  updatePayTabs();
   orderForm.querySelectorAll('input, select').forEach(function (el) {
     el.addEventListener('input', function () { el.classList.remove('field-blink'); });
     el.addEventListener('change', function () { el.classList.remove('field-blink'); });

@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -513,6 +514,9 @@ def scrape_goods(page, config):
         if not show_more or not show_more.is_visible():
             break
 
+        # Вежливость к порталу: случайная пауза перед кликом снижает
+        # «машинный» паттерн при частых прогонах
+        time.sleep(random.uniform(0.5, 1.5))
         try:
             prev_count = len(find_goods_rows(page))
             show_more.click(timeout=15000)
@@ -931,6 +935,95 @@ def base_index(products):
     return {p["sku"]: p for p in products if p.get("sku")}
 
 
+def fetch_all_goods(config):
+    """Полный список товаров портала из API (без авторизации).
+
+    /api/v1/shop/goods без code отдаёт весь каталог постранично (limit+offset),
+    включая служебные узлы без code (их отбрасывает ensure_full_catalog).
+    Это лёгкий проход: поля без описаний на каждой странице, ~13 запросов.
+    """
+    base = config.get("portal_url", "").rstrip("/")
+    fields = "id,code,path,name,title,photo"
+    out = []
+    offset = 0
+    page = 500
+    while True:
+        url = f"{base}/api/v1/shop/goods?fields={fields}&limit={page}&offset={offset}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                chunk = json.loads(resp.read().decode("utf-8", "ignore"))
+        except Exception as e:
+            print(f"Список товаров портала: ошибка на offset {offset} ({e}) — прекращаю")
+            break
+        if not chunk:
+            break
+        out.extend(chunk)
+        offset += len(chunk)
+        if len(chunk) < page:
+            break
+    print(f"Список товаров портала: {len(out)} записей")
+    return out
+
+
+def ensure_full_catalog(base_products, goods, config):
+    """Создаёт карточки для всех товаров портала, которых ещё нет в базе.
+
+    Карточки без цены/остатков: status out, price 0 (фронт показывает
+    «Цена по запросу»), фото — веб-вариант «-small» с портала (локально
+    не качаем — иначе репозиторий раздуется тысячами файлов). Когда артикул
+    появится в каталоге продажи, merge_sc_items достроит его полными данными
+    (цена, локальное фото, pending снимается).
+    """
+    categories = config.get("categories", [])
+    by_code = base_index(base_products)
+    created = 0
+    for g in goods:
+        code = (g.get("code") or "").strip()
+        if not code or code in by_code:
+            continue
+        title = (g.get("title") or {}).get("ru") or g.get("name") or ""
+        if not title:
+            continue
+        name = title
+        category = classify_category(name, categories)
+        photo = (g.get("photo") or "").strip()
+        image = ""
+        if photo:
+            base_url = config.get("portal_url", "").rstrip("/")
+            url = photo if photo.startswith("http") else base_url + photo
+            stem, _, ext = url.rpartition(".")
+            ext = ext.lower() if ext.lower() in ("png", "jpg", "jpeg") else ""
+            if ext:
+                image = stem + "-small." + ext
+            else:
+                image = url
+        card = {
+            "id": code,
+            "sku": code,
+            "name": name,
+            "category": category,
+            "price": 0,
+            "partner_price": 0,
+            "quantity": 0,
+            "image": image or image_for_category(category, categories),
+            "status": "out",
+            "eta": None,
+            "incoming": None,
+            "description": "",
+            "stock": {},
+            "hidden": False,
+        }
+        base_products.append(card)
+        by_code[code] = card
+        created += 1
+    if created:
+        print(f"Каталог портала: создано карточек {created} (всего в базе {len(base_products)})")
+    else:
+        print("Каталог портала: новых карточек нет")
+    return base_products
+
+
 def merge_sc_items(base_products, items, sc_id, config, images=None, descriptions=None, full=True):
     """Вливает каталог одного сервис-центра в базу: по коду обновляет количество,
     новые коды создают новые карточки. Описание не перезаписывается (заполняется
@@ -1235,6 +1328,9 @@ def ensure_cards_from_moves(page, base_products, moves, config):
                 if img_rel:
                     existing["image"] = img_rel
                 existing["image_src"] = img_url
+                # Заглушка видна в каталоге («нет в наличии»), даже без цены —
+                # полные данные достроит merge_sc_items при появлении в продаже
+                existing["hidden"] = False
             refreshed += 1
             continue
         card = {
@@ -1251,7 +1347,7 @@ def ensure_cards_from_moves(page, base_products, moves, config):
             "incoming": None,
             "description": desc,
             "stock": {},
-            "hidden": True,
+            "hidden": False,
             "pending": True,
             "image_src": img_url,
         }
@@ -1477,10 +1573,20 @@ def main():
             active_ids = active_store_ids(config)
             base_products = load_base_products()
             print(f"База товаров: {len(base_products)} карточек, режим: {'полный' if full else 'умный'}, СЦ: {[s['id'] for s in stores]}")
+            # Полный каталог портала: карточки для всех артикулов создаются
+            # один раз и дальше только досоздаются (лёгкий API-проход)
+            try:
+                goods_all = fetch_all_goods(config)
+                base_products = ensure_full_catalog(base_products, goods_all, config)
+            except Exception as e:
+                print(f"Каталог портала: не удалось ({e}) — продолжаем без него")
             for store in stores:
                 store_config = build_store_config(config, store)
                 base_products = run_parse_store(page, store_config, base_products, full=full)
                 if store.get("id") == central:
+                    # Пауза между этапами (каталог → накладные) — случайная,
+                    # чтобы прогон не выглядел как робот для защиты портала
+                    time.sleep(random.uniform(5, 15))
                     try:
                         moves = scrape_moves(page, store_config)
                         write_moves(moves)

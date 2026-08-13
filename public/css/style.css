@@ -684,6 +684,45 @@ a:hover { text-decoration: none; }
   color: var(--muted);
 }
 .pay-tab.active { border-color: var(--green); color: var(--green-dark); background: var(--green-soft); }
+.pay-tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #f0f2f0;
+  border-style: dashed;
+}
+/* Тултип над неактивным методом оплаты (обёртка span.tooltip-wrap) */
+.tooltip-wrap { position: relative; flex: 1; display: block; }
+.tooltip-wrap .pay-tab { width: 100%; }
+.tooltip-wrap[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 260px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(20, 30, 24, 0.95);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+  z-index: 30;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.tooltip-wrap[data-tip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(20, 30, 24, 0.95);
+  z-index: 30;
+}
 .pay-panel { margin-top: 6px; }
 .kaspi-amount { font-size: 15px; margin-bottom: 8px; }
 .kaspi-amount b { font-size: 22px; color: var(--green-dark); }
@@ -927,6 +966,7 @@ a:hover { text-decoration: none; }
 .card-prices { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .price-old { font-size: 14px; color: var(--muted); text-decoration: line-through; font-weight: 600; }
 .price-partner { font-size: 22px; font-weight: 800; color: var(--green-dark); }
+.price-ask { font-size: 15px; font-weight: 700; color: var(--muted); }
 .badge-sale {
   display: inline-flex;
   align-items: center;
@@ -1327,20 +1367,20 @@ a:hover { text-decoration: none; }
   height: 300px;
   min-height: 300px;
 }
-.map-2gis {
+.map-google {
   position: relative;
   display: block;
   width: 100%;
   height: 100%;
 }
-.map-2gis img {
+.map-google iframe {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   display: block;
+  border: 0;
   background: #eef2ee;
 }
-.map-2gis-overlay {
+.map-google-overlay {
   position: absolute;
   left: 12px;
   bottom: 12px;
@@ -1351,8 +1391,9 @@ a:hover { text-decoration: none; }
   font-size: 13.5px;
   font-weight: 800;
   color: var(--green-dark);
-  pointer-events: none;
+  text-decoration: none;
 }
+.map-google-overlay:hover { color: var(--green); }
 
 /* ---------- Футер ---------- */
 .footer {

@@ -384,6 +384,7 @@
     var imagePreview = store.image
       ? '<img id="storeImagePreview" class="store-img-preview" src="' + h(store.image) + '" alt="Превью фото" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
       : '<img id="storeImagePreview" class="store-img-preview hidden" src="assets/images/products/placeholder.svg" alt="Превью фото" onerror="this.src=\'assets/images/products/placeholder.svg\'">';
+    var pm = store.payment_methods || ['kaspi', 'cash'];
     return '<div class="admin-card">' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;" class="store-auth-grid">' +
       '<div class="form-group"><label>Название СЦ *</label><input name="storeName" value="' + h(store.name) + '" required></div>' +
@@ -397,6 +398,10 @@
             Utils.scheduleFormHtml(store) +
       '<p class="form-note" style="max-width:360px;">🕐 Часы работы — по времени Астаны (UTC+5), общий часовой пояс для всех филиалов. Бронь и выдача проверяются по нему.</p>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
+      '<div class="form-group"><label>Методы оплаты</label>' +
+      '<label style="display:flex; align-items:center; gap:8px; margin:4px 0; font-size:14px;"><input type="checkbox" name="pay_kaspi" value="1"' + (pm.indexOf('kaspi') !== -1 ? ' checked' : '') + '> 💳 Kaspi</label>' +
+      '<label style="display:flex; align-items:center; gap:8px; margin:4px 0; font-size:14px;"><input type="checkbox" name="pay_cash" value="1"' + (pm.indexOf('cash') !== -1 ? ' checked' : '') + '> 💵 Наличные</label>' +
+      '<p class="form-note">Отключённый метод станет недоступен при оформлении заказа (кнопка неактивна).</p></div>' +
       '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."' + (store.image ? '' : '') + '>' + imagePreview + '</div>' +
       '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
       '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
@@ -504,6 +509,18 @@
       store.authPassword = authPass ? authPass : store.authPassword;
       store.phoneRaw = (store.phone || '').replace(/\D/g, '');
       if (store.phoneRaw && !store.whatsapp) store.whatsapp = store.phoneRaw;
+      // Методы оплаты: хотя бы один выбран; пустая конфигурация не сохраняется
+      var paymentMethods = [];
+      if (form.pay_kaspi && form.pay_kaspi.checked) paymentMethods.push('kaspi');
+      if (form.pay_cash && form.pay_cash.checked) paymentMethods.push('cash');
+      if (!paymentMethods.length) {
+        form.classList.remove('show-success');
+        form.classList.add('show-error');
+        if (errMsg) errMsg.textContent = 'Выберите хотя бы один метод оплаты.';
+        Utils.showToast('⚠️ Выберите хотя бы один метод оплаты');
+        return;
+      }
+      store.payment_methods = paymentMethods;
 
       // Карточка СЦ всегда пишется в Worker KV: статика для остальных в stores.json
       var isNew = !store.id || String(store.id).indexOf('sc-new-') === 0;
@@ -520,6 +537,7 @@
         whatsapp: store.whatsapp,
         image: store.image,
         description: store.description,
+        payment_methods: store.payment_methods,
         portalLogin: store.portalLogin,
         portalPassword: portalPass,
         authLogin: store.authLogin || '',
@@ -686,12 +704,13 @@
           whatsapp: fromApp.phoneRaw || fromApp.phone || '',
           email: fromApp.email || '',
           kaspi_qr: '',
+          payment_methods: ['kaspi', 'cash'],
           image: '',
           description: '',
           portalLogin: fromApp.portalLogin || '',
           portalPassword: fromApp.portalPassword || ''
         }
-        : { id: 'sc-new-' + Date.now(), name: '', city: 'Алматы', address: '', hours: '', phone: '', whatsapp: '', email: '', kaspi_qr: '', image: '', description: '', officeCode: '', portalLogin: '', portalPassword: '', partner: '' };
+        : { id: 'sc-new-' + Date.now(), name: '', city: 'Алматы', address: '', hours: '', phone: '', whatsapp: '', email: '', kaspi_qr: '', payment_methods: ['kaspi', 'cash'], image: '', description: '', officeCode: '', portalLogin: '', portalPassword: '', partner: '' };
       state.editingStoreId = null;
       state.newStoreFromApp = null;
       formPane.insertAdjacentHTML('beforeend', '<h4 style="margin-bottom:8px; color:var(--green-dark);">➕ Новый филиал</h4><form class="form admin-form" id="storeForm">' + storeFormHtml(newStore, true) + '</form>');

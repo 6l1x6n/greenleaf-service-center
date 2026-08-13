@@ -18,7 +18,7 @@
 //                   storeName, city, address, officeCode, portalLogin, portalPassword, comment,
 //                   status: pending|approved|rejected|new, createdAt }}
 //   reservations — {"<orderId>": { storeId, items: [{productId, qty}], createdAt, expiresAt }}
-//                  временная бронь на 2 минуты при оформлении заказа (как места в кино)
+//                  временная бронь на 5 минут при оформлении заказа (как места в кино)
 //   orders       — {"<orderId>": { id, storeId, items: [{productId, qty}], name, phone,
 //                  comment, total, payment, pickupDate, pickupTime, status: new|confirmed|cancelled,
 //                  createdAt, confirmedAt?, cancelledAt? }} — активные заказы сайта.
@@ -140,7 +140,7 @@ async function decryptSecret(env, value) {
 
 // ---------------- Остатки: база − продажи − активные брони ----------------
 
-const RESERVE_TTL_MS = 120 * 1000; // 2 минуты
+const RESERVE_TTL_MS = 300 * 1000; // 5 минут
 
 function parseStockCount(text) {
   const t = String(text || '').trim();
@@ -345,7 +345,7 @@ async function handleReserve(request, env, url) {
 
   // Бронь доступна в любое время суток: ограничение по рабочим часам применяется
   // только к выбору времени получения (validatePickupSchedule при оформлении заказа).
-  const ttl = Math.min(Number(data.ttlSeconds) || 120, 600) * 1000;
+  const ttl = Math.min(Number(data.ttlSeconds) || 300, 600) * 1000;
   const eff = await computeEffectiveStock(env, url, orderId);
   const reservations = await activeReservations(env);
   const now = Date.now();
@@ -624,7 +624,7 @@ async function createOrder(env, data) {
   const orders = await loadOrders(env);
   orders[orderId] = order;
   await kvPut(env, 'orders', orders);
-  // Холд на 2 минуты больше не нужен — резерв держит сам заказ
+  // Холд на 5 минут больше не нужен — резерв держит сам заказ
   await deleteReservation(env, orderId);
   console.log('Заказ создан:', orderId, 'СЦ', res.storeId, order.items.length, 'поз.');
   return order;
@@ -1100,6 +1100,13 @@ async function handleScStore(request, env, auth) {
   const submittedAuthPass = String(data.authPassword || '').trim();
   const newPortalPass = submittedPortalPass ? await encryptSecret(env, submittedPortalPass) : '';
   const newAuthPass = submittedAuthPass ? await encryptSecret(env, submittedAuthPass) : '';
+  // Методы оплаты: подмножество ['kaspi','cash']; пустое/битое значение — дефолт «все»
+  const DEFAULT_PAYMENT_METHODS = ['kaspi', 'cash'];
+  const rawMethods = Array.isArray(data.payment_methods) ? data.payment_methods : [];
+  const paymentMethods = rawMethods
+    .map(function (m) { return String(m || '').trim(); })
+    .filter(function (m) { return m === 'kaspi' || m === 'cash'; });
+  const finalPaymentMethods = paymentMethods.length ? paymentMethods : (existing.payment_methods && existing.payment_methods.length ? existing.payment_methods : DEFAULT_PAYMENT_METHODS);
   const record = {
     id: storeId,
     officeCode: String(data.officeCode || '').trim() || existing.officeCode || '',
@@ -1124,6 +1131,7 @@ async function handleScStore(request, env, auth) {
       : (String(data.authLogin || '').trim().toLowerCase() || existing.authLogin || officeId || storeId.toLowerCase()),
     authPassword: newAuthPass || existing.authPassword || await encryptSecret(env, randomPassword(10)),
     status: isScRole ? (existing.status || 'active') : (data.status === 'inactive' ? 'inactive' : 'active'),
+    payment_methods: finalPaymentMethods,
     createdAt: existing.createdAt || new Date().toISOString()
   };
   stores[storeId] = record;
@@ -1271,7 +1279,10 @@ async function handleStores(env) {
       phoneRaw: s.phoneRaw || '',
       whatsapp: s.whatsapp || '',
       image: s.image || '',
-      description: s.description || ''
+      description: s.description || '',
+      payment_methods: (Array.isArray(s.payment_methods) && s.payment_methods.length)
+        ? s.payment_methods
+        : ['kaspi', 'cash']
     }));
   const deletedIds = Object.values(stores)
     .filter(s => s.deleted || s.status === 'deleted')
@@ -1753,6 +1764,26 @@ async function validatePickupSchedule(env, data) {
   return null;
 }
 
+// Проверка метода оплаты: СЦ мог отключить Kaspi/наличные (payment_methods в карточке).
+// Если выбранный метод не принимается — заказ не создаём (защита от подмены в форме).
+async function validatePaymentMethod(env, data) {
+  const storeId = String(data.orderStoreId || data.order_store_id || data.store_id || '');
+  const payment = String(data.payment || '');
+  if (!storeId || !payment) return null;
+  const stores = await kvGet(env, 'stores');
+  const store = (stores && typeof stores === 'object') ? stores[storeId] : null;
+  if (!store) return null;
+  const methods = (Array.isArray(store.payment_methods) && store.payment_methods.length)
+    ? store.payment_methods
+    : ['kaspi', 'cash'];
+  const wantsKaspi = payment.indexOf('Kaspi') !== -1;
+  const ok = wantsKaspi
+    ? methods.indexOf('kaspi') !== -1
+    : methods.indexOf('cash') !== -1;
+  if (ok) return null;
+  return 'Данный метод оплаты у СЦ «' + (store.name || storeId) + '» временно недоступен';
+}
+
 async function handleTelegram(request, env) {
   const BOT_TOKEN = env.TG_BOT_TOKEN;
 
@@ -1767,7 +1798,7 @@ async function handleTelegram(request, env) {
     return new Response('ok', { status: 200 });
   }
 
-  // Оформленный заказ: бронь на 2 минуты должна быть активной, иначе 409.
+  // Оформленный заказ: бронь на 5 минут должна быть активной, иначе 409.
   // При успехе — конверсия брони в заказ (до проверки токена).
   let createdOrder = null;
   if (data.type === 'order') {
@@ -1775,6 +1806,8 @@ async function handleTelegram(request, env) {
     if (!check.ok) return check.res;
     const schedErr = await validatePickupSchedule(env, data);
     if (schedErr) return jsonResponse({ ok: false, error: 'schedule', message: schedErr }, 409);
+    const payErr = await validatePaymentMethod(env, data);
+    if (payErr) return jsonResponse({ ok: false, error: 'payment', message: payErr }, 409);
     try { createdOrder = await createOrder(env, data); } catch (e) { console.error('createOrder error:', e); }
   }
 
@@ -1890,7 +1923,7 @@ export default {
       return handleDeliveriesGet(env, url);
     }
 
-    // 1.4.2 Бронь товаров на 2 минуты (оформление заказа)
+    // 1.4.2 Бронь товаров на 5 минут (оформление заказа)
     if (path === '/api/reserve' && request.method === 'POST') {
       return handleReserve(request, env, url);
     }

@@ -150,16 +150,21 @@
 
     // Скидочные цены: оверрайды СЦ/глобальные уже учтены в effectivePrices
     var prices = effectivePrices(p);
-    var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
-    var priceHtml;
-    if (disc) {
-      priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
-        '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>' +
-        '<span class="badge-sale">−' + Math.round((1 - prices.discount / prices.price) * 100) + '%</span>';
+    // Карточки портала без цены (созданы парсером заранее) — «Цена по запросу»
+    var priceHtml = '';
+    if (!(prices.price > 0)) {
+      priceHtml = '<span class="price-ask">Цена по запросу</span>';
     } else {
-      priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
-        '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
-        '<span class="badge-sale">-50%</span>';
+      var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
+      if (disc) {
+        priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
+          '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>' +
+          '<span class="badge-sale">−' + Math.round((1 - prices.discount / prices.price) * 100) + '%</span>';
+      } else {
+        priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
+          '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
+          '<span class="badge-sale">-50%</span>';
+      }
     }
 
     return '' +
@@ -357,12 +362,8 @@
       waContacts.href = 'https://wa.me/' + s.whatsapp + '?text=' + encodeURIComponent('Здравствуйте! Интересует продукция Greenleaf.');
     }
 
-    var map = document.getElementById('map');
-    if (map) {
-      map.src = 'https://static.maps.2gis.com/1.0?center=71.394568,51.126181&zoom=17&size=1200,600';
-    }
     var mapLink = document.getElementById('mapLink');
-    if (mapLink) mapLink.href = 'https://go.2gis.com/eKKpH';
+    if (mapLink) mapLink.href = 'https://www.google.com/maps?q=51.126181,71.394568';
   }
 
   window.CatalogRefreshContacts = renderContacts;
@@ -376,8 +377,10 @@
     var st = statusInfo(p);
     var prices = effectivePrices(p);
     var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
-    var priceHtml;
-    if (disc) {
+    var priceHtml = '';
+    if (!(prices.price > 0)) {
+      priceHtml = '<span class="price-ask">Цена по запросу</span>';
+    } else if (disc) {
       priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
         '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>' +
         '<span class="badge-sale">−' + Math.round((1 - prices.discount / prices.price) * 100) + '%</span>';
