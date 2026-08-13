@@ -628,6 +628,89 @@ def download_images(items, config, session=None):
     return result
 
 
+# ---------------- Фото из API портала (поле photo) ----------------
+# Поле photo отдаёт прямое фото товара — надёжнее парсинга страницы:
+# страницы с суффиксом в slug (_2/_n) не рендерят галерею и подставляют
+# первое фото из «похожих товаров». У файла есть веб-версия «-shop.»
+# (тот же файл, оптимизированный для сайта) — пробуем её первой.
+
+MAX_IMAGE_BYTES = 400 * 1024
+MAX_IMAGE_EDGE = 800
+
+
+def compress_image_if_needed(path):
+    """Сжимает фото больше 400КБ до 800px по большей стороне (Pillow).
+
+    RGBA/палитровые сохраняются как PNG; остальные — как JPEG (файл
+    переименовывается в .jpg, чтобы расширение совпадало с содержимым).
+    Возвращает итоговый путь (может отличаться от входного).
+    """
+    try:
+        from PIL import Image
+        if os.path.getsize(path) <= MAX_IMAGE_BYTES:
+            return path
+        img = Image.open(path)
+        img.load()
+        w, h = img.size
+        scale = min(1.0, MAX_IMAGE_EDGE / max(w, h))
+        if scale < 1.0:
+            img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
+        if img.mode in ("RGBA", "P", "LA"):
+            img.convert("RGBA").save(path, "PNG", optimize=True)
+            return path
+        new_path = os.path.splitext(path)[0] + ".jpg"
+        img.convert("RGB").save(new_path, "JPEG", quality=82, optimize=True, progressive=True)
+        if new_path != path and os.path.exists(path):
+            os.remove(path)
+        print(f"Фото сжато: {os.path.basename(new_path)} ({os.path.getsize(new_path) // 1024} КБ)")
+        return new_path
+    except ImportError:
+        print("Pillow не установлен — фото без сжатия")
+        return path
+    except Exception as e:
+        print(f"Сжатие фото {os.path.basename(path)} не удалось ({e}) — оставляю как есть")
+        return path
+
+
+def clean_local_photo_variants(sku):
+    """Удаляет все локальные варианты фото артикула (для принудительной перезагрузки)."""
+    for ext in (".png", ".jpg", ".jpeg"):
+        p = os.path.join(IMAGES_DIR, sku + ext)
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+
+
+def download_product_photo(sku, photo_url, config, session=None):
+    """Скачивает фото товара с портала: веб-версию «-shop.», затем оригинал.
+
+    Большие файлы сжимаются (Pillow). Возвращает относительный путь или None.
+    """
+    url = str(photo_url or "").strip()
+    if not url:
+        return None
+    if url.startswith("/"):
+        url = config.get("portal_url", "") + url
+    stem, _, ext = url.rpartition(".")
+    orig_ext = ext.lower() if ext.lower() in ("png", "jpg", "jpeg") else ""
+    # Сначала веб-версии «-shop.» (включая то же расширение, что у оригинала),
+    # затем оригинал — так берём самый лёгкий подходящий файл
+    attempts = []
+    for e in ("png", "jpg", "jpeg"):
+        if e != orig_ext:
+            attempts.append(stem + "-shop." + e)
+    attempts.insert(0, stem + "-shop." + orig_ext) if orig_ext else None
+    attempts.append(url)
+    for attempt in attempts:
+        path = image_local_path(sku, attempt)
+        if fetch_image(path, [attempt], session):
+            final = compress_image_if_needed(path)
+            return os.path.relpath(final, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
+    return None
+
+
 def status_from_qty(qty, low_threshold):
     if qty >= low_threshold:
         return "in_stock"
@@ -1116,26 +1199,22 @@ def ensure_cards_from_moves(page, base_products, moves, config):
         name = clean_product_name(title or move_name) or sku
         desc = (goods.get("description") or "").strip()
         existing = by_code.get(sku)
-        img_url = ""
+        # Фото: приоритет — поле photo из API портала (прямое фото товара);
+        # страница парсится только ради полного описания, её фото — фолбэк
+        img_url = (goods.get("photo") or "").strip()
         if goods:
-            page_desc, img = fetch_move_card_data(sku, goods, config)
+            page_desc, page_img = fetch_move_card_data(sku, goods, config)
             if page_desc:
                 desc = page_desc
-            img_url = img
+            if not img_url:
+                img_url = page_img
         img_rel = None
         if img_url:
-            urls = image_variant_urls(img_url, config)
-            path = image_local_path(sku, urls[0])
             # Заглушку перекачиваем принудительно: fetch_image пропускает уже
-            # существующие файлы, а старый файл мог быть общей картинкой портала
-            # (index.jpg), скачанной до появления реального фото.
-            if existing and existing.get("pending") and os.path.exists(path):
-                try:
-                    os.remove(path)
-                except Exception:
-                    pass
-            if fetch_image(path, urls, page.request):
-                img_rel = os.path.relpath(path, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
+            # существующие файлы, а старый файл мог быть чужой картинкой
+            if existing and existing.get("pending"):
+                clean_local_photo_variants(sku)
+            img_rel = download_product_photo(sku, img_url, config, page.request)
         category = classify_category(name, categories)
         if existing and existing.get("pending"):
             # Обновляем только если портал отдал хоть какие-то данные: иначе
@@ -1206,7 +1285,7 @@ def fetch_goods_map(page, config, ids=None):
     """
     if not ids:
         return []
-    fields = "id,code,path,name,title,description"
+    fields = "id,code,path,name,title,description,photo"
     goods = page.evaluate(
         """async (a) => {
             const out = [];
