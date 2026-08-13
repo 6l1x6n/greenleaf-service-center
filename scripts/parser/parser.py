@@ -1085,11 +1085,12 @@ def ensure_cards_from_moves(page, base_products, moves, config):
     for p in base_products:
         if not p.get("pending"):
             continue
-        src = p.get("image_src") or ""
-        if not src or DEFAULT_IMG_RE.search(src):
-            if p["sku"] not in refresh_seen:
-                refresh_seen.add(p["sku"])
-                todo.append((p["sku"], p.get("name") or ""))
+        # Заглушки перепроверяем каждый прогон: пока артикул не появился в каталоге,
+        # уточняем имя/фото (их немного, до десятков — экономия не страдает).
+        # После достройки (pending снят) карточка больше не обрабатывается здесь.
+        if p["sku"] not in refresh_seen:
+            refresh_seen.add(p["sku"])
+            todo.append((p["sku"], p.get("name") or ""))
     if not todo:
         print("Карточки из накладных: новых артикулов нет")
         return base_products
@@ -1114,6 +1115,7 @@ def ensure_cards_from_moves(page, base_products, moves, config):
         title = (goods.get("title") or "").strip()
         name = clean_product_name(title or move_name) or sku
         desc = (goods.get("description") or "").strip()
+        existing = by_code.get(sku)
         img_url = ""
         if goods:
             page_desc, img = fetch_move_card_data(sku, goods, config)
@@ -1124,17 +1126,28 @@ def ensure_cards_from_moves(page, base_products, moves, config):
         if img_url:
             urls = image_variant_urls(img_url, config)
             path = image_local_path(sku, urls[0])
+            # Заглушку перекачиваем принудительно: fetch_image пропускает уже
+            # существующие файлы, а старый файл мог быть общей картинкой портала
+            # (index.jpg), скачанной до появления реального фото.
+            if existing and existing.get("pending") and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
             if fetch_image(path, urls, page.request):
                 img_rel = os.path.relpath(path, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
         category = classify_category(name, categories)
-        existing = by_code.get(sku)
         if existing and existing.get("pending"):
-            existing["name"] = name
-            existing["category"] = category
-            existing["description"] = desc
-            if img_rel:
-                existing["image"] = img_rel
-            existing["image_src"] = img_url
+            # Обновляем только если портал отдал хоть какие-то данные: иначе
+            # не затираем image_src/фото — следующий прогон попробует снова
+            if img_url or goods:
+                existing["name"] = name
+                existing["category"] = category
+                if desc:
+                    existing["description"] = desc
+                if img_rel:
+                    existing["image"] = img_rel
+                existing["image_src"] = img_url
             refreshed += 1
             continue
         card = {
