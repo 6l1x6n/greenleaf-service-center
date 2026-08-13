@@ -576,7 +576,10 @@ def image_variant_urls(url, config):
 def image_local_path(code, url):
     m = IMAGE_EXT_RE.search(url.split("?")[0])
     ext = m.group(0).lower() if m else ".png"
-    return os.path.join(IMAGES_DIR, code + ext)
+    # Артикулы с «/» (ASF007/K) не могут лежать в одном каталоге — слеш
+    # заменяем на подчёркивание (для остальных кодов имя не меняется)
+    safe = code.replace("/", "_")
+    return os.path.join(IMAGES_DIR, safe + ext)
 
 
 def fetch_image(path, urls, session=None):
@@ -721,6 +724,49 @@ def download_product_photo(sku, photo_url, config, session=None):
             final = compress_image_if_needed(path)
             return os.path.relpath(final, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
     return None
+
+
+def fill_local_photos(base_products, config, session=None, limit=None):
+    """Доскачивает качественные фото (-shop 600×600) для карточек полного каталога.
+
+    Карточки, созданные из API-списка, ссылаются на remote-миниатюры портала
+    (-small, 60×60 — «мыло» в модалке). Шаг идемпотентный: карточки с локальным
+    фото или плейсхолдером пропускаются, уже скачанные файлы не трогаются,
+    после заполнения всех — no-op (0 запросов к порталу). Лимит на прогон —
+    чтобы не превысить таймаут workflow и не долбить портал подряд.
+    """
+    if limit is None:
+        limit = config.get("photo_fill_limit", 800)
+    todo = []
+    for p in base_products:
+        # Мёртвые URL помечаются photo_404 и больше не запрашиваются
+        if (p.get("image") or "").startswith("http") and not p.get("photo_404"):
+            todo.append(p)
+    done = 0
+    failed = 0
+    for p in todo:
+        if done >= limit:
+            break
+        url = p.get("image") or ""
+        if not url.startswith("http"):
+            continue
+        try:
+            rel = download_product_photo(p.get("sku"), url, config, session)
+        except Exception:
+            rel = None
+        if rel:
+            p["image"] = rel
+            done += 1
+        else:
+            p["photo_404"] = True
+            failed += 1
+        if (done + failed) % 50 == 0:
+            print(f"Фото каталога: {done} скачано, {failed} не удалось...")
+    if todo:
+        print(f"Фото каталога: скачано {done}, не удалось {failed}, осталось {len(todo) - done - failed}")
+    else:
+        print("Фото каталога: все карточки уже с локальными фото")
+    return base_products
 
 
 def status_from_qty(qty, low_threshold):
@@ -1596,6 +1642,12 @@ def main():
                         base_products = ensure_cards_from_moves(page, base_products, moves, store_config)
                     except Exception as e:
                         print(f"Перемещения товаров: не удалось ({e}) — продолжаем без них")
+            # Доскачиваем качественные фото (-shop 600×600) для карточек полного
+            # каталога: идемпотентно, лимит на прогон, дальше автодосыпка
+            try:
+                base_products = fill_local_photos(base_products, config, session=page.request)
+            except Exception as e:
+                print(f"Фото каталога: не удалось ({e}) — продолжаем")
             write_products(base_products, active_ids)
             write_store_stock(base_products, config, active_ids)
             browser.close()
