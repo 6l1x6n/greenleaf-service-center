@@ -110,8 +110,18 @@
     reserve.interval = setInterval(tick, 1000);
   }
 
+  var reserveDebounceTimer = null;
+
+  // Дебаунс: серии кликов «+/−» и других изменений корзины схлопываются
+  // в одну запись брони (экономия KV-записей на сервере)
   function scheduleReserve() {
     if (window.__stockReserveOff) return;
+    if (reserveDebounceTimer) clearTimeout(reserveDebounceTimer);
+    reserveDebounceTimer = setTimeout(doReserve, 800);
+  }
+
+  function doReserve() {
+    reserveDebounceTimer = null;
     var t = totals();
     if (!state.storeId || !t.lines.length) {
       reserve.expired = false;

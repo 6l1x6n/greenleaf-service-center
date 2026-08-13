@@ -363,6 +363,25 @@ async function handleReserve(request, env, url) {
   });
   if (error) return jsonResponse({ ok: false, error: 'not enough', product: error }, 409);
 
+  // Дедупликация: если для этого orderId уже есть активная бронь с тем же
+  // составом и сроком > 60% запрошенного TTL — не пишем новую запись в KV
+  // (экономия записей: двойные клики, сетевые ретраи, повторные прогоны).
+  try {
+    const raw = await env.SC_STORES.get('res_' + orderId);
+    if (raw) {
+      const existing = JSON.parse(raw);
+      const sameItems = (existing.items || []).length === items.length &&
+        (existing.items || []).every(function (e, idx) {
+          return String(e.productId) === String(items[idx].productId) &&
+            Number(e.qty) === Number(items[idx].qty);
+        });
+      if (existing.storeId === storeId && sameItems &&
+        Number(existing.expiresAt || 0) > now + ttl * 0.6) {
+        return jsonResponse({ ok: true, expiresAt: Number(existing.expiresAt), ttlSeconds: ttl / 1000 });
+      }
+    }
+  } catch (e) { /* брони нет или повреждена — записываем заново */ }
+
   await saveReservation(env, orderId, { storeId, items, createdAt: new Date().toISOString(), expiresAt: now + ttl }, ttl);
   return jsonResponse({ ok: true, expiresAt: now + ttl, ttlSeconds: ttl / 1000 });
 }
@@ -624,8 +643,9 @@ async function createOrder(env, data) {
   const orders = await loadOrders(env);
   orders[orderId] = order;
   await kvPut(env, 'orders', orders);
-  // Холд на 5 минут больше не нужен — резерв держит сам заказ
-  await deleteReservation(env, orderId);
+  // Резерв не удаляем: заказ сам удерживает остаток (computeEffectiveStock
+  // вычитает заказы, включая статус «новый»), а ключ res_<orderId> истекает
+  // сам через TTL — это экономит одну запись KV на каждый заказ.
   console.log('Заказ создан:', orderId, 'СЦ', res.storeId, order.items.length, 'поз.');
   return order;
 }
