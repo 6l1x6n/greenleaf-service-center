@@ -1531,12 +1531,18 @@
       return '<option value="' + h(s.id) + '"' + (orderStoreFilter === s.id ? ' selected' : '') + '>' + h(s.name) + '</option>';
     }).join('');
 
+    // Тулбар с фильтром/архивом — только у суперадмина: для СЦ он был бы
+    // пустой серой плашкой между подсказкой и списком.
+    var toolbarHtml = isSuper()
+      ? '<div class="admin-toolbar">' +
+        '<label style="font-weight:600; font-size:13.5px;">Филиал:</label><select id="orderStoreFilter">' + storeOptions + '</select>' +
+        '<label class="form-checkbox" style="margin:0;"><input type="checkbox" id="orderArchiveToggle"' + (showArchive ? ' checked' : '') + '> Архив подтверждённых</label>' +
+        '</div>'
+      : '';
+
     content.insertAdjacentHTML('beforeend',
       '<div class="admin-note">🛒 Активные заказы сайта: <b>новые</b> держат резерв товара, <b>подтверждённые</b> — состоявшиеся продажи (после синка парсера уходят в архив и на остаток не влияют), <b>отменённые</b> возвращают товар. Удаление подтверждённого заказа <b>не</b> возвращает товар.</div>' +
-      '<div class="admin-toolbar" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">' +
-      (isSuper() ? '<label style="font-weight:600; font-size:13.5px;">Филиал:</label><select id="orderStoreFilter">' + storeOptions + '</select>' : '') +
-      (isSuper() ? '<label class="form-checkbox" style="margin:0;"><input type="checkbox" id="orderArchiveToggle"' + (showArchive ? ' checked' : '') + '> Архив подтверждённых</label>' : '') +
-      '</div>' +
+      toolbarHtml +
       '<div class="admin-card"><div id="ordersList">Загружаем заказы…</div></div>'
     );
 
@@ -1560,10 +1566,10 @@
         var storeName = {};
         state.stores.forEach(function (s) { storeName[s.id] = s.name; });
         listEl.innerHTML = '<ul class="admin-list">' + orders.map(function (o) {
-          var statusBadge = o.status === 'new' ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">⏳ Новый</span>'
-            : (o.status === 'ready' ? '<span class="badge" style="background:#cce5ff;color:#004085;">🟦 Готов к выдаче</span>'
-              : (o.status === 'confirmed' ? '<span class="badge" style="background:#d4edda;color:#155724;">✅ Подтверждён</span>'
-                : '<span class="badge" style="background:#f8d7da;color:#721c24;">🚫 Отменён</span>'));
+          var statusBadge = o.status === 'new' ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">' + Utils.icon('clock', 14) + ' Новый</span>'
+            : (o.status === 'ready' ? '<span class="badge" style="background:#cce5ff;color:#004085;">' + Utils.icon('package', 14) + ' Готов к выдаче</span>'
+              : (o.status === 'confirmed' ? '<span class="badge" style="background:#d4edda;color:#155724;">' + Utils.icon('check', 14) + ' Подтверждён</span>'
+                : '<span class="badge" style="background:#f8d7da;color:#721c24;">' + Utils.icon('x', 14) + ' Отменён</span>'));
           var itemsHtml = (o.items || []).map(function (i) {
             var p = byId[i.productId];
             var img = p ? adminImgUrl(p) : '';
@@ -1579,38 +1585,52 @@
           var totalTxt = o.total ? '<span>💰 Итого: <b>' + h(String(o.total).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) + ' ₸</b></span>' : '';
           var payTxt = o.payment ? '<span>💳 ' + h(o.payment) + '</span>' : '';
           var pickupTxt = o.pickupDate ? '<span>📅 Забрать: ' + h(o.pickupDate) + (o.pickupTime ? ' в ' + h(o.pickupTime) : '') + '</span>' : '';
-          var discTxt = o.partnerMode ? '<span class="badge" style="background:#d1e7dd;color:#0a5c36;">🎫 Партнёрские цены −50%</span>' : '';
-          var clientIdTxt = o.clientToken ? '<span style="font-size:12px;color:var(--muted);">🆔 ID клиента: ' + h(o.clientToken) + '</span>' : '';
+          // Партнёрская скидка — приглушённый текст в строке метаданных, а не яркая плашка
+          var partnerTxt = o.partnerMode ? '<span class="order-partner-txt">🎫 Партнёрская цена (−50%)</span>' : '';
           var noteTxt = o.managerNote ? '<span style="color:var(--muted);">💬 Менеджер: ' + h(o.managerNote) + '</span>' : '';
           var canResolve = o.status === 'new' || o.status === 'ready';
+          var dispNum = o.number ? ('#' + o.number) : o.id;
           return '<li>' +
             '<div class="admin-list-main">' +
-            '<strong>' + (o.number ? 'Заказ #' + h(o.number) + ' ' : 'Заказ ') + '<small class="muted-sku">' + h(o.id) + '</small> ' + statusBadge + '</strong>' +
+            '<strong>' + (o.number ? 'Заказ #' + h(o.number) : 'Заказ ' + h(o.id)) + ' ' + statusBadge + '</strong>' +
             '<span>👤 ' + h(o.name || '—') + (o.phone ? ' · 📞 ' + h(o.phone) : '') + '</span>' +
             '<span>🏬 ' + h(storeName[o.storeId] || o.storeId || '—') + ' · 🕐 ' + h(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
             '<div class="delivery-items order-receipt" style="margin:6px 0 0; display:flex; flex-direction:column; align-items:flex-start; gap:4px;">' + itemsHtml + '</div>' +
-            '<span style="font-size:13px;color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center;">' + [totalTxt, payTxt, discTxt, pickupTxt].filter(Boolean).join('') + '</span>' +
-            clientIdTxt +
+            '<span style="font-size:13px;color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center;">' + [totalTxt, payTxt, partnerTxt, pickupTxt].filter(Boolean).join('') + '</span>' +
             (o.comment ? '<span style="color:var(--muted);">💬 Клиент: ' + h(o.comment) + '</span>' : '') +
             noteTxt +
             '</div>' +
             '<div class="admin-actions" style="flex-wrap:wrap;">' +
-            (o.status === 'new' ? '<button class="btn btn-outline btn-sm" data-order-ready="' + h(o.id) + '">🟦 Готов к выдаче</button>' : '') +
-            (canResolve ? '<button class="btn btn-primary btn-sm" data-order-confirm="' + h(o.id) + '">✅ Подтвердить</button>' : '') +
-            (canResolve ? '<button class="btn btn-outline btn-sm" data-order-cancel="' + h(o.id) + '">🚫 Отменить</button>' : '') +
-            '<button class="btn btn-outline btn-sm danger-btn" data-order-delete="' + h(o.id) + '">🗑 Удалить</button>' +
+            (o.status === 'new' ? '<button class="btn btn-outline btn-sm" data-order-ready="' + h(o.id) + '">' + Utils.icon('package', 14) + ' Готов к выдаче</button>' : '') +
+            (canResolve ? '<button class="btn btn-primary btn-sm" data-order-confirm="' + h(o.id) + '">' + Utils.icon('check', 14) + ' Подтвердить</button>' : '') +
+            (canResolve ? '<button class="btn btn-outline btn-sm btn-neutral" data-order-cancel="' + h(o.id) + '">' + Utils.icon('x', 14) + ' Отменить</button>' : '') +
+            '<span class="admin-more">' +
+            '<button class="btn btn-outline btn-sm btn-icon" type="button" data-more-open="' + h(o.id) + '" aria-label="Ещё действия" title="Ещё действия">' + Utils.icon('more', 16) + '</button>' +
+            '<span class="admin-more-menu hidden"><button class="admin-more-item danger" type="button" data-order-delete="' + h(o.id) + '">' + Utils.iconTrash(14) + ' Удалить заказ</button></span>' +
+            '</span>' +
             '</div></li>';
         }).join('') + '</ul>';
 
         listEl.addEventListener('click', function (e) {
+          // Меню «⋯»: открыть/закрыть
+          var moreBtn = e.target.closest('[data-more-open]');
+          if (moreBtn) {
+            var wrap = moreBtn.closest('.admin-more');
+            var menu = wrap ? wrap.querySelector('.admin-more-menu') : null;
+            if (menu) menu.classList.toggle('hidden');
+            return;
+          }
           var btn = e.target.closest('[data-order-confirm],[data-order-cancel],[data-order-delete],[data-order-ready]');
           if (!btn) return;
           var oid = btn.hasAttribute('data-order-ready') ? btn.getAttribute('data-order-ready')
             : btn.getAttribute('data-order-' + (btn.hasAttribute('data-order-confirm') ? 'confirm' : (btn.hasAttribute('data-order-cancel') ? 'cancel' : 'delete')));
           var action = btn.hasAttribute('data-order-ready') ? 'ready' : (btn.hasAttribute('data-order-confirm') ? 'confirm' : (btn.hasAttribute('data-order-cancel') ? 'cancel' : 'delete'));
-          var label = action === 'ready' ? 'Отметить заказ «' + oid + '» готовым к выдаче? Клиент увидит статус в «Моих заказах».' :
-            (action === 'confirm' ? 'Подтвердить заказ «' + oid + '»? Товар считается проданным и не вернётся в остаток.' :
-              (action === 'cancel' ? 'Отменить заказ «' + oid + '»? Зарезервированный товар вернётся в доступное.' : 'Удалить заказ «' + oid + '»? Подтверждённый заказ удаляется без возврата товара.'));
+          var dispNum = '#?';
+          var orderRow = orders.find(function (x) { return x.id === oid; });
+          if (orderRow) dispNum = orderRow.number ? ('#' + orderRow.number) : oid;
+          var label = action === 'ready' ? 'Отметить заказ ' + dispNum + ' готовым к выдаче? Клиент увидит статус в «Моих заказах».' :
+            (action === 'confirm' ? 'Подтвердить заказ ' + dispNum + '? Товар считается проданным и не вернётся в остаток.' :
+              (action === 'cancel' ? 'Отменить заказ ' + dispNum + '? Зарезервированный товар вернётся в доступное.' : 'Удалить заказ ' + dispNum + '? Подтверждённый заказ удаляется без возврата товара.'));
           if (!confirm(label)) return;
           // Необязательный комментарий для клиента (виден в «Моих заказах»)
           var comment = '';
@@ -1621,7 +1641,7 @@
           if (comment) payload.comment = comment.trim();
           Auth.api('/api/orders/action', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
             if (res && res.ok) {
-              Utils.showToast(action === 'ready' ? '🟦 Заказ готов к выдаче' : (action === 'confirm' ? '✅ Заказ подтверждён' : (action === 'cancel' ? '🚫 Заказ отменён' : '🗑 Заказ удалён')));
+              Utils.showToast(action === 'ready' ? 'Заказ готов к выдаче' : (action === 'confirm' ? '✅ Заказ подтверждён' : (action === 'cancel' ? '🚫 Заказ отменён' : '🗑 Заказ удалён')));
             } else {
               Utils.showToast((res && res.error) || '⚠️ Не удалось выполнить. Войдите заново (сессия истекла).');
             }
@@ -1643,6 +1663,18 @@
       state.orderShowArchive = archiveToggle.checked;
       load();
     });
+
+    // Закрытие меню «⋯» при клике вне него (один слушатель на документ)
+    if (!window.__adminMoreMenusBound) {
+      window.__adminMoreMenusBound = true;
+      document.addEventListener('click', function (ev) {
+        if (ev.target.closest('.admin-more')) return;
+        document.querySelectorAll('.admin-more-menu:not(.hidden)').forEach(function (m) {
+          m.classList.add('hidden');
+        });
+      });
+    }
+
     load();
   }
 

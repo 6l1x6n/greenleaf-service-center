@@ -1901,6 +1901,54 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .danger-btn { color: var(--danger); border-color: rgba(214, 69, 69, 0.5); }
 .danger-btn:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
 
+/* ---------- Кнопки заказов: акцент на «Подтвердить», остальное — вторичное ---------- */
+.btn-neutral { background: transparent; border-color: var(--line); color: var(--muted); }
+.btn-neutral:hover { background: var(--line); border-color: var(--line); color: var(--ink); }
+.btn-icon { padding: 8px 10px; }
+.btn-icon .ico { margin-right: 0; }
+.admin-actions .ico { flex-shrink: 0; }
+
+/* Меню «⋯» с деструктивным действием — подальше от рабочих кнопок */
+.admin-more { position: relative; display: inline-flex; }
+.admin-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 172px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(22, 48, 31, 0.14);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.admin-more-item:hover { background: #f4f8f5; }
+.admin-more-item.danger { color: var(--danger); }
+.admin-more-item.danger:hover { background: #fdf0f0; }
+
+/* Партнёрская скидка — строка метаданных, без яркой плашки */
+.order-partner-txt { color: var(--green-dark); font-weight: 600; }
+
 /* ---------- Чекбокс кабинета в форме заявки ---------- */
 .form-checkbox {
   display: flex;

@@ -171,7 +171,8 @@
     x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
     copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     package: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>',
-    arrowUp: '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'
+    arrowUp: '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
+    more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>'
   };
 
   function icon(name, size) {
@@ -272,7 +273,7 @@
             return '<li class="order-card">' +
               '<div class="order-card-head">' +
               '<span class="order-id-chip" title="' + esc(oid) + '">Заказ ' + esc(oidShow) +
-              '<button class="btn btn-outline btn-sm" type="button" data-copy-order="' + esc(oid) + '" title="Скопировать номер">' + icon('copy', 14) + '</button></span>' +
+              '<button class="btn btn-outline btn-sm" type="button" data-copy-order="' + esc(oidShow) + '" title="Скопировать номер">' + icon('copy', 14) + '</button></span>' +
               '<span class="' + st.cls + '">' + icon(st.icon, 14) + ' ' + st.label + (st.sub ? '<small> · ' + st.sub + '</small>' : '') + '</span>' +
               '</div>' +
               '<div class="order-meta">' + icon('store', 14) + ' <span>' + esc(o.storeName || '—') + ' · ' + esc(orderDate(o.createdAt)) + '</span></div>' +
@@ -529,6 +530,7 @@
     openMyOrdersModal: openMyOrdersModal,
     getStore: function () { return store; },
     waLink: waLink,
+    icon: icon,
     iconX: iconX,
     iconTrash: iconTrash,
     iconTruck: iconTruck,

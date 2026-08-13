@@ -1672,20 +1672,42 @@ function buildText(data) {
   const phone = (data.phone || '').trim();
   const type = data.type || 'other';
   const isOrder = type === 'order';
-  const head = isOrder ? '🛒 НОВЫЙ ЗАКАЗ' : '🔔 Новая заявка с сайта';
+  // Деньги с разделителями тысяч: 5615 → «5 615»
+  const money = (n) => String(Number(n) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  // Дата «2026-08-13» → «13.08.2026»
+  const ruDate = (d) => {
+    const parts = String(d || '').split('-');
+    return parts.length === 3 ? parts[2] + '.' + parts[1] + '.' + parts[0] : String(d || '');
+  };
+  const orderNum = data.orderNumber ? ('#' + data.orderNumber) : (data.order_id || data.orderId || '—');
+  const orderMeta = [
+    '💳 ' + (data.payment || '—'),
+    data.order_store ? '🏬 Филиал: ' + data.order_store : null,
+    data.pickup_date ? '📅 Приезд: ' + ruDate(data.pickup_date) + (data.pickup_time ? ' в ' + data.pickup_time : '') : null,
+    data.partner_id ? '🎫 Партнёр: ' + data.partner_id + (data.order_partner_mode === '1' ? ' (−50%)' : '') : null
+  ].filter(Boolean);
+  const orderTotals = [
+    '📦 Упаковка: ' + money(data.order_package || 0) + ' ₸',
+    '💰 ИТОГО: ' + money(data.order_total || 0) + ' ₸' + (data.payment && data.payment.indexOf('Kaspi') !== -1 ? ' · оплачено' : '')
+  ];
+  const orderFooter = [
+    '👤 ' + name,
+    '📞 ' + phone,
+    '🕐 ' + new Date().toLocaleDateString('ru-RU', { timeZone: 'Asia/Almaty' }) + ' ' + new Date().toLocaleTimeString('ru-RU', { timeZone: 'Asia/Almaty', hour: '2-digit', minute: '2-digit' })
+  ];
 
   const blocks = {
     order: [
-      '🆔 Номер заказа: ' + (data.order_id || data.orderId || '—'),
-      '💳 Оплата: ' + (data.payment || '—'),
-      data.partner_id ? '🎫 ID партнёра: ' + data.partner_id + (data.order_partner_mode === '1' ? ' (партнёрские цены)' : '') : null,
-      data.order_store ? '🏬 Филиал: ' + data.order_store : null,
+      '🛒 НОВЫЙ ЗАКАЗ ' + orderNum,
+      '',
+      ...orderMeta,
+      '',
       '— Состав заказа —',
       data.order_items ? data.order_items : '—',
-      '—',
-      '🧾 Пакет-упаковка: ' + (data.order_package || 0) + ' ₸',
-      '💰 ИТОГО: ' + (data.order_total || 0) + ' ₸' + (data.payment && data.payment.indexOf('Kaspi') !== -1 ? ' (оплачено)' : ''),
-      data.pickup_date ? '📅 Дата приезда: ' + data.pickup_date + (data.pickup_time ? ' в ' + data.pickup_time : '') : null
+      '',
+      ...orderTotals,
+      '',
+      ...orderFooter
     ],
     event: [
       '📅 Запись на мероприятие',
@@ -1735,13 +1757,16 @@ function buildText(data) {
     ]
   };
 
-  const lines = [
-    head,
-    ...(blocks[type] || ['✉️ Новая заявка']).filter(Boolean),
-    '👤 Имя: ' + name,
-    '📞 Телефон: ' + phone,
-    '🕐 ' + new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty', hour12: false })
-  ];
+  const lines = isOrder
+    ? blocks.order
+    : ['🔔 Новая заявка с сайта', ...(blocks[type] || ['✉️ Новая заявка']).filter(Boolean)];
+  if (!isOrder) {
+    lines.push(
+      '👤 Имя: ' + name,
+      '📞 Телефон: ' + phone,
+      '🕐 ' + new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty', hour12: false })
+    );
+  }
 
   return lines.join('\n');
 }
@@ -1843,7 +1868,8 @@ async function handleTelegram(request, env) {
     return new Response('Telegram not configured', { status: 500 });
   }
 
-  const text = buildText(data);
+  // Номер #N знаем только после создания заказа — передаём в текст сообщения
+  const text = buildText(Object.assign({}, data, createdOrder && createdOrder.number ? { orderNumber: createdOrder.number } : {}));
 
   const res = await fetch(`${TELEGRAM_API}${BOT_TOKEN}/sendMessage`, {
     method: 'POST',
