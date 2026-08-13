@@ -380,8 +380,14 @@
     var cashBtn = cashWrap ? cashWrap.querySelector('.pay-tab') : null;
     if (kaspiBtn) kaspiBtn.disabled = !hasKaspi;
     if (cashBtn) cashBtn.disabled = !hasCash;
-    if (kaspiWrap) kaspiWrap.setAttribute('data-tip', hasKaspi ? '' : tip);
-    if (cashWrap) cashWrap.setAttribute('data-tip', hasCash ? '' : tip);
+    if (kaspiWrap) {
+      if (hasKaspi) kaspiWrap.removeAttribute('data-tip');
+      else kaspiWrap.setAttribute('data-tip', tip);
+    }
+    if (cashWrap) {
+      if (hasCash) cashWrap.removeAttribute('data-tip');
+      else cashWrap.setAttribute('data-tip', tip);
+    }
     if (!hasKaspi && state.payment === 'kaspi') setPayment('cash');
     else if (!hasCash && state.payment === 'cash') setPayment('kaspi');
   }

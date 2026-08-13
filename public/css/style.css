@@ -693,7 +693,7 @@ a:hover { text-decoration: none; }
 /* Тултип над неактивным методом оплаты (обёртка span.tooltip-wrap) */
 .tooltip-wrap { position: relative; flex: 1; display: block; }
 .tooltip-wrap .pay-tab { width: 100%; }
-.tooltip-wrap[data-tip]:hover::after {
+.tooltip-wrap[data-tip]:not([data-tip=""]):hover::after {
   content: attr(data-tip);
   position: absolute;
   bottom: calc(100% + 8px);
@@ -713,7 +713,7 @@ a:hover { text-decoration: none; }
   pointer-events: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
-.tooltip-wrap[data-tip]:hover::before {
+.tooltip-wrap[data-tip]:not([data-tip=""]):hover::before {
   content: '';
   position: absolute;
   bottom: calc(100% + 2px);
