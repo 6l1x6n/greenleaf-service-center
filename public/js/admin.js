@@ -262,7 +262,7 @@
     var html = visibleSections().map(function (k) {
       return '<button class="admin-nav-btn' + (state.section === k ? ' active' : '') + '" data-section="' + k + '">' + SECTIONS[k].label + '</button>';
     }).join('');
-    html += '<div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted);">Вы вошли как:<br><strong style="color:var(--ink);">' + h(state.user.name) + '</strong><br>' + (isSuper() ? '👑 Суперадмин' : '🏬 Сервис-Центр') + '</div>';
+    html += '<div class="admin-nav-user" style="margin-top:24px; padding-top:16px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted);">Вы вошли как:<br><strong style="color:var(--ink);">' + h(state.user.name) + '</strong><br>' + (isSuper() ? '👑 Суперадмин' : '🏬 Сервис-Центр') + '</div>';
     nav.innerHTML = html;
   }
 

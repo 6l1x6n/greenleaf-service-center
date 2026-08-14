@@ -2012,13 +2012,14 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
     width: 100%;
     position: static;
     height: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     border-right: 0;
     border-bottom: 1px solid var(--line);
     top: auto;
   }
-  .admin-nav-btn { width: auto; }
+  .admin-nav-btn { width: 100%; }
+  .admin-nav-user { grid-column: 1 / -1; }
   .admin-content { padding: 20px 16px 50px; }
   .store-auth-grid { grid-template-columns: 1fr !important; }
 }
