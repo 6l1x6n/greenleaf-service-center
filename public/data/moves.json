@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-13T19:53:01+03:00",
+  "updated": "2026-08-14T06:11:35+03:00",
   "moves": [
     {
       "number": "3334404",
@@ -9,8 +9,8 @@
       "sum": 670832.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "SXA003",
@@ -53,8 +53,8 @@
       "sum": 218264.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "CCC036",
@@ -102,8 +102,8 @@
       "sum": 696000.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "CIA064",
