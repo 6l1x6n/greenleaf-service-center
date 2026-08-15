@@ -13,11 +13,11 @@
   var products = [];
   var stores = [];
   var categories = [];
-  var state = { category: 'all', query: '', stockOnly: true, selectedStoreId: 'all', cityFilter: 'all', storeQuery: '', showAllCatalog: false, visibleCount: CATALOG_PAGE_STEP };
+  var state = { category: 'all', query: '', stockOnly: true, selectedStoreId: 'all', cityFilter: 'all', storeQuery: '', showAllCatalog: false, page: 0 };
 
   var isCatalogPage = document.body && document.body.dataset.catalogPage === '1';
   var MAIN_PAGE_LIMIT = 10;
-  var CATALOG_PAGE_STEP = 48;
+  var CATALOG_PAGE_SIZE = 100;
   var FILTERS_KEY = 'greenleaf_catalog_filters_v1';
 
   var grid = document.getElementById('grid');
@@ -450,6 +450,31 @@
     );
   }
 
+  // Нумерованный пейджер каталога — тот же дизайн, что в админке:
+  // окно из 5 номеров вокруг текущей страницы, крайние страницы с «…»
+  function catalogPagerHtml(info) {
+    var page = info.page;
+    var pages = info.pages;
+    var html = '';
+    if (pages > 1 && page > 0) html += '<button class="pager-btn" type="button" data-page-go="' + (page - 1) + '">‹ Назад</button>';
+    var from = Math.max(0, page - 2);
+    var to = Math.min(pages - 1, from + 4);
+    from = Math.max(0, to - 4);
+    if (from > 0) {
+      html += '<button class="pager-btn' + (page === 0 ? ' active' : '') + '" type="button" data-page-go="0">1</button>';
+      if (from > 1) html += '<span class="pager-ellipsis">…</span>';
+    }
+    for (var i = from; i <= to; i++) {
+      html += '<button class="pager-btn' + (page === i ? ' active' : '') + '" type="button" data-page-go="' + i + '">' + (i + 1) + '</button>';
+    }
+    if (to < pages - 1) {
+      if (to < pages - 2) html += '<span class="pager-ellipsis">…</span>';
+      html += '<button class="pager-btn' + (page === pages - 1 ? ' active' : '') + '" type="button" data-page-go="' + (pages - 1) + '">' + pages + '</button>';
+    }
+    if (pages > 1 && page < pages - 1) html += '<button class="pager-btn" type="button" data-page-go="' + (page + 1) + '">Вперёд ›</button>';
+    return html;
+  }
+
   function render() {
     var list = products.filter(function (p) {
       if (p.hidden) return false;
@@ -476,19 +501,29 @@
     });
     var total = list.length;
     var sliced = list;
+    var pageInfo = null;
     if (!isCatalogPage) {
       if (total > MAIN_PAGE_LIMIT) sliced = list.slice(0, MAIN_PAGE_LIMIT);
-    } else if (state.visibleCount < total) {
-      sliced = list.slice(0, state.visibleCount);
+    } else {
+      var pages = Math.max(1, Math.ceil(total / CATALOG_PAGE_SIZE));
+      if (state.page < 0) state.page = 0;
+      if (state.page >= pages) state.page = pages - 1;
+      var start = state.page * CATALOG_PAGE_SIZE;
+      pageInfo = { page: state.page, pages: pages, total: total, start: start, end: Math.min(total, start + CATALOG_PAGE_SIZE) };
+      sliced = list.slice(start, start + CATALOG_PAGE_SIZE);
+      var wantHash = '#page=' + (state.page + 1);
+      if (location.hash !== wantHash) history.replaceState(null, '', wantHash);
     }
     grid.innerHTML = sliced.map(rowHtml).join('');
     var countEl = document.getElementById('catalogCount');
     if (countEl && isCatalogPage) {
-      countEl.textContent = sliced.length + ' из ' + total;
+      countEl.textContent = pageInfo.total ? (pageInfo.start + 1) + '–' + pageInfo.end + ' из ' + pageInfo.total : '0 из 0';
     }
-    var moreBtn = document.getElementById('catalogMore');
-    if (moreBtn) {
-      moreBtn.classList.toggle('hidden', !isCatalogPage || sliced.length >= total);
+    var pagerEl = document.getElementById('catalogPager');
+    if (pagerEl) {
+      pagerEl.innerHTML = (isCatalogPage && pageInfo && pageInfo.pages > 1)
+        ? '<div class="admin-pager catalog-pager">' + catalogPagerHtml(pageInfo) + '</div>'
+        : '';
     }
     var allLink = document.getElementById('catalogAllLink');
     if (allLink) {
@@ -622,7 +657,7 @@
       var storeId = storeChip.getAttribute('data-select-store');
       state.selectedStoreId = (state.selectedStoreId === storeId && storeId !== 'all') ? 'all' : storeId;
       state.showAllCatalog = false;
-      state.visibleCount = CATALOG_PAGE_STEP;
+      state.page = 0;
       try {
         var selStore = stores.find(function (s) { return s.id === state.selectedStoreId; }) || null;
         if (selStore) {
@@ -644,7 +679,7 @@
     var catalogAllBtn = e.target.closest('[data-catalog-all]');
     if (catalogAllBtn) {
       state.showAllCatalog = true;
-      state.visibleCount = CATALOG_PAGE_STEP;
+      state.page = 0;
       syncStockToggle();
       renderActiveStoreBanner();
       render();
@@ -691,7 +726,7 @@
     var chip = e.target.closest('[data-cat]');
     if (!chip) return;
     state.category = chip.getAttribute('data-cat');
-    state.visibleCount = CATALOG_PAGE_STEP;
+    state.page = 0;
     renderChips();
     render();
     saveFilters();
@@ -699,7 +734,7 @@
 
   search.addEventListener('input', function () {
     state.query = search.value;
-    state.visibleCount = CATALOG_PAGE_STEP;
+    state.page = 0;
     render();
     saveFilters();
   });
@@ -711,19 +746,35 @@
   stockOnly.addEventListener('change', function () {
     state.stockOnly = stockOnly.checked;
     state.showAllCatalog = !stockOnly.checked;
-    state.visibleCount = CATALOG_PAGE_STEP;
+    state.page = 0;
     render();
     renderChips();
     saveFilters();
   });
 
-  var catalogMore = document.getElementById('catalogMore');
-  if (catalogMore) {
-    catalogMore.addEventListener('click', function () {
-      state.visibleCount += CATALOG_PAGE_STEP;
+  var catalogPager = document.getElementById('catalogPager');
+  if (catalogPager) {
+    catalogPager.addEventListener('click', function (e) {
+      var go = e.target.closest('[data-page-go]');
+      if (!go || !isCatalogPage) return;
+      var p = parseInt(go.getAttribute('data-page-go'), 10) || 0;
+      if (p === state.page) return;
+      state.page = p;
+      location.hash = '#page=' + (p + 1); // запись в историю → работают «назад/вперёд» браузера
       render();
     });
   }
+
+  // Навигация по страницам через кнопки браузера / прямые ссылки #page=N
+  window.addEventListener('hashchange', function () {
+    if (!isCatalogPage) return;
+    var m = /#page=(\d+)/.exec(location.hash);
+    var p = m ? Math.max(0, (parseInt(m[1], 10) || 1) - 1) : 0;
+    if (p !== state.page) {
+      state.page = p;
+      render();
+    }
+  });
 
   function saveFilters() {
     try {
@@ -1373,6 +1424,12 @@ fetch('/api/event-bookings')
     applyLocalOverrides();
     updateHeroMeta();
     restoreFilters();
+
+    // Прямая ссылка на страницу каталога (#page=N, нумерация с 1)
+    if (isCatalogPage) {
+      var pageMatch = /#page=(\d+)/.exec(location.hash);
+      if (pageMatch) state.page = Math.max(0, (parseInt(pageMatch[1], 10) || 1) - 1);
+    }
 
     try {
       var savedCity = localStorage.getItem('greenleaf_city_v1');

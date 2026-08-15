@@ -496,7 +496,7 @@ a:hover { text-decoration: none; }
 .catalog-all-link { display: flex; justify-content: center; margin: 26px 0 0; }
 .catalog-all-link .btn { gap: 4px; }
 .catalog-all-note { font-size: 13.5px; color: var(--muted); font-weight: 700; margin-bottom: 16px; }
-.catalog-more { display: block; margin: 18px auto 0; }
+.catalog-pager { margin: 14px 0 4px; }
 
 .breadcrumbs { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
 .breadcrumbs a { color: var(--green-dark); font-weight: 700; text-decoration: none; }
@@ -1986,16 +1986,38 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .reset-check { display: block; margin: 0 0 8px; font-size: 14px; color: var(--ink); }
 .reset-check input { margin-top: 3px; }
 
-/* Пагинация таблиц админки */
+/* Пагинация таблиц админки: нумерованные кнопки слева, счётчик справа */
 .admin-pager {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 6px;
   padding: 12px 2px 0;
 }
-.pager-info { font-size: 13px; color: var(--muted); }
+.pager-btn {
+  min-width: 34px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  text-align: center;
+}
+.pager-btn:hover { border-color: var(--green); color: var(--green); }
+.pager-btn.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  cursor: default;
+}
+.pager-ellipsis { padding: 0 2px; color: var(--muted); font-size: 13px; }
+.pager-info { font-size: 13px; color: var(--muted); margin-left: auto; }
 
 /* Ячейка остатка: поле + бейдж постоянной поправки */
 .stock-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }

@@ -110,10 +110,32 @@
     };
   }
 
+  // Нумерованный пейджер: окно из 5 номеров вокруг текущей страницы,
+  // крайние страницы с «…» при большом числе страниц, активная — подсвечена
+  function pagerBtnHtml(label, go, active) {
+    return '<button class="pager-btn' + (active ? ' active' : '') + '" type="button" data-page-go="' + go + '">' + label + '</button>';
+  }
+
   function pagerHtml(info) {
-    return '<button class="btn btn-outline btn-sm" type="button" data-page-prev' + (info.page <= 0 ? ' disabled' : '') + '>‹ Назад</button>' +
-      '<span class="pager-info">Стр. ' + (info.page + 1) + ' из ' + info.pages + ' · показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>' +
-      '<button class="btn btn-outline btn-sm" type="button" data-page-next' + (info.page >= info.pages - 1 ? ' disabled' : '') + '>Вперёд ›</button>';
+    var page = info.page;
+    var pages = info.pages;
+    var html = '';
+    if (pages > 1 && page > 0) html += pagerBtnHtml('‹ Назад', page - 1);
+    var from = Math.max(0, page - 2);
+    var to = Math.min(pages - 1, from + 4);
+    from = Math.max(0, to - 4);
+    if (from > 0) {
+      html += pagerBtnHtml('1', 0, page === 0);
+      if (from > 1) html += '<span class="pager-ellipsis">…</span>';
+    }
+    for (var i = from; i <= to; i++) html += pagerBtnHtml(String(i + 1), i, page === i);
+    if (to < pages - 1) {
+      if (to < pages - 2) html += '<span class="pager-ellipsis">…</span>';
+      html += pagerBtnHtml(String(pages), pages - 1);
+    }
+    if (pages > 1 && page < pages - 1) html += pagerBtnHtml('Вперёд ›', page + 1);
+    html += '<span class="pager-info">Стр. ' + (page + 1) + ' из ' + pages + ' · показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>';
+    return html;
   }
 
   // Бейдж постоянной поправки остатка: красный при минусе, зелёный при плюсе
@@ -1071,8 +1093,8 @@
     });
     var stockPager = document.getElementById('stockPager');
     stockPager.addEventListener('click', function (e) {
-      if (e.target.closest('[data-page-prev]')) { state.stockPage--; drawRows(); }
-      else if (e.target.closest('[data-page-next]')) { state.stockPage++; drawRows(); }
+      var go = e.target.closest('[data-page-go]');
+      if (go) { state.stockPage = parseInt(go.getAttribute('data-page-go'), 10) || 0; drawRows(); }
     });
 
     var saveBtn = content.querySelector('#stockSaveBtn');
@@ -2018,8 +2040,8 @@
     });
     var prodPager = document.getElementById('prodPager');
     prodPager.addEventListener('click', function (e) {
-      if (e.target.closest('[data-page-prev]')) { state.productPage--; drawRows(); }
-      else if (e.target.closest('[data-page-next]')) { state.productPage++; drawRows(); }
+      var go = e.target.closest('[data-page-go]');
+      if (go) { state.productPage = parseInt(go.getAttribute('data-page-go'), 10) || 0; drawRows(); }
     });
 
     // Создание категории: сохраняет в settings и обновляет фильтр; false при отмене/ошибке
@@ -2387,8 +2409,8 @@
       drawAvRows();
     });
     wrap.addEventListener('click', function (e) {
-      if (e.target.closest('[data-page-prev]')) { state.availabilityPage--; drawAvRows(); }
-      else if (e.target.closest('[data-page-next]')) { state.availabilityPage++; drawAvRows(); }
+      var go = e.target.closest('[data-page-go]');
+      if (go) { state.availabilityPage = parseInt(go.getAttribute('data-page-go'), 10) || 0; drawAvRows(); }
     });
     wrap.addEventListener('input', function (e) {
       var el = e.target.closest('[data-sc-prod],[data-stock-prod]');
