@@ -18,6 +18,10 @@ on:
         description: "Полный прогон (перезапись названий/цен/фото существующих карточек)"
         type: boolean
         default: false
+      rephotos:
+        description: "Перекачать ВСЕ фото товаров разово в исходном разрешении (без сжатия)"
+        type: boolean
+        default: false
       task:
         description: "Что запустить (по расписанию всегда all)"
         type: choice
@@ -72,7 +76,7 @@ jobs:
         env:
           SC_LOGIN: ${{ secrets.SC_LOGIN }}
           SC_PASSWORD: ${{ secrets.SC_PASSWORD }}
-        run: python scripts/parser/parser.py ${{ github.event.inputs.task == 'deliveries' && '--moves-only' || '' }} ${{ github.event.inputs.full == 'true' && '--full' || '' }}
+        run: python scripts/parser/parser.py ${{ github.event.inputs.task == 'deliveries' && '--moves-only' || '' }} ${{ github.event.inputs.full == 'true' && '--full' || '' }} ${{ github.event.inputs.rephotos == 'true' && '--rephotos' || '' }}
 
       - name: Upload diag (если парсер что-то сохранил)
         if: always()
@@ -86,7 +90,7 @@ jobs:
         run: |
           git config user.name "catalog-bot"
           git config user.email "catalog-bot@users.noreply.github.com"
-          git add public/data/products.base.json public/data/moves.json public/data/store-stock.json public/assets/images/products
+          git add public/data/products.base.json public/data/moves.json public/data/store-stock.json public/assets/images/products scripts/parser/.rephotos_pending
           if git diff --cached --quiet; then
             echo "Каталог не изменился — коммит не нужен"
           else

@@ -167,8 +167,12 @@ async function loadBaseStock(env, url) {
         Object.keys(deltas[scId]).forEach((pid) => {
           const delta = Number(deltas[scId][pid]);
           if (!isFinite(delta) || delta === 0) return;
-          const baseCount = parseStockCount(stock[scId][pid]);
-          if (baseCount === null) return; // нет факта парсера — дельта не применяется
+          const raw = stock[scId][pid];
+          if (raw === undefined) return; // записи нет — дельту некуда применить
+          // Запись есть, но число не парсится («Ожидается»/пусто) — считаем факт 0:
+          // ручная поправка админа должна сохраняться всегда, пока её не снимут
+          let baseCount = parseStockCount(raw);
+          if (baseCount === null) baseCount = 0;
           const left = Math.max(0, baseCount + delta);
           stock[scId][pid] = left > 0
             ? 'В наличии (' + left + ' шт)'
@@ -227,7 +231,7 @@ async function handleStockSave(env, url, body) {
     const target = parseStockCount(v); // null = очистить поправку
     const rawCount = parseStockCount(rawSc[pid]);
     // Товар с фактом парсера → постоянная дельта к факту
-    if (rawCount !== null && (target !== null || rawSc[pid] !== undefined)) {
+    if (rawCount !== null) {
       const next = target === null ? 0 : (target - rawCount);
       const set = (obj) => {
         if (!obj[scId]) obj[scId] = {};
@@ -246,10 +250,18 @@ async function handleStockSave(env, url, body) {
       }
       return;
     }
-    // Без факта парсера — абсолютное значение (прежнее поведение)
+    // Без факта парсера (в т.ч. запись «Ожидается») — абсолютное значение:
+    // ручное число хранится как есть и не зависит от следующих синков парсера;
+    // пустое поле снимает правку
     if (!edits[scId]) edits[scId] = {};
     if (v === '') delete edits[scId][pid];
     else edits[scId][pid] = v;
+    // Старая дельта больше не нужна — снимаем, чтобы после сброса правки
+    // не всплыло устаревшее значение
+    if (deltas[scId]) {
+      delete deltas[scId][pid];
+      if (!Object.keys(deltas[scId]).length) delete deltas[scId];
+    }
   });
   if (!Object.keys(edits[scId] || {}).length) delete edits[scId];
   await kvPut(env, 'stock_deltas', deltas);

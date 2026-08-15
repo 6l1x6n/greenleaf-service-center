@@ -147,6 +147,41 @@
     return ' <span class="' + cls + '" title="Постоянная поправка к остатку парсера: на сайте = факт ' + (d > 0 ? '+ ' : '− ') + Math.abs(d) + '">Δ ' + sign + d + '</span>';
   }
 
+  // Эффективное число остатка товара в СЦ: несохранённая правка из буфера
+  // (если введена) или эффективный остаток (факт парсера + поправка)
+  function effCount(pe, scId, p) {
+    if (pe && pe.stock !== undefined && pe.stock !== '') {
+      var n = Number(pe.stock);
+      return isFinite(n) ? n : null;
+    }
+    return StoreStock.count(scId, p.id);
+  }
+
+  // Состояние наличия по числу остатка (пороги как у каталога: low_threshold = 6):
+  // ≥6 — в наличии, 1–5 — заканчивается, 0 — нет, null — нет данных
+  function stockState(cnt) {
+    if (cnt === null || cnt === undefined) return 'none';
+    if (cnt >= 6) return 'in_stock';
+    if (cnt >= 1) return 'low';
+    return 'out';
+  }
+
+  // Сортировка списка товаров по остатку (возрастание/убывание, без данных — в конец)
+  function sortByStock(list, scId, pend, dir) {
+    return list.slice().sort(function (a, b) {
+      var ca = effCount(pend[a.id] || {}, scId, a);
+      var cb = effCount(pend[b.id] || {}, scId, b);
+      if (dir === 'stock_asc') {
+        var na = ca === null ? Infinity : ca;
+        var nb = cb === null ? Infinity : cb;
+        return na - nb;
+      }
+      var da = ca === null ? -1 : ca;
+      var db = cb === null ? -1 : cb;
+      return db - da;
+    });
+  }
+
   // Группы параметров для модалки «Сбросить правки» (имена полей оверрайдов)
   var RESET_GROUPS = [
     { fields: ['price', 'discount_price'], label: '💰 Цены (цена и скидка)' },
@@ -972,11 +1007,17 @@
       visibleStores.map(function (s) { return '<option value="' + h(s.id) + '"' + (s.id === curScId ? ' selected' : '') + '>' + h(s.name) + '</option>'; }).join('') +
       '</select>' +
       '<input class="search" id="stockSearch" type="search" placeholder="Поиск по названию или артикулу…" autocomplete="off" style="flex:1; min-width:200px;">' +
-      '<select id="stockStatusFilter" style="min-width:170px;">' +
-      '<option value="">Статус: все</option>' +
-      '<option value="in_stock">В наличии</option>' +
-      '<option value="zero">Нет в наличии</option>' +
-      '<option value="none">Нет данных</option>' +
+      '<select id="stockStatusFilter" style="min-width:185px;">' +
+      '<option value="">Наличие: все</option>' +
+      '<option value="in_stock">✅ В наличии</option>' +
+      '<option value="low">⚠️ Заканчивается</option>' +
+      '<option value="out">— Нет в наличии</option>' +
+      '<option value="none">🕓 Нет данных</option>' +
+      '</select>' +
+      '<select id="stockSort" style="min-width:200px;">' +
+      '<option value="">Сортировка: по умолчанию</option>' +
+      '<option value="stock_asc">Остаток: по возрастанию ↑</option>' +
+      '<option value="stock_desc">Остаток: по убыванию ↓</option>' +
       '</select>' +
       '</div>' +
       '<div class="admin-card admin-table-wrap">' +
@@ -1003,16 +1044,11 @@
     var scSel = content.querySelector('#stockScSel');
     var searchInp = content.querySelector('#stockSearch');
     var statusFilter = content.querySelector('#stockStatusFilter');
+    var stockSort = content.querySelector('#stockSort');
 
     function pendSc() {
       if (!state.pendingScChanges[curScId]) state.pendingScChanges[curScId] = {};
       return state.pendingScChanges[curScId];
-    }
-
-    function statusOf(p, scId) {
-      var cnt = StoreStock.count(scId, p.id);
-      if (cnt === null) return 'none';
-      return cnt > 0 ? 'in_stock' : 'zero';
     }
 
     function drawRows() {
@@ -1021,19 +1057,22 @@
       if (scId) curScId = scId;
       var q = (searchInp ? searchInp.value : '').trim().toLowerCase();
       var stFilter = statusFilter ? statusFilter.value : '';
+      var sort = stockSort ? stockSort.value : '';
+      var pend = pendSc();
       var list = state.products.filter(function (p) {
         if (q && p.name.toLowerCase().indexOf(q) === -1 && p.sku.toLowerCase().indexOf(q) === -1) return false;
-        if (stFilter && statusOf(p, scId) !== stFilter) return false;
+        if (stFilter && stockState(effCount(pend[p.id] || {}, scId, p)) !== stFilter) return false;
         return true;
       });
+      if (sort) list = sortByStock(list, scId, pend, sort);
       var info = pageSlice(list, state.stockPage);
       state.stockPage = info.page;
-      var pend = pendSc();
       var rows = info.items.map(function (p) {
         var img = adminImgUrl(p);
-        var st = statusOf(p, scId);
+        var st = stockState(effCount(pend[p.id] || {}, scId, p));
         var stBadge = st === 'in_stock' ? '<span class="badge st-in">✅ В наличии</span>'
-          : st === 'zero' ? '<span class="badge st-out">— Нет</span>'
+          : st === 'low' ? '<span class="badge st-low">⚠️ Заканчивается</span>'
+          : st === 'out' ? '<span class="badge st-out">— Нет</span>'
           : '<span class="badge st-exp">🕓 Нет данных</span>';
         var pe = pend[p.id] || {};
         var cnt = pe.stock !== undefined ? pe.stock : StoreStock.count(scId, p.id);
@@ -1081,6 +1120,10 @@
       drawRows();
     });
     statusFilter.addEventListener('change', function () {
+      state.stockPage = 0;
+      drawRows();
+    });
+    stockSort.addEventListener('change', function () {
       state.stockPage = 0;
       drawRows();
     });
@@ -2316,6 +2359,18 @@
       state.stores.map(function (s) { return '<option value="' + h(s.id) + '"' + (s.id === state.availabilityScId ? ' selected' : '') + '>' + h(s.name) + '</option>'; }).join('') +
       '</select>' +
       '<input class="search" id="avSearch" type="search" placeholder="Поиск по названию или артикулу…" autocomplete="off">' +
+      '<select id="avStatusFilter" style="min-width:185px;">' +
+      '<option value="">Наличие: все</option>' +
+      '<option value="in_stock">✅ В наличии</option>' +
+      '<option value="low">⚠️ Заканчивается</option>' +
+      '<option value="out">— Нет в наличии</option>' +
+      '<option value="none">🕓 Нет данных</option>' +
+      '</select>' +
+      '<select id="avSort" style="min-width:200px;">' +
+      '<option value="">Сортировка: по умолчанию</option>' +
+      '<option value="stock_asc">Остаток: по возрастанию ↑</option>' +
+      '<option value="stock_desc">Остаток: по убыванию ↓</option>' +
+      '</select>' +
       '</div>' +
       '<div class="admin-card admin-table-wrap" id="avTableWrap">' +
       '<p style="color:var(--muted); padding:16px;">Выберите Сервис-Центр, чтобы настроить наличие товаров.</p>' +
@@ -2352,9 +2407,14 @@
       var scOverrides = state.scProductOverrides[scId] || {};
       var pend = pendSc();
       var q = (searchInput.value || '').trim().toLowerCase();
+      var stFilter = content.querySelector('#avStatusFilter').value;
+      var sort = content.querySelector('#avSort').value;
       var list = state.products.filter(function (p) {
-        return !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1;
+        if (q && p.name.toLowerCase().indexOf(q) === -1 && p.sku.toLowerCase().indexOf(q) === -1) return false;
+        if (stFilter && stockState(effCount(pend[p.id] || {}, scId, p)) !== stFilter) return false;
+        return true;
       });
+      if (sort) list = sortByStock(list, scId, pend, sort);
       var info = pageSlice(list, state.availabilityPage);
       state.availabilityPage = info.page;
       var rows = info.items.map(function (p) {
@@ -2421,6 +2481,16 @@
       drawRows(e.target.value);
     });
     searchInput.addEventListener('input', function () {
+      if (!state.availabilityScId) return;
+      state.availabilityPage = 0;
+      drawAvRows();
+    });
+    content.querySelector('#avStatusFilter').addEventListener('change', function () {
+      if (!state.availabilityScId) return;
+      state.availabilityPage = 0;
+      drawAvRows();
+    });
+    content.querySelector('#avSort').addEventListener('change', function () {
       if (!state.availabilityScId) return;
       state.availabilityPage = 0;
       drawAvRows();

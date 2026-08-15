@@ -26,6 +26,10 @@ STORE_STOCK_PATH = os.path.join(ROOT_DIR, "public", "data", "store-stock.json")
 CATALOG_CACHE_PATH = os.path.join(BASE_DIR, ".catalog_cache.json")
 GOODS_CACHE_PATH = os.path.join(BASE_DIR, ".goods_cache.json")
 GOODS_ID_CACHE_PATH = os.path.join(BASE_DIR, ".goods_id_map.json")
+# Маркер разового перекачивания ВСЕХ фото в исходном разрешении:
+# лежит в репозитории, снимается после успешного прохода — дальше парсер
+# работает по обычной «умной» логике (существующие файлы не перекачиваются)
+REPHOTOS_PENDING_PATH = os.path.join(BASE_DIR, ".rephotos_pending")
 
 PRODUCT_CODE_STRICT_RE = re.compile(r"^[A-Z]{3}\d{3}$")
 BOX_PREFIX_RE = re.compile(
@@ -799,11 +803,13 @@ def clean_local_photo_variants(sku):
                 pass
 
 
-def download_product_photo(sku, photo_url, config, session=None, force=False):
+def download_product_photo(sku, photo_url, config, session=None, force=False, compress=True):
     """Скачивает фото товара с портала: оригинал + веб-варианты «-shop»/«-big».
 
     Берётся вариант с наибольшим разрешением (оригинал портала часто 800×800,
-    тогда как -shop 600×600, а -small 60×60), затем файл сжимается (Pillow).
+    тогда как -shop 600×600, а -small 60×60). compress=True — файл сжимается
+    (Pillow, ≤400КБ/800px); compress=False — сохраняется байт-в-байт
+    (исходное разрешение/качество портала, для разового перекачивания всех фото).
     Возвращает относительный путь или None. force=True перекачивает даже
     существующий файл (для апгрейда «мыльных» фото).
     """
@@ -836,8 +842,10 @@ def download_product_photo(sku, photo_url, config, session=None, force=False):
         attempts.append(url)
     path = image_local_path(sku, attempts[0])
     if download_best_image(path, attempts, session, force=force):
-        final = compress_image_if_needed(path)
-        return os.path.relpath(final, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
+        if compress:
+            final = compress_image_if_needed(path)
+            return os.path.relpath(final, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
+        return os.path.relpath(path, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
     return None
 
 
@@ -948,6 +956,104 @@ def upgrade_low_res_photos(base_products, goods, config, session=None, limit=Non
         if (done + failed) % 25 == 0:
             print(f"Фото каталога (апгрейд): {done} перекачано, {failed} не удалось...")
     print(f"Фото каталога (апгрейд): перекачано {done}, не удалось {failed}, осталось {max(0, len(todo) - done - failed)}")
+    return base_products
+
+
+def force_all_photos(base_products, goods, config, limit=None):
+    """Разовое перекачивание ВСЕХ фото товаров в исходном разрешении.
+
+    Однократный проход (флаг --rephotos или маркер .rephotos_pending):
+    для каждого товара, у которого портал знает фото (поле photo API-списка),
+    файл скачивается заново (force) без фильтрации — берётся вариант
+    с наибольшим разрешением (оригинал, иначе -big/-shop), сохраняется
+    байт-в-байт (без сжатия Pillow — нужен исходник). Коды без фото в API,
+    но с image_url в кэше листинга (свежий из этого же прогона), перекачиваются
+    из листинга. Товары без источника фото (ни API, ни листинга) не трогаются.
+    Неудачные URL помечаются photo_404, успешные — снимают этот флаг.
+    Скачивание через urllib в потоках (публичные файлы, Playwright не нужен).
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    photo_by_code = {}
+    for g in goods or []:
+        code = (g.get("code") or "").strip()
+        photo = (g.get("photo") or "").strip()
+        if code and photo:
+            photo_by_code.setdefault(code, photo)
+
+    listing_urls = {}
+    try:
+        with open(CATALOG_CACHE_PATH, encoding="utf-8") as f:
+            cached = json.load(f)
+        for it in cached or []:
+            code = (it.get("code") or "").strip()
+            url = (it.get("image_url") or "").strip()
+            if code and url:
+                listing_urls.setdefault(code, url)
+    except Exception:
+        pass
+
+    tasks = []
+    for p in base_products:
+        sku = (p.get("sku") or "").strip()
+        if not sku:
+            continue
+        if sku in photo_by_code:
+            tasks.append((sku, photo_by_code[sku]))
+        elif sku in listing_urls:
+            tasks.append((sku, listing_urls[sku]))
+    seen = set()
+    uniq = []
+    for sku, url in tasks:
+        if sku in seen:
+            continue
+        seen.add(sku)
+        uniq.append((sku, url))
+    if limit:
+        uniq = uniq[:limit]
+
+    if not uniq:
+        print("Фото (разовое перекачивание): товаров с известным источником фото нет")
+        return base_products
+
+    by_sku = {p.get("sku"): p for p in base_products if p.get("sku")}
+
+    def work(task):
+        sku, url = task
+        try:
+            rel = download_product_photo(sku, url, config, session=None, force=True, compress=False)
+        except Exception:
+            rel = None
+        return sku, rel
+
+    done = 0
+    failed = 0
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futs = {pool.submit(work, t): t for t in uniq}
+        for fut in as_completed(futs):
+            sku, rel = fut.result()
+            p = by_sku.get(sku)
+            if not p:
+                continue
+            if rel:
+                p["image"] = rel
+                p.pop("photo_404", None)
+                want = os.path.join(ROOT_DIR, "public", rel.replace("/", os.sep))
+                for ext in (".png", ".jpg", ".jpeg"):
+                    cur = os.path.join(IMAGES_DIR, sku + ext)
+                    if cur != want and os.path.exists(cur):
+                        try:
+                            os.remove(cur)
+                        except Exception:
+                            pass
+                done += 1
+            else:
+                p["photo_404"] = True
+                failed += 1
+            if (done + failed) % 100 == 0:
+                print(f"Фото (разовое перекачивание): {done} скачано, {failed} не удалось...")
+
+    print(f"Фото (разовое перекачивание): скачано {done}, не удалось {failed}, всего {len(uniq)}")
     return base_products
 
 
@@ -1769,6 +1875,10 @@ def main():
     # новые артикулы (в любом запуске) создаются с полными данными один раз.
     # Редкий ручной полный прогон (перезапись названий/цен/фото) — флаг --full.
     full = "--full" in sys.argv
+    # Разовое перекачивание ВСЕХ фото в исходном разрешении: флаг --rephotos
+    # или маркер .rephotos_pending (следующий плановый запуск после обновления).
+    # После успешного прохода маркер удаляется — дальше обычная «умная» логика.
+    rephotos = "--rephotos" in sys.argv or os.path.exists(REPHOTOS_PENDING_PATH)
     config = load_config()
     try:
         if moves_only:
@@ -1825,6 +1935,21 @@ def main():
                         base_products = ensure_cards_from_moves(page, base_products, moves, store_config)
                     except Exception as e:
                         print(f"Перемещения товаров: не удалось ({e}) — продолжаем без них")
+            # Разовое перекачивание ВСЕХ фото в исходном разрешении (без сжатия):
+            # флаг --rephotos или маркер .rephotos_pending — только один проход,
+            # после успеха маркер снимается и следующие запуски идут по обычной
+            # логике (существующие файлы не перекачиваются)
+            if rephotos:
+                try:
+                    base_products = force_all_photos(base_products, goods_all, config)
+                except Exception as e:
+                    print(f"Фото (разовое перекачивание): не удалось ({e}) — маркер остаётся, повторим в следующий запуск")
+                else:
+                    try:
+                        os.remove(REPHOTOS_PENDING_PATH)
+                        print("Маркер разового перекачивания фото снят — следующие запуски по обычной логике")
+                    except Exception:
+                        pass
             # Доскачиваем качественные фото (-shop 600×600) для карточек полного
             # каталога: идемпотентно, лимит на прогон, дальше автодосыпка
             try:
