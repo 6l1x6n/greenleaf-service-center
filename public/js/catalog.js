@@ -519,12 +519,11 @@
     if (countEl && isCatalogPage) {
       countEl.textContent = pageInfo.total ? (pageInfo.start + 1) + '–' + pageInfo.end + ' из ' + pageInfo.total : '0 из 0';
     }
-    var pagerEl = document.getElementById('catalogPager');
-    if (pagerEl) {
-      pagerEl.innerHTML = (isCatalogPage && pageInfo && pageInfo.pages > 1)
-        ? '<div class="admin-pager catalog-pager">' + catalogPagerHtml(pageInfo) + '</div>'
-        : '';
-    }
+    var pagerHtmlStr = (isCatalogPage && pageInfo && pageInfo.pages > 1) ? catalogPagerHtml(pageInfo) : '';
+    ['catalogPager', 'catalogPagerTop'].forEach(function (id) {
+      var pagerEl = document.getElementById(id);
+      if (pagerEl) pagerEl.innerHTML = pagerHtmlStr;
+    });
     var allLink = document.getElementById('catalogAllLink');
     if (allLink) {
       allLink.classList.toggle('hidden', list.length < MAIN_PAGE_LIMIT);
@@ -752,18 +751,21 @@
     saveFilters();
   });
 
-  var catalogPager = document.getElementById('catalogPager');
-  if (catalogPager) {
-    catalogPager.addEventListener('click', function (e) {
-      var go = e.target.closest('[data-page-go]');
-      if (!go || !isCatalogPage) return;
-      var p = parseInt(go.getAttribute('data-page-go'), 10) || 0;
-      if (p === state.page) return;
-      state.page = p;
-      location.hash = '#page=' + (p + 1); // запись в историю → работают «назад/вперёд» браузера
-      render();
-    });
-  }
+  ['catalogPager', 'catalogPagerTop'].forEach(function (id) {
+    var catalogPager = document.getElementById(id);
+    if (catalogPager) {
+      catalogPager.addEventListener('click', function (e) {
+        var go = e.target.closest('[data-page-go]');
+        if (!go || !isCatalogPage) return;
+        var p = parseInt(go.getAttribute('data-page-go'), 10) || 0;
+        if (p === state.page) return;
+        state.page = p;
+        location.hash = '#page=' + (p + 1); // запись в историю → работают «назад/вперёд» браузера
+        render();
+        grid.scrollIntoView({ block: 'start' });
+      });
+    }
+  });
 
   // Навигация по страницам через кнопки браузера / прямые ссылки #page=N
   window.addEventListener('hashchange', function () {
@@ -773,6 +775,7 @@
     if (p !== state.page) {
       state.page = p;
       render();
+      grid.scrollIntoView({ block: 'start' });
     }
   });
 

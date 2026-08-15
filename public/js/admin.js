@@ -980,6 +980,7 @@
       '</select>' +
       '</div>' +
       '<div class="admin-card admin-table-wrap">' +
+      '<div class="admin-pager pager-top" id="stockPagerTop"></div>' +
       '<table class="admin-table" id="stockTable">' +
       '<thead><tr>' +
       '<th style="min-width:60px;"></th>' +
@@ -1048,10 +1049,11 @@
           '</tr>';
       }).join('');
       document.getElementById('stockTbody').innerHTML = rows || '<tr><td colspan="6" style="color:var(--muted);">Ничего не найдено.</td></tr>';
-      var pager = document.getElementById('stockPager');
-      if (pager) {
-        pager.innerHTML = info.pages > 1 ? pagerHtml(info) : '<span class="pager-info">Показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>';
-      }
+      var pagerHtmlStr = info.pages > 1 ? pagerHtml(info) : '<span class="pager-info">Показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>';
+      ['stockPager', 'stockPagerTop'].forEach(function (id) {
+        var pager = document.getElementById(id);
+        if (pager) pager.innerHTML = pagerHtmlStr;
+      });
     }
 
     // Текущая страница → буфер (изменённое запоминаем, возвращённое к data-init убираем)
@@ -1091,10 +1093,16 @@
       if (!pend[pid]) pend[pid] = {};
       pend[pid].stock = el.value;
     });
-    var stockPager = document.getElementById('stockPager');
-    stockPager.addEventListener('click', function (e) {
-      var go = e.target.closest('[data-page-go]');
-      if (go) { state.stockPage = parseInt(go.getAttribute('data-page-go'), 10) || 0; drawRows(); }
+    ['stockPager', 'stockPagerTop'].forEach(function (id) {
+      var stockPager = document.getElementById(id);
+      stockPager.addEventListener('click', function (e) {
+        var go = e.target.closest('[data-page-go]');
+        if (go) {
+          state.stockPage = parseInt(go.getAttribute('data-page-go'), 10) || 0;
+          drawRows();
+          content.querySelector('.admin-table-wrap').scrollIntoView({ block: 'start' });
+        }
+      });
     });
 
     var saveBtn = content.querySelector('#stockSaveBtn');
@@ -1951,6 +1959,7 @@
       '<button class="btn btn-outline" id="prodAddCatBtn">➕ Добавить категорию</button>' +
       '</div>' +
       '<div class="admin-card admin-table-wrap">' +
+      '<div class="admin-pager pager-top" id="prodPagerTop"></div>' +
       '<table class="admin-table"><thead><tr>' +
       '<th>Фото</th><th style="min-width:200px;">Название</th><th>Артикул</th><th style="min-width:180px;">Описание</th><th>Категория</th><th>Цена ₸</th><th>Приоритет</th><th style="min-width:110px;">Скидка на сайте</th><th style="width:46px;"></th>' +
       '</tr></thead><tbody id="prodTbody"></tbody></table>' +
@@ -2010,10 +2019,11 @@
           '</tr>';
       }).join('');
       document.getElementById('prodTbody').innerHTML = rows || '<tr><td colspan="9" style="color:var(--muted);">Ничего не найдено.</td></tr>';
-      var pager = document.getElementById('prodPager');
-      if (pager) {
-        pager.innerHTML = info.pages > 1 ? pagerHtml(info) : '<span class="pager-info">Показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>';
-      }
+      var pagerHtmlStr = info.pages > 1 ? pagerHtml(info) : '<span class="pager-info">Показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>';
+      ['prodPager', 'prodPagerTop'].forEach(function (id) {
+        var pager = document.getElementById(id);
+        if (pager) pager.innerHTML = pagerHtmlStr;
+      });
     }
 
     drawRows();
@@ -2038,10 +2048,16 @@
       if (!state.pendingProductChanges[pid]) state.pendingProductChanges[pid] = {};
       state.pendingProductChanges[pid][field] = el.type === 'checkbox' ? el.checked : el.value;
     });
-    var prodPager = document.getElementById('prodPager');
-    prodPager.addEventListener('click', function (e) {
-      var go = e.target.closest('[data-page-go]');
-      if (go) { state.productPage = parseInt(go.getAttribute('data-page-go'), 10) || 0; drawRows(); }
+    ['prodPager', 'prodPagerTop'].forEach(function (id) {
+      var prodPager = document.getElementById(id);
+      prodPager.addEventListener('click', function (e) {
+        var go = e.target.closest('[data-page-go]');
+        if (go) {
+          state.productPage = parseInt(go.getAttribute('data-page-go'), 10) || 0;
+          drawRows();
+          content.querySelector('.admin-table-wrap').scrollIntoView({ block: 'start' });
+        }
+      });
     });
 
     // Создание категории: сохраняет в settings и обновляет фильтр; false при отмене/ошибке
@@ -2363,10 +2379,11 @@
           '<td style="text-align:center;"><input type="checkbox" data-sc-prod="' + h(p.id) + '" data-sc-field="hidden" data-init="' + (isHidden ? '1' : '0') + '" ' + (isHidden ? 'checked' : '') + ' title="Скрыть товар в этом филиале"></td>' +
           '</tr>';
       }).join('');
-      var pager = info.pages > 1 ? '<div class="admin-pager">' + pagerHtml(info) + '</div>' : '';
-      wrap.innerHTML = '<table class="admin-table"><thead><tr>' +
+      var pagerTop = info.pages > 1 ? '<div class="admin-pager pager-top">' + pagerHtml(info) + '</div>' : '';
+      var pagerBottom = info.pages > 1 ? '<div class="admin-pager">' + pagerHtml(info) + '</div>' : '';
+      wrap.innerHTML = pagerTop + '<table class="admin-table"><thead><tr>' +
         '<th style="min-width:200px;">Товар</th><th>Цена ₸</th><th>Скидка ₸</th><th>Наличие</th><th style="min-width:120px;">Остаток</th><th>Скрыть</th>' +
-        '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--muted);">Ничего не найдено.</td></tr>') + '</tbody></table>' + pager;
+        '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--muted);">Ничего не найдено.</td></tr>') + '</tbody></table>' + pagerBottom;
     }
 
     // Текущая страница → буфер: изменённые значения запоминаются,
@@ -2410,7 +2427,11 @@
     });
     wrap.addEventListener('click', function (e) {
       var go = e.target.closest('[data-page-go]');
-      if (go) { state.availabilityPage = parseInt(go.getAttribute('data-page-go'), 10) || 0; drawAvRows(); }
+      if (go) {
+        state.availabilityPage = parseInt(go.getAttribute('data-page-go'), 10) || 0;
+        drawAvRows();
+        wrap.scrollIntoView({ block: 'start' });
+      }
     });
     wrap.addEventListener('input', function (e) {
       var el = e.target.closest('[data-sc-prod],[data-stock-prod]');

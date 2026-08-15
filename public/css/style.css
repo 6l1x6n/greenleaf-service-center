@@ -2018,6 +2018,11 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 }
 .pager-ellipsis { padding: 0 2px; color: var(--muted); font-size: 13px; }
 .pager-info { font-size: 13px; color: var(--muted); margin-left: auto; }
+/* Верхний пейджер: отступ снизу вместо сверху, на мобильных скрыт */
+.pager-top { padding: 10px 2px 4px; }
+@media (max-width: 767px) {
+  .pager-top { display: none; }
+}
 
 /* Ячейка остатка: поле + бейдж постоянной поправки */
 .stock-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
