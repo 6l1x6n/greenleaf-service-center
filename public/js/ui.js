@@ -550,6 +550,7 @@
   var baseStock = {};
   var baseStockUpdated = '';
   var baseStockLoaded = null;
+  var stockDeltas = {};
 
   function loadBaseStock() {
     if (baseStockLoaded) return baseStockLoaded;
@@ -561,11 +562,13 @@
         if (d && d.stock) {
           baseStock = d.stock;
           baseStockUpdated = (d && d.updated) || '';
+          stockDeltas = (d && d.deltas) || {};
           return;
         }
         throw new Error('no stock');
       })
       .catch(function () {
+        stockDeltas = {};
         return fetch('data/store-stock.json')
           .then(function (r) { return r.json(); })
           .then(function (d) {
@@ -613,7 +616,7 @@
     var t = stockText(storeId, p && p.id);
     if (t === undefined || t === null || String(t).trim() === '') return false;
     t = String(t);
-    return t.indexOf('Нет') !== 0 && t.indexOf('Ожидается') === -1;
+    return t.toLowerCase().indexOf('нет') !== 0 && t.indexOf('Ожидается') === -1;
   }
 
   // Число из «В наличии (26 шт)» → 26; «Нет…» → 0; «Ожидается…»/без числа → null (лимита нет)
@@ -622,7 +625,7 @@
     if (t === undefined || t === null) return null;
     t = String(t).trim();
     if (t === '' || t.indexOf('Ожидается') !== -1) return null;
-    if (t.indexOf('Нет') === 0) return 0;
+    if (t.toLowerCase().indexOf('нет') === 0) return 0;
     var m = t.match(/(\d+)\s*шт/);
     return m ? parseInt(m[1], 10) : null;
   }
@@ -640,6 +643,15 @@
     return any ? sum : null;
   }
 
+  // Постоянная поправка остатка (дельта к факту парсера): число или null
+  function stockDelta(storeId, productId) {
+    var m = stockDeltas || {};
+    var v = m[storeId] && m[storeId][productId];
+    if (v === undefined || v === null || v === '') return null;
+    var n = Number(v);
+    return isFinite(n) && n !== 0 ? n : null;
+  }
+
   window.StoreStock = {
     load: loadBaseStock,
     reload: reloadBaseStock,
@@ -648,6 +660,7 @@
     count: stockCount,
     totalCount: totalCount,
     available: isAvailableInStore,
+    delta: stockDelta,
     updated: function () { return baseStockUpdated; }
   };
 })();

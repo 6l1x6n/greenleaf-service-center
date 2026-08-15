@@ -48,6 +48,9 @@
     siteSettings: { showDiscountPrices: true, categories: [] },
     productSearch: '',
     productCatFilter: 'all',
+    productPage: 0,
+    availabilityPage: 0,
+    stockPage: 0,
     pendingProductChanges: {},
     pendingScChanges: {},
     availabilityScId: null,
@@ -63,7 +66,7 @@
     deliveries: { label: '🚚 Поставки', roles: ['superadmin', 'sc'] },
     events: { label: '📅 Мероприятия', roles: ['superadmin', 'sc'] },
     products: { label: '🛒 Товары', roles: ['superadmin'] },
-    catalog: { label: '📦 Наличие товаров в СЦ', roles: ['superadmin'] },
+    catalog: { label: '📦 Наличие в СЦ', roles: ['superadmin'] },
     orders: { label: '🛒 Заказы', roles: ['superadmin', 'sc'] },
     applications: { label: '📋 Заявки', roles: ['superadmin'] },
     notices: { label: '📢 Уведомления СЦ', roles: ['superadmin', 'sc'] }
@@ -86,6 +89,125 @@
     return fetch(url + '?t=' + Date.now()).then(function (r) { return r.json(); });
   }
   function isSuper() { return state.user && state.user.role === 'superadmin'; }
+
+  // ---------------- Пагинация таблиц и бейдж разницы остатков ----------------
+
+  var PAGE_SIZE = 100;
+
+  function pageSlice(list, page) {
+    var total = list.length;
+    var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    if (page < 0) page = 0;
+    if (page >= pages) page = pages - 1;
+    var start = page * PAGE_SIZE;
+    return {
+      page: page,
+      pages: pages,
+      total: total,
+      start: start,
+      end: Math.min(total, start + PAGE_SIZE),
+      items: list.slice(start, start + PAGE_SIZE)
+    };
+  }
+
+  function pagerHtml(info) {
+    return '<button class="btn btn-outline btn-sm" type="button" data-page-prev' + (info.page <= 0 ? ' disabled' : '') + '>‹ Назад</button>' +
+      '<span class="pager-info">Стр. ' + (info.page + 1) + ' из ' + info.pages + ' · показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>' +
+      '<button class="btn btn-outline btn-sm" type="button" data-page-next' + (info.page >= info.pages - 1 ? ' disabled' : '') + '>Вперёд ›</button>';
+  }
+
+  // Бейдж постоянной поправки остатка: красный при минусе, зелёный при плюсе
+  function deltaBadgeHtml(scId, pid) {
+    var d = window.StoreStock && StoreStock.delta ? StoreStock.delta(scId, pid) : null;
+    if (d === null || d === undefined || d === 0) return '';
+    var cls = d < 0 ? 'stock-delta neg' : 'stock-delta pos';
+    var sign = d > 0 ? '+' : '';
+    return ' <span class="' + cls + '" title="Постоянная поправка к остатку парсера: на сайте = факт ' + (d > 0 ? '+ ' : '− ') + Math.abs(d) + '">Δ ' + sign + d + '</span>';
+  }
+
+  // Группы параметров для модалки «Сбросить правки» (имена полей оверрайдов)
+  var RESET_GROUPS = [
+    { fields: ['price', 'discount_price'], label: '💰 Цены (цена и скидка)' },
+    { fields: ['description', 'category'], label: '📝 Описания и категории' },
+    { fields: ['status', 'eta', 'incoming'], label: '📊 Статусы и поставки' },
+    { fields: ['priority', 'hit'], label: '🔥 Приоритеты и «Хит»' },
+    { fields: ['showDiscount'], label: '🏷 Показ скидки на сайте' },
+    { fields: ['hidden'], label: '🙈 Скрытие товаров с сайта' }
+  ];
+  // Для сброса настроек филиала — только поля, которые есть в sc_product_overrides
+  var RESET_SC_GROUPS = [
+    { fields: ['price', 'discount_price'], label: '💰 Цены (цена и скидка)' },
+    { fields: ['status', 'eta', 'incoming'], label: '📊 Статусы и поставки' },
+    { fields: ['hidden'], label: '🙈 Скрытие товаров в филиале' }
+  ];
+
+  function openResetModal(opts) {
+    var groups = (opts.sc ? RESET_SC_GROUPS : RESET_GROUPS).map(function (g, i) {
+      return '<label class="form-checkbox reset-check"><input type="checkbox" name="grp" value="' + i + '" checked> ' + g.label + '</label>';
+    }).join('');
+    var includeScHtml = opts.includeSc
+      ? '<label class="form-checkbox reset-check"><input type="checkbox" name="includeSc" checked> 🏬 Настройки товаров филиалов («Наличие в СЦ»)</label>'
+      : '';
+    Utils.openModal(
+      '<h3 style="margin-bottom:6px;">🧹 ' + h(opts.title) + '</h3>' +
+      '<p style="margin-top:0; color:var(--muted); font-size:13.5px;">Выберите параметры, которые вернуть к базовым данным. Невыбранные правки останутся.</p>' +
+      '<form class="form" id="resetForm">' + groups + includeScHtml +
+      '<label class="form-checkbox reset-check"><input type="checkbox" id="resetAllChk" checked> ☑️ Выбрать всё</label>' +
+      '<div class="admin-actions" style="margin-top:14px;">' +
+      '<button class="btn btn-primary danger-btn" type="submit">🧹 Сбросить выбранное</button>' +
+      '<button class="btn btn-outline" type="button" id="resetCancelBtn">Отмена</button>' +
+      '</div></form>'
+    );
+    var form = document.getElementById('resetForm');
+    var allChk = document.getElementById('resetAllChk');
+    var groupBoxes = form.querySelectorAll('input[type="checkbox"]:not(#resetAllChk)');
+    function syncAll() {
+      allChk.checked = Array.prototype.every.call(groupBoxes, function (b) { return b.checked; });
+    }
+    allChk.addEventListener('change', function () {
+      groupBoxes.forEach(function (b) { b.checked = allChk.checked; });
+    });
+    form.addEventListener('change', syncAll);
+    document.getElementById('resetCancelBtn').addEventListener('click', function () { Utils.closeModal(); });
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var srcGroups = opts.sc ? RESET_SC_GROUPS : RESET_GROUPS;
+      var fields = [];
+      form.querySelectorAll('input[name="grp"]:checked').forEach(function (b) {
+        srcGroups[Number(b.value)].fields.forEach(function (f) {
+          if (fields.indexOf(f) === -1) fields.push(f);
+        });
+      });
+      var includeSc = opts.includeSc && !!form.querySelector('input[name="includeSc"]:checked');
+      if (!fields.length) {
+        Utils.showToast('⚠️ Выберите хотя бы один параметр');
+        return;
+      }
+      var payload = { action: opts.action, fields: fields };
+      if (opts.extra) Object.assign(payload, opts.extra);
+      if (opts.action === 'reset') payload.includeSc = includeSc;
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = '⏳ Сбрасываем…';
+      Auth.api('/api/admin/products', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
+        if (res && res.ok) {
+          Utils.closeModal();
+          Utils.showToast('🧹 Правки сброшены');
+          state.pendingProductChanges = {};
+          state.pendingScChanges = {};
+          loadData().then(function () { openSection(state.section); });
+        } else {
+          btn.disabled = false;
+          btn.textContent = '🧹 Сбросить выбранное';
+          Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сбросить. Проверьте соединение.'));
+        }
+      }).catch(function () {
+        btn.disabled = false;
+        btn.textContent = '🧹 Сбросить выбранное';
+        Utils.showToast('⚠️ Сеть недоступна — попробуйте ещё раз');
+      });
+    });
+  }
 
   // ---------------- Данные ----------------
 
@@ -816,11 +938,12 @@
   function renderStock(content) {
     var visibleStores = isSuper() ? state.stores : state.stores.filter(function (s) { return s.id === state.user.id; });
     if (!visibleStores.length) visibleStores = state.stores;
-    var canSave = isSuper();
+    // СЦ правит остатки своего филиала, суперадмин — любого
+    var canSave = true;
     var curScId = state.stockScId || (visibleStores[0] ? visibleStores[0].id : '');
 
     content.insertAdjacentHTML('beforeend',
-      '<div class="admin-note">📦 Остатки = база (парсер/файл) − продажи − активные брони (Worker). Выберите филиал и отредактируйте остатки — <b>«Сохранить остатки»</b> сразу обновляет сайт.' + (canSave ? '' : ' (Правки сохраняет только суперадмин.)') + '</div>' +
+      '<div class="admin-note">📦 Остатки = база (парсер/файл) − продажи − активные брони (Worker). Введите нужное число — сохранится постоянная поправка к факту парсера (бейдж Δ под полем: красный — минус, зелёный — плюс). Пустое поле снимает поправку.</div>' +
       '<div class="admin-toolbar stock-toolbar" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">' +
       '<label style="font-weight:600; font-size:13.5px;">Филиал:</label>' +
       '<select id="stockScSel" style="min-width:260px;">' +
@@ -844,6 +967,7 @@
       '<th>Статус</th>' +
       '<th style="min-width:150px;">Остаток</th>' +
       '</tr></thead><tbody id="stockTbody"></tbody></table>' +
+      '<div class="admin-pager" id="stockPager"></div>' +
       '</div>' +
       '<div class="admin-actions stock-actions" style="flex-wrap:wrap;">' +
       (canSave ? '<button class="btn btn-primary" id="stockSaveBtn">💾 Сохранить остатки (Worker)</button>' : '') +
@@ -857,6 +981,11 @@
     var searchInp = content.querySelector('#stockSearch');
     var statusFilter = content.querySelector('#stockStatusFilter');
 
+    function pendSc() {
+      if (!state.pendingScChanges[curScId]) state.pendingScChanges[curScId] = {};
+      return state.pendingScChanges[curScId];
+    }
+
     function statusOf(p, scId) {
       var cnt = StoreStock.count(scId, p.id);
       if (cnt === null) return 'none';
@@ -865,19 +994,26 @@
 
     function drawRows() {
       var scId = scSel ? scSel.value : curScId;
+      if (!scId && visibleStores.length) scId = visibleStores[0].id;
+      if (scId) curScId = scId;
       var q = (searchInp ? searchInp.value : '').trim().toLowerCase();
       var stFilter = statusFilter ? statusFilter.value : '';
-      var rows = state.products.filter(function (p) {
+      var list = state.products.filter(function (p) {
         if (q && p.name.toLowerCase().indexOf(q) === -1 && p.sku.toLowerCase().indexOf(q) === -1) return false;
         if (stFilter && statusOf(p, scId) !== stFilter) return false;
         return true;
-      }).map(function (p) {
+      });
+      var info = pageSlice(list, state.stockPage);
+      state.stockPage = info.page;
+      var pend = pendSc();
+      var rows = info.items.map(function (p) {
         var img = adminImgUrl(p);
         var st = statusOf(p, scId);
         var stBadge = st === 'in_stock' ? '<span class="badge st-in">✅ В наличии</span>'
           : st === 'zero' ? '<span class="badge st-out">— Нет</span>'
           : '<span class="badge st-exp">🕓 Нет данных</span>';
-        var cnt = StoreStock.count(scId, p.id);
+        var pe = pend[p.id] || {};
+        var cnt = pe.stock !== undefined ? pe.stock : StoreStock.count(scId, p.id);
         var priceTxt = Utils.fmtPrice(p.price);
         if (p.discount_price) priceTxt += ' <s class="muted-sku">' + Utils.fmtPrice(p.discount_price) + '</s>';
         return '<tr>' +
@@ -886,35 +1022,79 @@
           '<td>' + h(p.category || '') + '</td>' +
           '<td>' + priceTxt + '</td>' +
           '<td>' + stBadge + '</td>' +
-          '<td><input data-stock-prod="' + h(p.id) + '" type="number" min="0" value="' + h(cnt === null ? '' : cnt) + '" placeholder="Число (0 = нет)" style="width:130px;"></td>' +
+          '<td><div class="stock-cell"><input data-stock-prod="' + h(p.id) + '" type="number" min="0" data-init="' + h(cnt === null ? '' : cnt) + '" value="' + h(cnt === null ? '' : cnt) + '" placeholder="Число (0 = нет)" style="width:130px;">' + deltaBadgeHtml(scId, p.id) + '</div></td>' +
           '</tr>';
       }).join('');
       document.getElementById('stockTbody').innerHTML = rows || '<tr><td colspan="6" style="color:var(--muted);">Ничего не найдено.</td></tr>';
+      var pager = document.getElementById('stockPager');
+      if (pager) {
+        pager.innerHTML = info.pages > 1 ? pagerHtml(info) : '<span class="pager-info">Показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>';
+      }
+    }
+
+    // Текущая страница → буфер (изменённое запоминаем, возвращённое к data-init убираем)
+    function syncBuffer() {
+      var pend = pendSc();
+      content.querySelectorAll('#stockTbody [data-stock-prod]').forEach(function (el) {
+        var pid = el.getAttribute('data-stock-prod');
+        var init = el.getAttribute('data-init') || '';
+        var val = el.value;
+        if (!pend[pid]) pend[pid] = {};
+        if (val !== init) pend[pid].stock = val;
+        else delete pend[pid].stock;
+        if (!Object.keys(pend[pid]).length) delete pend[pid];
+      });
     }
 
     drawRows();
     scSel.addEventListener('change', function () {
       state.stockScId = scSel.value;
+      state.stockPage = 0;
       drawRows();
     });
-    searchInp.addEventListener('input', drawRows);
-    statusFilter.addEventListener('change', drawRows);
+    searchInp.addEventListener('input', function () {
+      state.stockPage = 0;
+      drawRows();
+    });
+    statusFilter.addEventListener('change', function () {
+      state.stockPage = 0;
+      drawRows();
+    });
+    var stockTbody = document.getElementById('stockTbody');
+    stockTbody.addEventListener('input', function (e) {
+      var el = e.target.closest('[data-stock-prod]');
+      if (!el) return;
+      var pend = pendSc();
+      var pid = el.getAttribute('data-stock-prod');
+      if (!pend[pid]) pend[pid] = {};
+      pend[pid].stock = el.value;
+    });
+    var stockPager = document.getElementById('stockPager');
+    stockPager.addEventListener('click', function (e) {
+      if (e.target.closest('[data-page-prev]')) { state.stockPage--; drawRows(); }
+      else if (e.target.closest('[data-page-next]')) { state.stockPage++; drawRows(); }
+    });
 
     var saveBtn = content.querySelector('#stockSaveBtn');
     if (saveBtn) {
       saveBtn.addEventListener('click', function () {
-        var scId = scSel.value;
+        var scId = curScId;
+        syncBuffer();
+        var pend = pendSc();
         var items = {};
-        content.querySelectorAll('#stockTbody [data-stock-prod]').forEach(function (inp) {
-          var v = inp.value.trim();
-          if (v === '') return;
+        Object.keys(pend).forEach(function (pid) {
+          var v = pend[pid].stock;
+          if (v === undefined) return;
+          v = String(v).trim();
           var n = Number(v);
-          if (isNaN(n) || n < 0) return;
-          items[inp.getAttribute('data-stock-prod')] = n > 0 ? 'В наличии (' + n + ' шт)' : 'нет в наличии';
+          if (v !== '' && (isNaN(n) || n < 0)) return;
+          // Пустое значение = снять поправку (дельту/абсолютную правку)
+          items[pid] = v === '' ? '' : (n > 0 ? 'В наличии (' + n + ' шт)' : 'нет в наличии');
         });
         Auth.api('/api/stock', { method: 'POST', body: JSON.stringify({ scId: scId, items: items }) }).then(function (res) {
           if (res && res.ok) {
             Utils.showToast('✅ Остатки филиала сохранены — сайт обновлён');
+            delete state.pendingScChanges[scId];
             return StoreStock.reload();
           }
           Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сохранить. Проверьте соединение.'));
@@ -926,15 +1106,17 @@
     }
 
     content.querySelector('#stockExportBtn').addEventListener('click', function () {
+      syncBuffer();
+      var scId = curScId;
+      var pend = pendSc();
       var stock = {};
-      content.querySelectorAll('[data-stock-prod]').forEach(function (inp) {
-        var val = inp.value.trim();
-        if (val === '') return;
-        var n = Number(val);
+      state.products.forEach(function (p) {
+        var v = (pend[p.id] || {}).stock !== undefined ? String(pend[p.id].stock) : (StoreStock.count(scId, p.id) === null ? '' : String(StoreStock.count(scId, p.id)));
+        if (v === '') return;
+        var n = Number(v);
         if (isNaN(n)) return;
-        var scId = scSel.value;
         if (!stock[scId]) stock[scId] = {};
-        stock[scId][inp.getAttribute('data-stock-prod')] = n > 0 ? 'В наличии (' + n + ' шт)' : 'нет в наличии';
+        stock[scId][p.id] = n > 0 ? 'В наличии (' + n + ' шт)' : 'нет в наличии';
       });
       var payload = JSON.stringify({ updated: new Date().toISOString(), stock: stock }, null, 1);
       var blob = new Blob([payload], { type: 'application/json' });
@@ -961,15 +1143,16 @@
           var parsed = JSON.parse(reader.result);
           var stock = (parsed && parsed.stock) || parsed || {};
           if (typeof stock !== 'object' || Array.isArray(stock)) throw new Error('bad format');
-          var scId = scSel.value;
+          var scId = curScId;
           if (stock[scId]) {
-            content.querySelectorAll('[data-stock-prod]').forEach(function (inp) {
-              var pid = inp.getAttribute('data-stock-prod');
-              if (stock[scId][pid] !== undefined) {
-                var m = /(\d+)\s*шт/.exec(String(stock[scId][pid]));
-                inp.value = m ? m[1] : (String(stock[scId][pid]).indexOf('Нет') === 0 ? '0' : '');
-              }
+            if (!state.pendingScChanges[scId]) state.pendingScChanges[scId] = {};
+            Object.keys(stock[scId]).forEach(function (pid) {
+              var m = /(\d+)\s*шт/.exec(String(stock[scId][pid]));
+              var val = m ? m[1] : (String(stock[scId][pid]).toLowerCase().indexOf('нет') === 0 ? '0' : '');
+              if (!state.pendingScChanges[scId][pid]) state.pendingScChanges[scId][pid] = {};
+              state.pendingScChanges[scId][pid].stock = val;
             });
+            drawRows();
           }
           Utils.showToast('⬆️ Файл загружен в таблицу — проверьте и нажмите «Сохранить остатки»');
         } catch (err) {
@@ -1611,7 +1794,10 @@
             '</div></li>';
         }).join('') + '</ul>';
 
-        listEl.addEventListener('click', function (e) {
+        // onclick (а не addEventListener): load() вызывается многократно, а
+        // element «ordersList» сохраняется — addEventListener копил бы обработчики
+        // и каждое нажатие открывало бы confirm по нескольку раз подряд.
+        listEl.onclick = function (e) {
           // Меню «⋯»: открыть/закрыть
           var moreBtn = e.target.closest('[data-more-open]');
           if (moreBtn) {
@@ -1632,6 +1818,8 @@
             (action === 'confirm' ? 'Подтвердить заказ ' + dispNum + '? Товар считается проданным и не вернётся в остаток.' :
               (action === 'cancel' ? 'Отменить заказ ' + dispNum + '? Зарезервированный товар вернётся в доступное.' : 'Удалить заказ ' + dispNum + '? Подтверждённый заказ удаляется без возврата товара.'));
           if (!confirm(label)) return;
+          // Защита от двойного клика: список перерендерится после действия
+          btn.disabled = true;
           // Необязательный комментарий для клиента (виден в «Моих заказах»)
           var comment = '';
           if (action !== 'delete') {
@@ -1646,8 +1834,11 @@
               Utils.showToast((res && res.error) || '⚠️ Не удалось выполнить. Войдите заново (сессия истекла).');
             }
             load();
+          }).catch(function () {
+            Utils.showToast('⚠️ Сеть недоступна — попробуйте ещё раз');
+            btn.disabled = false;
           });
-        });
+        };
       }).catch(function () {
         content.querySelector('#ordersList').innerHTML = '<div class="owner-req-empty">Не удалось загрузить заказы. Войдите заново.</div>';
       });
@@ -1706,7 +1897,10 @@
 
     function prioValue(p) {
       // Свежие оверрайды (KV, /api/admin/products без кеша) — в приоритете над
-      // закешированным каталогом: после сохранения панель сразу показывает бейдж
+      // закешированным каталогом: после сохранения панель сразу показывает бейдж.
+      // Несохранённая правка из буфера — самая свежая.
+      var pend = state.pendingProductChanges[p.id] || {};
+      if (pend.priority !== undefined) return String(pend.priority);
       var o = state.productOverrides[p.id] || {};
       if (o.priority != null && o.priority !== '') return String(o.priority);
       if (o.hit) return '1';
@@ -1738,6 +1932,7 @@
       '<table class="admin-table"><thead><tr>' +
       '<th>Фото</th><th style="min-width:200px;">Название</th><th>Артикул</th><th style="min-width:180px;">Описание</th><th>Категория</th><th>Цена ₸</th><th>Приоритет</th><th style="min-width:110px;">Скидка на сайте</th><th style="width:46px;"></th>' +
       '</tr></thead><tbody id="prodTbody"></tbody></table>' +
+      '<div class="admin-pager" id="prodPager"></div>' +
       '</div>' +
       '<div class="admin-actions" style="flex-wrap:wrap;">' +
       '<button class="btn btn-primary" id="prodSaveBtn">💾 Сохранить изменения</button>' +
@@ -1746,21 +1941,22 @@
       '<p style="margin-top:10px; font-size:13px; color:var(--muted);">Приоритет: 🔥 Хит — 1, ✨ Новинка — 2, 🚀 Топ — 3 (меньше число — выше в каталоге). «Скидка на сайте» включает скидочную цену товара для всех посетителей. Статус (наличие) задаётся в разделе «Наличие товаров в СЦ» для каждого филиала отдельно. Пустые поля не меняют данные.</p>'
     );
 
+    function pendValue(p, field, baseVal) {
+      var pend = state.pendingProductChanges[p.id] || {};
+      if (pend[field] !== undefined) return pend[field];
+      return baseVal;
+    }
+
     function drawRows() {
-      var prev = {};
-      var oldTbody = document.getElementById('prodTbody');
-      if (oldTbody) {
-        oldTbody.querySelectorAll('[data-cat-prod]').forEach(function (el) {
-          var k = el.getAttribute('data-cat-prod') + '|' + el.getAttribute('data-cat-field');
-          prev[k] = el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
-        });
-      }
       var q = (state.productSearch || '').trim().toLowerCase();
       var cat = state.productCatFilter || 'all';
-      var rows = state.products.filter(function (p) {
+      var list = state.products.filter(function (p) {
         if (cat !== 'all' && p.category !== cat) return false;
         return !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1;
-      }).map(function (p) {
+      });
+      var info = pageSlice(list, state.productPage);
+      state.productPage = info.page;
+      var rows = info.items.map(function (p) {
         var o = state.productOverrides[p.id] || {};
         var changed = Object.keys(o).some(function (k) { return k !== 'hidden' && k !== 'discount_price'; }) ? ' style="outline:1px solid var(--green); outline-offset:-1px;"' : '';
         var isHidden = !!p.hidden;
@@ -1771,39 +1967,59 @@
           : (isHidden
             ? '<button class="btn btn-outline btn-sm" data-prod-restore="' + h(p.id) + '" title="Вернуть на сайт">↩️</button>'
             : '<button class="btn btn-outline btn-sm" data-prod-del="' + h(p.id) + '" title="Скрыть с сайта">🗑</button>');
+        var descVal = pendValue(p, 'description', p.description || '');
+        var catVal = pendValue(p, 'category', p.category || '');
+        var priceVal = pendValue(p, 'price', p.price != null ? p.price : '');
+        var showDisc = pendValue(p, 'showDiscount', p.showDiscount !== false);
         return '<tr' + (isHidden ? ' class="row-hidden"' : '') + changed + '>' +
           '<td><img class="admin-thumb" src="' + h(img) + '" alt="' + h(p.name) + '" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\';"></td>' +
           '<td><strong>' + h(p.name) + '</strong>' + prioBadgeChip(p) + (isCustom ? ' <span class="admin-sc-tag">🖊 ручной</span>' : '') + (isHidden ? ' <span class="badge st-out">скрыт</span>' : '') + '</td>' +
           '<td class="muted-sku">' + h(p.sku) + '</td>' +
-          '<td><input class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="description" value="' + h(p.description || '') + '"></td>' +
-          '<td><select class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="category">' + catOptionsHtml(p.category || '') + '</select></td>' +
-          '<td><input class="cat-input" type="number" min="0" data-cat-prod="' + h(p.id) + '" data-cat-field="price" value="' + h(p.price != null ? p.price : '') + '"></td>' +
-          '<td><select class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="priority">' +
+          '<td><input class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="description" data-init="' + h(descVal) + '" value="' + h(descVal) + '"></td>' +
+          '<td><select class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="category" data-init="' + h(catVal) + '">' + catOptionsHtml(catVal) + '</select></td>' +
+          '<td><input class="cat-input" type="number" min="0" data-cat-prod="' + h(p.id) + '" data-cat-field="price" data-init="' + h(priceVal) + '" value="' + h(priceVal) + '"></td>' +
+          '<td><select class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="priority" data-init="' + h(prioValue(p)) + '">' +
           PRIO_OPTIONS.map(function (pr) {
             return '<option value="' + pr[0] + '"' + (prioValue(p) === pr[0] ? ' selected' : '') + '>' + pr[1] + '</option>';
           }).join('') +
           '</select></td>' +
-          '<td style="text-align:center;"><input type="checkbox" data-cat-prod="' + h(p.id) + '" data-cat-field="showDiscount" ' + (p.showDiscount !== false ? 'checked' : '') + ' title="Показывать скидочную цену на сайте"></td>' +
+          '<td style="text-align:center;"><input type="checkbox" data-cat-prod="' + h(p.id) + '" data-cat-field="showDiscount" data-init="' + (showDisc ? '1' : '0') + '" ' + (showDisc ? 'checked' : '') + ' title="Показывать скидочную цену на сайте"></td>' +
           '<td>' + delBtn + '</td>' +
           '</tr>';
       }).join('');
-      oldTbody.innerHTML = rows || '<tr><td colspan="9" style="color:var(--muted);">Ничего не найдено.</td></tr>';
-      oldTbody.querySelectorAll('[data-cat-prod]').forEach(function (el) {
-        var k = el.getAttribute('data-cat-prod') + '|' + el.getAttribute('data-cat-field');
-        if (prev[k] === undefined) return;
-        if (el.type === 'checkbox') el.checked = prev[k] === '1';
-        else if (prev[k] !== el.value) el.value = prev[k];
-      });
+      document.getElementById('prodTbody').innerHTML = rows || '<tr><td colspan="9" style="color:var(--muted);">Ничего не найдено.</td></tr>';
+      var pager = document.getElementById('prodPager');
+      if (pager) {
+        pager.innerHTML = info.pages > 1 ? pagerHtml(info) : '<span class="pager-info">Показано ' + (info.total ? (info.start + 1) + '–' + info.end : 0) + ' из ' + info.total + '</span>';
+      }
     }
 
     drawRows();
     content.querySelector('#prodSearch').addEventListener('input', function (e) {
       state.productSearch = e.target.value;
+      state.productPage = 0;
       drawRows();
     });
     content.querySelector('#prodCatFilter').addEventListener('change', function (e) {
       state.productCatFilter = e.target.value;
+      state.productPage = 0;
       drawRows();
+    });
+
+    // Несохранённые правки живут в буфере, чтобы переживать смену страницы/поиск
+    var prodTbody = document.getElementById('prodTbody');
+    prodTbody.addEventListener('input', function (e) {
+      var el = e.target.closest('[data-cat-prod]');
+      if (!el) return;
+      var pid = el.getAttribute('data-cat-prod');
+      var field = el.getAttribute('data-cat-field');
+      if (!state.pendingProductChanges[pid]) state.pendingProductChanges[pid] = {};
+      state.pendingProductChanges[pid][field] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    var prodPager = document.getElementById('prodPager');
+    prodPager.addEventListener('click', function (e) {
+      if (e.target.closest('[data-page-prev]')) { state.productPage--; drawRows(); }
+      else if (e.target.closest('[data-page-next]')) { state.productPage++; drawRows(); }
     });
 
     // Создание категории: сохраняет в settings и обновляет фильтр; false при отмене/ошибке
@@ -1974,32 +2190,49 @@
     content.querySelector('#prodAddBtn').addEventListener('click', openCustomProductModal);
 
     content.querySelector('#prodSaveBtn').addEventListener('click', function () {
-      // 1. Собираем правки из полей таблицы
-      var edits = {};
+      // 1. Синхронизируем текущую страницу в буфер (на случай, если событие
+      //    input не сработало), убираем поля, возвращённые к исходному виду
       content.querySelectorAll('[data-cat-prod]').forEach(function (el) {
         var prodId = el.getAttribute('data-cat-prod');
         var field = el.getAttribute('data-cat-field');
+        var init = el.getAttribute('data-init') || '';
+        var val = el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
+        if (!state.pendingProductChanges[prodId]) state.pendingProductChanges[prodId] = {};
+        if (val !== init) {
+          state.pendingProductChanges[prodId][field] = el.type === 'checkbox' ? val === '1' : val;
+        } else {
+          delete state.pendingProductChanges[prodId][field];
+          if (!Object.keys(state.pendingProductChanges[prodId]).length) delete state.pendingProductChanges[prodId];
+        }
+      });
+      // 2. Собираем правки из буфера (переживает пагинацию)
+      var edits = {};
+      Object.keys(state.pendingProductChanges).forEach(function (prodId) {
         var prod = state.products.find(function (x) { return x.id === prodId; });
-        if (field === 'showDiscount') {
-          var curBool = prod && prod.showDiscount !== undefined ? !!prod.showDiscount : true;
-          if (el.checked !== curBool) {
-            if (!edits[prodId]) edits[prodId] = {};
-            edits[prodId].showDiscount = el.checked;
+        if (!prod) return;
+        var pend = state.pendingProductChanges[prodId];
+        Object.keys(pend).forEach(function (field) {
+          if (field === 'showDiscount') {
+            var curBool = prod.showDiscount !== false;
+            if (pend.showDiscount !== curBool) {
+              if (!edits[prodId]) edits[prodId] = {};
+              edits[prodId].showDiscount = pend.showDiscount;
+            }
+            return;
           }
-          return;
-        }
-        var val = el.value.trim();
-        var cur = prod ? prod[field] : null;
-        var curStr = cur == null ? '' : String(cur);
-        if (field === 'priority' && val === '' && curStr !== '') {
+          var val = String(pend[field]).trim();
+          var cur = prod[field];
+          var curStr = cur == null ? '' : String(cur);
+          if (field === 'priority' && val === '' && curStr !== '') {
+            if (!edits[prodId]) edits[prodId] = {};
+            edits[prodId][field] = '';
+            return;
+          }
+          // Пустое значение = снять правку (вернуть базовую цену/описание)
+          if (val === curStr) return;
           if (!edits[prodId]) edits[prodId] = {};
-          edits[prodId][field] = '';
-          return;
-        }
-        // Пустое значение = снять правку (вернуть базовую цену/описание)
-        if (val === curStr) return;
-        if (!edits[prodId]) edits[prodId] = {};
-        edits[prodId][field] = (field === 'price' || field === 'discount_price' || val === '') ? (val === '' ? '' : parseFloat(val)) : val;
+          edits[prodId][field] = (field === 'price' || field === 'discount_price' || val === '') ? (val === '' ? '' : parseFloat(val)) : val;
+        });
       });
       var btn = content.querySelector('#prodSaveBtn');
       btn.disabled = true;
@@ -2008,6 +2241,7 @@
         var ok = res && res.ok;
         if (ok) {
           Utils.showToast('✅ Изменения сохранены — применены на сайте');
+          state.pendingProductChanges = {};
         } else {
           Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сохранить. Проверьте соединение.'));
         }
@@ -2022,14 +2256,10 @@
     });
 
     content.querySelector('#prodResetBtn').addEventListener('click', function () {
-      if (!confirm('Сбросить все оверрайды товаров (цены, статусы, скидки, настройки СЦ) к базовым данным? Ручные карточки и скрытые товары останутся.')) return;
-      Auth.api('/api/admin/products', { method: 'POST', body: JSON.stringify({ action: 'reset' }) }).then(function (res) {
-        if (res && res.ok) {
-          Utils.showToast('🧹 Все правки товаров сброшены');
-        } else {
-          Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сбросить. Проверьте соединение.'));
-        }
-        loadData().then(function () { openSection(state.section); });
+      openResetModal({
+        title: 'Сбросить мои правки',
+        action: 'reset',
+        includeSc: true
       });
     });
 
@@ -2066,34 +2296,81 @@
     var storeSel = content.querySelector('#scSel');
     var searchInput = content.querySelector('#avSearch');
 
+    // Буфер несохранённых правок филиала (переживает пагинацию): { pid: {field: value, stock: 'N'} }
+    function pendSc() {
+      if (!state.pendingScChanges[state.availabilityScId]) state.pendingScChanges[state.availabilityScId] = {};
+      return state.pendingScChanges[state.availabilityScId];
+    }
+
     function drawRows(scId) {
       state.availabilityScId = scId;
+      state.availabilityPage = 0;
+      drawAvRows();
+    }
+
+    function drawAvRows() {
+      var scId = state.availabilityScId;
+      if (!scId) return;
       var scOverrides = state.scProductOverrides[scId] || {};
+      var pend = pendSc();
       var q = (searchInput.value || '').trim().toLowerCase();
-      var rows = state.products.filter(function (p) {
+      var list = state.products.filter(function (p) {
         return !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1;
-      }).map(function (p) {
+      });
+      var info = pageSlice(list, state.availabilityPage);
+      state.availabilityPage = info.page;
+      var rows = info.items.map(function (p) {
         var o = scOverrides[p.id] || {};
-        var isHidden = !!o.hidden;
-        var basePrice = o.price != null ? o.price : p.price;
-        var baseDisc = o.discount_price != null ? o.discount_price : p.discount_price;
-        var cnt = StoreStock.count(scId, p.id);
+        var pe = pend[p.id] || {};
+        function fv(field, base) { return pe[field] !== undefined ? pe[field] : (o[field] != null ? o[field] : (base != null ? base : '')); }
+        var isHidden = pe.hidden !== undefined ? pe.hidden : !!o.hidden;
+        var basePrice = fv('price', p.price);
+        var baseDisc = fv('discount_price', p.discount_price);
+        var stVal = fv('status', p.status);
+        var cnt = pe.stock !== undefined ? pe.stock : StoreStock.count(scId, p.id);
         return '<tr' + (isHidden ? ' class="row-hidden"' : '') + '>' +
           '<td><strong>' + h(p.name) + '</strong>' + (isHidden ? ' <span class="badge st-out">скрыт</span>' : '') + '<br><span class="muted-sku">' + h(p.sku) + '</span></td>' +
-          '<td><input class="cat-input" type="number" min="0" data-sc-prod="' + h(p.id) + '" data-sc-field="price" value="' + h(basePrice != null ? basePrice : '') + '"></td>' +
-          '<td><input class="cat-input" type="number" min="0" data-sc-prod="' + h(p.id) + '" data-sc-field="discount_price" value="' + h(baseDisc != null ? baseDisc : '') + '" placeholder="—"></td>' +
-          '<td><select class="cat-input" data-sc-prod="' + h(p.id) + '" data-sc-field="status">' +
+          '<td><input class="cat-input" type="number" min="0" data-sc-prod="' + h(p.id) + '" data-sc-field="price" data-init="' + h(basePrice) + '" value="' + h(basePrice) + '"></td>' +
+          '<td><input class="cat-input" type="number" min="0" data-sc-prod="' + h(p.id) + '" data-sc-field="discount_price" data-init="' + h(baseDisc) + '" value="' + h(baseDisc) + '" placeholder="—"></td>' +
+          '<td><select class="cat-input" data-sc-prod="' + h(p.id) + '" data-sc-field="status" data-init="' + h(stVal) + '">' +
           STATUS_OPTIONS.map(function (o2) {
-            return '<option value="' + o2[0] + '"' + ((o.status || p.status) === o2[0] ? ' selected' : '') + '>' + o2[1] + '</option>';
+            return '<option value="' + o2[0] + '"' + (stVal === o2[0] ? ' selected' : '') + '>' + o2[1] + '</option>';
           }).join('') +
           '</select></td>' +
-          '<td><input class="cat-input" type="number" min="0" data-stock-prod="' + h(p.id) + '" value="' + h(cnt === null ? '' : cnt) + '" placeholder="—"></td>' +
-          '<td style="text-align:center;"><input type="checkbox" data-sc-prod="' + h(p.id) + '" data-sc-field="hidden" ' + (isHidden ? 'checked' : '') + ' title="Скрыть товар в этом филиале"></td>' +
+          '<td><div class="stock-cell"><input class="cat-input" type="number" min="0" data-stock-prod="' + h(p.id) + '" data-init="' + h(cnt === null ? '' : cnt) + '" value="' + h(cnt === null ? '' : cnt) + '" placeholder="—">' + deltaBadgeHtml(scId, p.id) + '</div></td>' +
+          '<td style="text-align:center;"><input type="checkbox" data-sc-prod="' + h(p.id) + '" data-sc-field="hidden" data-init="' + (isHidden ? '1' : '0') + '" ' + (isHidden ? 'checked' : '') + ' title="Скрыть товар в этом филиале"></td>' +
           '</tr>';
       }).join('');
+      var pager = info.pages > 1 ? '<div class="admin-pager">' + pagerHtml(info) + '</div>' : '';
       wrap.innerHTML = '<table class="admin-table"><thead><tr>' +
         '<th style="min-width:200px;">Товар</th><th>Цена ₸</th><th>Скидка ₸</th><th>Наличие</th><th style="min-width:120px;">Остаток</th><th>Скрыть</th>' +
-        '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--muted);">Ничего не найдено.</td></tr>') + '</tbody></table>';
+        '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--muted);">Ничего не найдено.</td></tr>') + '</tbody></table>' + pager;
+    }
+
+    // Текущая страница → буфер: изменённые значения запоминаются,
+    // возвращённые к исходному виду (data-init) — убираются из буфера
+    function syncAvBuffer() {
+      var pend = pendSc();
+      wrap.querySelectorAll('[data-sc-prod]').forEach(function (el) {
+        var pid = el.getAttribute('data-sc-prod');
+        var field = el.getAttribute('data-sc-field');
+        var init = el.getAttribute('data-init') || '';
+        var val = el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
+        if (!pend[pid]) pend[pid] = {};
+        if (val !== init) pend[pid][field] = el.type === 'checkbox' ? val === '1' : val;
+        else delete pend[pid][field];
+      });
+      wrap.querySelectorAll('[data-stock-prod]').forEach(function (el) {
+        var pid = el.getAttribute('data-stock-prod');
+        var init = el.getAttribute('data-init') || '';
+        var val = el.value;
+        if (!pend[pid]) pend[pid] = {};
+        if (val !== init) pend[pid].stock = val;
+        else delete pend[pid].stock;
+      });
+      Object.keys(pend).forEach(function (pid) {
+        if (!Object.keys(pend[pid]).length) delete pend[pid];
+      });
     }
 
     storeSel.addEventListener('change', function (e) {
@@ -2105,31 +2382,60 @@
       drawRows(e.target.value);
     });
     searchInput.addEventListener('input', function () {
-      if (state.availabilityScId) drawRows(state.availabilityScId);
+      if (!state.availabilityScId) return;
+      state.availabilityPage = 0;
+      drawAvRows();
+    });
+    wrap.addEventListener('click', function (e) {
+      if (e.target.closest('[data-page-prev]')) { state.availabilityPage--; drawAvRows(); }
+      else if (e.target.closest('[data-page-next]')) { state.availabilityPage++; drawAvRows(); }
+    });
+    wrap.addEventListener('input', function (e) {
+      var el = e.target.closest('[data-sc-prod],[data-stock-prod]');
+      if (!el) return;
+      var pend = pendSc();
+      var pid = el.hasAttribute('data-sc-prod') ? el.getAttribute('data-sc-prod') : el.getAttribute('data-stock-prod');
+      if (!pend[pid]) pend[pid] = {};
+      if (el.hasAttribute('data-sc-prod')) {
+        var field = el.getAttribute('data-sc-field');
+        pend[pid][field] = el.type === 'checkbox' ? el.checked : el.value;
+      } else {
+        pend[pid].stock = el.value;
+      }
     });
 
+    // Сохранение настроек филиала: буфер → сравнение с текущими значениями
     content.querySelector('#avSaveBtn').addEventListener('click', function () {
       if (!state.availabilityScId) {
         Utils.showToast('⚠️ Сначала выберите Сервис-Центр');
         return;
       }
       var scId = state.availabilityScId;
+      syncAvBuffer();
+      var pend = pendSc();
       var edits = {};
-      content.querySelectorAll('[data-sc-prod]').forEach(function (el) {
-        var pid = el.getAttribute('data-sc-prod');
-        var field = el.getAttribute('data-sc-field');
-        if (field === 'hidden') {
+      Object.keys(pend).forEach(function (pid) {
+        var prod = state.products.find(function (x) { return x.id === pid; });
+        if (!prod) return;
+        var o = (state.scProductOverrides[scId] || {})[pid] || {};
+        var pe = pend[pid];
+        Object.keys(pe).forEach(function (field) {
+          if (field === 'stock') return; // остатки сохраняются отдельной кнопкой
+          if (field === 'hidden') {
+            if (pe.hidden !== !!o.hidden) {
+              if (!edits[pid]) edits[pid] = {};
+              edits[pid].hidden = pe.hidden;
+            }
+            return;
+          }
+          var val = String(pe[field]).trim();
+          var cur = o[field] != null ? o[field] : (prod[field] != null ? prod[field] : null);
+          var curStr = cur == null ? '' : String(cur);
+          // Пустое значение = снять правку филиала (вернуть базовую цену/статус)
+          if (val === curStr) return;
           if (!edits[pid]) edits[pid] = {};
-          edits[pid].hidden = el.checked;
-          return;
-        }
-        var val = el.value.trim();
-        var cur = (state.scProductOverrides[scId] || {})[pid] ? state.scProductOverrides[scId][pid][field] : null;
-        var curStr = cur == null ? '' : String(cur);
-        // Пустое значение = снять правку филиала (вернуть базовую цену/статус)
-        if (val === curStr) return;
-        if (!edits[pid]) edits[pid] = {};
-        edits[pid][field] = (field === 'price' || field === 'discount_price' || val === '') ? (val === '' ? '' : parseFloat(val)) : val;
+          edits[pid][field] = (field === 'price' || field === 'discount_price' || val === '') ? (val === '' ? '' : parseFloat(val)) : val;
+        });
       });
       var items = Object.keys(edits).map(function (pid) {
         return Object.assign({ productId: pid }, edits[pid]);
@@ -2140,12 +2446,17 @@
       Auth.api('/api/admin/products', { method: 'POST', body: JSON.stringify({ action: 'saveSc', storeId: scId, items: items }) }).then(function (data) {
         if (data && data.ok) {
           Utils.showToast('✅ Настройки филиала сохранены');
+          delete state.pendingScChanges[scId];
         } else {
           Utils.showToast('⚠️ ' + ((data && data.error) || 'Не удалось сохранить. Проверьте соединение.'));
         }
         btn.disabled = false;
         btn.textContent = '💾 Сохранить настройки филиала';
-        loadData();
+        loadData().then(function () { openSection(state.section); });
+      }).catch(function () {
+        btn.disabled = false;
+        btn.textContent = '💾 Сохранить настройки филиала';
+        Utils.showToast('⚠️ Сеть недоступна — попробуйте ещё раз');
       });
     });
 
@@ -2154,15 +2465,11 @@
         Utils.showToast('⚠️ Сначала выберите Сервис-Центр');
         return;
       }
-      var scId = state.availabilityScId;
-      if (!confirm('Сбросить все настройки товаров для этого филиала (цены, наличие, скрытие)?')) return;
-      Auth.api('/api/admin/products', { method: 'POST', body: JSON.stringify({ action: 'resetSc', storeId: scId }) }).then(function (data) {
-        if (data && data.ok) {
-          Utils.showToast('🧹 Настройки филиала сброшены');
-          loadData().then(function () { openSection(state.section); });
-        } else {
-          Utils.showToast('⚠️ ' + ((data && data.error) || 'Не удалось сбросить. Проверьте соединение.'));
-        }
+      openResetModal({
+        title: 'Сбросить настройки филиала',
+        action: 'resetSc',
+        sc: true,
+        extra: { storeId: state.availabilityScId }
       });
     });
 
@@ -2174,13 +2481,17 @@
           return;
         }
         var scId = state.availabilityScId;
+        syncAvBuffer();
+        var pend = pendSc();
         var items = {};
-        wrap.querySelectorAll('[data-stock-prod]').forEach(function (inp) {
-          var v = inp.value.trim();
-          if (v === '') return;
+        Object.keys(pend).forEach(function (pid) {
+          var v = pend[pid].stock;
+          if (v === undefined) return;
+          v = String(v).trim();
           var n = Number(v);
-          if (isNaN(n) || n < 0) return;
-          items[inp.getAttribute('data-stock-prod')] = n > 0 ? 'В наличии (' + n + ' шт)' : 'нет в наличии';
+          if (v !== '' && (isNaN(n) || n < 0)) return;
+          // Пустое значение = снять поправку (дельту/абсолютную правку)
+          items[pid] = v === '' ? '' : (n > 0 ? 'В наличии (' + n + ' шт)' : 'нет в наличии');
         });
         avStockSaveBtn.disabled = true;
         avStockSaveBtn.textContent = '⏳ Сохраняем…';
@@ -2189,6 +2500,7 @@
           avStockSaveBtn.textContent = '📦 Сохранить остатки (Worker)';
           if (res && res.ok) {
             Utils.showToast('✅ Остатки филиала сохранены — сайт обновлён');
+            delete state.pendingScChanges[scId];
             return StoreStock.reload();
           }
           Utils.showToast('⚠️ ' + ((res && res.error) || 'Не удалось сохранить. Проверьте соединение.'));
@@ -2205,14 +2517,16 @@
         return;
       }
       var scId = state.availabilityScId;
+      syncAvBuffer();
+      var pend = pendSc();
       var stock = {};
-      wrap.querySelectorAll('[data-stock-prod]').forEach(function (inp) {
-        var val = inp.value.trim();
-        if (val === '') return;
-        var n = Number(val);
+      state.products.forEach(function (p) {
+        var v = (pend[p.id] || {}).stock !== undefined ? String(pend[p.id].stock) : (StoreStock.count(scId, p.id) === null ? '' : String(StoreStock.count(scId, p.id)));
+        if (v === '') return;
+        var n = Number(v);
         if (isNaN(n)) return;
         if (!stock[scId]) stock[scId] = {};
-        stock[scId][inp.getAttribute('data-stock-prod')] = n > 0 ? 'В наличии (' + n + ' шт)' : 'нет в наличии';
+        stock[scId][p.id] = n > 0 ? 'В наличии (' + n + ' шт)' : 'нет в наличии';
       });
       var payload = JSON.stringify({ updated: new Date().toISOString(), stock: stock }, null, 1);
       var blob = new Blob([payload], { type: 'application/json' });
@@ -2241,13 +2555,14 @@
           if (typeof stock !== 'object' || Array.isArray(stock)) throw new Error('bad format');
           var scId = state.availabilityScId;
           if (scId && stock[scId]) {
-            wrap.querySelectorAll('[data-stock-prod]').forEach(function (inp) {
-              var pid = inp.getAttribute('data-stock-prod');
-              if (stock[scId][pid] !== undefined) {
-                var m = /(\d+)\s*шт/.exec(String(stock[scId][pid]));
-                inp.value = m ? m[1] : (String(stock[scId][pid]).indexOf('Нет') === 0 ? '0' : '');
-              }
+            if (!state.pendingScChanges[scId]) state.pendingScChanges[scId] = {};
+            Object.keys(stock[scId]).forEach(function (pid) {
+              var m = /(\d+)\s*шт/.exec(String(stock[scId][pid]));
+              var val = m ? m[1] : (String(stock[scId][pid]).toLowerCase().indexOf('нет') === 0 ? '0' : '');
+              if (!state.pendingScChanges[scId][pid]) state.pendingScChanges[scId][pid] = {};
+              state.pendingScChanges[scId][pid].stock = val;
             });
+            drawAvRows();
           }
           Utils.showToast('⬆️ Файл загружен в таблицу — проверьте и нажмите «Сохранить остатки»');
         } catch (err) {

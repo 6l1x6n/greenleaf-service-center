@@ -566,11 +566,32 @@ DOWNLOAD_TIMEOUT = 25
 
 
 def image_variant_urls(url, config):
-    base = config.get("portal_url", "")
+    """Варианты одного файла портала: оригинал, -big, -shop, -small.
+
+    Портал хранит оригинал (часто 800×800), веб-версию «-shop» (600×600),
+    «-big» и миниатюру «-small» (60×60). Скачивание (download_best_image)
+    выбирает вариант с наибольшим разрешением — порядок не важен.
+    """
+    base = config.get("portal_url", "").rstrip("/")
     if url.startswith("/"):
         url = base + url
-    big_url = url.replace("-small.", "-big.")
-    return [big_url, url]
+    stem, _, ext = url.rpartition(".")
+    orig_ext = ext.lower() if ext.lower() in ("png", "jpg", "jpeg") else ""
+    core = stem
+    for suf in ("-small", "-big", "-shop"):
+        if core.lower().endswith(suf):
+            core = core[: -len(suf)]
+            break
+    out = []
+    for suf in ("", "-big", "-shop", "-small"):
+        if orig_ext:
+            out.append(core + suf + "." + orig_ext)
+        else:
+            out.append(core + suf + "." + ext)
+    # Оригинальный URL всегда в списке (нестандартные расширения/параметры)
+    if url not in out:
+        out.insert(0, url)
+    return out
 
 
 def image_local_path(code, url):
@@ -580,6 +601,73 @@ def image_local_path(code, url):
     # заменяем на подчёркивание (для остальных кодов имя не меняется)
     safe = code.replace("/", "_")
     return os.path.join(IMAGES_DIR, safe + ext)
+
+
+def image_dims(path):
+    """Размеры (w, h) через Pillow с поднятыми лимитами; None — файл битый."""
+    try:
+        from PIL import Image, ImageFile
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        ImageFile.MAX_TEXT_CHUNK = 64 * 1024 * 1024  # PNG с тяжёлыми метаданными
+        try:
+            Image.MAX_IMAGE_PIXELS = None
+        except Exception:
+            pass
+        with Image.open(path) as img:
+            img.load()
+            return img.size
+    except Exception:
+        return None
+
+
+def download_best_image(path, urls, session=None, force=False):
+    """Качает кандидатов urls и оставляет файл с наибольшим разрешением.
+
+    Ранняя остановка: кандидат с большей стороной ≥ MAX_IMAGE_EDGE — лучший
+    (сжатие всё равно ограничит 800px), дальше не качаем. Существующий
+    валидный файл не трогается (кроме force — перекачать принудительно).
+    """
+    if not force and os.path.exists(path) and image_dims(path) is not None:
+        return True
+    os.makedirs(IMAGES_DIR, exist_ok=True)
+    tmps = []
+    try:
+        for i, url in enumerate(urls):
+            tmp = path + ".tmp." + str(i)
+            try:
+                if session is not None:
+                    resp = session.get(url)
+                    if not resp.ok:
+                        continue
+                    data = resp.body()
+                else:
+                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp:
+                        data = resp.read()
+                if len(data) < 200:
+                    continue
+                with open(tmp, "wb") as f:
+                    f.write(data)
+            except Exception:
+                continue
+            dims = image_dims(tmp)
+            if dims is None:
+                continue
+            tmps.append((tmp, dims))
+            if max(dims) >= MAX_IMAGE_EDGE:
+                break
+        if not tmps:
+            return False
+        tmps.sort(key=lambda t: max(t[1]), reverse=True)
+        os.replace(tmps[0][0], path)
+        return True
+    finally:
+        for tmp, _ in tmps:
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except Exception:
+                    pass
 
 
 def fetch_image(path, urls, session=None):
@@ -631,7 +719,7 @@ def download_images(items, config, session=None):
     done = 0
     # Последовательно: sync-API Playwright нельзя вызывать из потоков
     for path, urls in tasks:
-        if fetch_image(path, urls, session):
+        if download_best_image(path, urls, session):
             done += 1
         if done > 0 and (done % 50) == 0:
             print(f"Изображения: {done}/{len(tasks)}...")
@@ -656,23 +744,36 @@ MAX_IMAGE_EDGE = 800
 def compress_image_if_needed(path):
     """Сжимает фото больше 400КБ до 800px по большей стороне (Pillow).
 
-    RGBA/палитровые сохраняются как PNG; остальные — как JPEG (файл
-    переименовывается в .jpg, чтобы расширение совпадало с содержимым).
-    Возвращает итоговый путь (может отличаться от входного).
+    PNG с реальной прозрачностью остаются PNG; непрозрачные фото (в т.ч.
+    RGBA/палитровые с тяжёлыми метаданными) перекодируются в JPEG q82 — файл
+    переименовывается в .jpg, чтобы расширение совпадало с содержимым.
+    Метаданные вычищаются. Возвращает итоговый путь (может отличаться от входного).
     """
     try:
-        from PIL import Image
+        from PIL import Image, ImageFile
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        ImageFile.MAX_TEXT_CHUNK = 64 * 1024 * 1024  # PNG с гигантскими текстовыми чанками
+        try:
+            Image.MAX_IMAGE_PIXELS = None
+        except Exception:
+            pass
         if os.path.getsize(path) <= MAX_IMAGE_BYTES:
             return path
         img = Image.open(path)
         img.load()
+        img.info.clear()
         w, h = img.size
         scale = min(1.0, MAX_IMAGE_EDGE / max(w, h))
         if scale < 1.0:
             img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
-        if img.mode in ("RGBA", "P", "LA"):
-            img.convert("RGBA").save(path, "PNG", optimize=True)
-            return path
+        if img.mode in ("RGBA", "LA", "P"):
+            rgba = img.convert("RGBA")
+            if rgba.getchannel("A").getextrema()[0] >= 255:
+                # Альфа полностью непрозрачная — фото можно отдать как JPEG
+                img = rgba.convert("RGB")
+            else:
+                rgba.save(path, "PNG", optimize=True)
+                return path
         new_path = os.path.splitext(path)[0] + ".jpg"
         img.convert("RGB").save(new_path, "JPEG", quality=82, optimize=True, progressive=True)
         if new_path != path and os.path.exists(path):
@@ -698,31 +799,45 @@ def clean_local_photo_variants(sku):
                 pass
 
 
-def download_product_photo(sku, photo_url, config, session=None):
-    """Скачивает фото товара с портала: веб-версию «-shop.», затем оригинал.
+def download_product_photo(sku, photo_url, config, session=None, force=False):
+    """Скачивает фото товара с портала: оригинал + веб-варианты «-shop»/«-big».
 
-    Большие файлы сжимаются (Pillow). Возвращает относительный путь или None.
+    Берётся вариант с наибольшим разрешением (оригинал портала часто 800×800,
+    тогда как -shop 600×600, а -small 60×60), затем файл сжимается (Pillow).
+    Возвращает относительный путь или None. force=True перекачивает даже
+    существующий файл (для апгрейда «мыльных» фото).
     """
     url = str(photo_url or "").strip()
     if not url:
         return None
     if url.startswith("/"):
-        url = config.get("portal_url", "") + url
+        url = config.get("portal_url", "").rstrip("/") + url
     stem, _, ext = url.rpartition(".")
     orig_ext = ext.lower() if ext.lower() in ("png", "jpg", "jpeg") else ""
-    # Сначала веб-версии «-shop.» (включая то же расширение, что у оригинала),
-    # затем оригинал — так берём самый лёгкий подходящий файл
+    core = stem
+    for suf in ("-small", "-big", "-shop"):
+        if core.lower().endswith(suf):
+            core = core[: -len(suf)]
+            break
     attempts = []
-    for e in ("png", "jpg", "jpeg"):
-        if e != orig_ext:
-            attempts.append(stem + "-shop." + e)
-    attempts.insert(0, stem + "-shop." + orig_ext) if orig_ext else None
-    attempts.append(url)
-    for attempt in attempts:
-        path = image_local_path(sku, attempt)
-        if fetch_image(path, [attempt], session):
-            final = compress_image_if_needed(path)
-            return os.path.relpath(final, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
+    if orig_ext:
+        # Оригинал — обычно максимальное разрешение; затем другие расширения
+        # оригинала, затем веб-варианты -shop/-big
+        attempts.append(core + "." + orig_ext)
+        for e in ("png", "jpg", "jpeg"):
+            if e != orig_ext:
+                attempts.append(core + "." + e)
+        attempts.append(core + "-shop." + orig_ext)
+        attempts.append(core + "-big." + orig_ext)
+    else:
+        for e in ("png", "jpg", "jpeg"):
+            attempts.append(core + "." + e)
+    if url not in attempts:
+        attempts.append(url)
+    path = image_local_path(sku, attempts[0])
+    if download_best_image(path, attempts, session, force=force):
+        final = compress_image_if_needed(path)
+        return os.path.relpath(final, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
     return None
 
 
@@ -766,6 +881,73 @@ def fill_local_photos(base_products, config, session=None, limit=None):
         print(f"Фото каталога: скачано {done}, не удалось {failed}, осталось {len(todo) - done - failed}")
     else:
         print("Фото каталога: все карточки уже с локальными фото")
+    return base_products
+
+
+MIN_PHOTO_EDGE = 400  # меньше по большей стороне — считаем фото «мыльным»
+
+
+def upgrade_low_res_photos(base_products, goods, config, session=None, limit=None):
+    """Перекачивает локальные фото с низким разрешением (или битые).
+
+    Файлы меньше MIN_PHOTO_EDGE по большей стороне перекачиваются заново из
+    API портала (поле photo — оригинал, часто 800×800; download_best_image
+    выбирает вариант с наибольшим разрешением). Идемпотентно: хорошие файлы
+    не трогаются, неудачные помечаются photo_404 и больше не запрашиваются.
+    Лимит на прогон — чтобы не превысить таймаут workflow.
+    """
+    if limit is None:
+        limit = config.get("photo_upgrade_limit", 400)
+    photo_by_code = {}
+    for g in goods or []:
+        code = (g.get("code") or "").strip()
+        photo = (g.get("photo") or "").strip()
+        if code and photo:
+            photo_by_code.setdefault(code, photo)
+    todo = []
+    for p in base_products:
+        img = (p.get("image") or "").strip()
+        if not img.startswith("assets/") or p.get("photo_404"):
+            continue
+        abs_path = os.path.join(ROOT_DIR, "public", img.replace("/", os.sep))
+        if not os.path.exists(abs_path):
+            continue
+        dims = image_dims(abs_path)
+        if dims is not None and max(dims) >= MIN_PHOTO_EDGE:
+            continue
+        if p.get("sku") in photo_by_code:
+            todo.append(p)
+    if not todo:
+        print("Фото каталога (апгрейд): все локальные фото хорошего качества")
+        return base_products
+    done = 0
+    failed = 0
+    for p in todo:
+        if done >= limit:
+            break
+        sku = p["sku"]
+        try:
+            rel = download_product_photo(sku, photo_by_code[sku], config, session, force=True)
+        except Exception:
+            rel = None
+        if rel:
+            p["image"] = rel
+            # Убираем устаревшие локальные варианты с другим расширением
+            want = os.path.join(ROOT_DIR, "public", rel.replace("/", os.sep))
+            for ext in (".png", ".jpg", ".jpeg"):
+                cur = os.path.join(IMAGES_DIR, sku + ext)
+                if cur != want and os.path.exists(cur):
+                    try:
+                        os.remove(cur)
+                    except Exception:
+                        pass
+            done += 1
+        else:
+            p["photo_404"] = True
+            failed += 1
+        if (done + failed) % 25 == 0:
+            print(f"Фото каталога (апгрейд): {done} перекачано, {failed} не удалось...")
+    print(f"Фото каталога (апгрейд): перекачано {done}, не удалось {failed}, осталось {max(0, len(todo) - done - failed)}")
     return base_products
 
 
@@ -1621,6 +1803,7 @@ def main():
             print(f"База товаров: {len(base_products)} карточек, режим: {'полный' if full else 'умный'}, СЦ: {[s['id'] for s in stores]}")
             # Полный каталог портала: карточки для всех артикулов создаются
             # один раз и дальше только досоздаются (лёгкий API-проход)
+            goods_all = []
             try:
                 goods_all = fetch_all_goods(config)
                 base_products = ensure_full_catalog(base_products, goods_all, config)
@@ -1648,6 +1831,12 @@ def main():
                 base_products = fill_local_photos(base_products, config, session=page.request)
             except Exception as e:
                 print(f"Фото каталога: не удалось ({e}) — продолжаем")
+            # Апгрейд «мыльных» фото (300×300 из старых прогонов): перекачиваем
+            # оригиналы (до 800×800) по данным API портала, лимит на прогон
+            try:
+                base_products = upgrade_low_res_photos(base_products, goods_all, config, session=page.request)
+            except Exception as e:
+                print(f"Фото каталога (апгрейд): не удалось ({e}) — продолжаем")
             write_products(base_products, active_ids)
             write_store_stock(base_products, config, active_ids)
             browser.close()

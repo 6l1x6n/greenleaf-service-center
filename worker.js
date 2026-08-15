@@ -145,7 +145,7 @@ const RESERVE_TTL_MS = 300 * 1000; // 5 минут
 function parseStockCount(text) {
   const t = String(text || '').trim();
   if (!t || t.indexOf('Ожидается') !== -1) return null;
-  if (t.indexOf('Нет') === 0) return 0;
+  if (t.toLowerCase().indexOf('нет') === 0) return 0;
   const m = t.match(/(\d+)\s*шт/);
   return m ? parseInt(m[1], 10) : null;
 }
@@ -155,7 +155,31 @@ async function loadBaseStock(env, url) {
   if (!res.ok) return { stock: {}, updated: '' };
   const d = await res.json();
   const stock = (d && d.stock) || {};
-  // Ручные правки остатков суперадмина (KV) — приоритетнее статичного файла
+  // Постоянные поправки остатков (KV): значение на сайте = факт парсера + дельта.
+  // Дельта хранится отдельно от факта, поэтому каждый синк парсера автоматически
+  // сдвигает итоговое число на ту же разницу.
+  try {
+    const deltas = await kvGet(env, 'stock_deltas');
+    if (deltas) {
+      Object.keys(deltas).forEach((scId) => {
+        if (!deltas[scId] || typeof deltas[scId] !== 'object') return;
+        if (!stock[scId]) return;
+        Object.keys(deltas[scId]).forEach((pid) => {
+          const delta = Number(deltas[scId][pid]);
+          if (!isFinite(delta) || delta === 0) return;
+          const baseCount = parseStockCount(stock[scId][pid]);
+          if (baseCount === null) return; // нет факта парсера — дельта не применяется
+          const left = Math.max(0, baseCount + delta);
+          stock[scId][pid] = left > 0
+            ? 'В наличии (' + left + ' шт)'
+            : 'Нет в наличии';
+        });
+      });
+    }
+  } catch (e) { console.error('stock_deltas merge:', e); }
+  // Ручные абсолютные правки остатков (KV) — приоритетнее статичного файла.
+  // Остаются для товаров без данных парсера (для остальных после пересохранения
+  // запись переносится в stock_deltas и отсюда удаляется).
   try {
     const edits = await kvGet(env, 'stock_edits');
     if (edits) {
@@ -171,27 +195,66 @@ async function loadBaseStock(env, url) {
   return { stock, updated: (d && d.updated) || '' };
 }
 
-// Суперадмин: сохранение ручных остатков (KV) — сайт обновляется сразу
-async function handleStockSave(request, env) {
-  let body;
+// «Сырая» база остатков парсера из статичного файла (без дельт и правок KV):
+// нужна, чтобы считать дельту от факта, а не от уже скорректированного числа
+async function loadRawBaseStock(env, url) {
   try {
-    body = await request.json();
+    const res = await env.ASSETS.fetch(new URL('/data/store-stock.json', url));
+    if (!res.ok) return {};
+    const d = await res.json();
+    return (d && d.stock) || {};
   } catch (e) {
+    return {};
+  }
+}
+
+// Суперадмин/СЦ: сохранение ручных остатков (KV) — сайт обновляется сразу.
+// Если у товара есть факт парсера — сохраняется постоянная дельта (N − факт),
+// иначе — абсолютное значение (как раньше, в stock_edits).
+async function handleStockSave(env, url, body) {
+  if (!body || typeof body !== 'object') {
     return jsonResponse({ ok: false, error: 'invalid json' }, 400);
   }
   const scId = String(body.scId || '').trim();
   const items = body.items && typeof body.items === 'object' ? body.items : null;
   if (!scId || !items) return jsonResponse({ ok: false, error: 'scId и items обязательны' }, 400);
+  const rawStock = await loadRawBaseStock(env, url);
+  const rawSc = (rawStock && rawStock[scId]) || {};
+  const deltas = await kvGet(env, 'stock_deltas');
   const edits = await kvGet(env, 'stock_edits');
-  if (!edits[scId]) edits[scId] = {};
   Object.keys(items).forEach((pid) => {
     const v = String(items[pid] == null ? '' : items[pid]).trim();
+    const target = parseStockCount(v); // null = очистить поправку
+    const rawCount = parseStockCount(rawSc[pid]);
+    // Товар с фактом парсера → постоянная дельта к факту
+    if (rawCount !== null && (target !== null || rawSc[pid] !== undefined)) {
+      const next = target === null ? 0 : (target - rawCount);
+      const set = (obj) => {
+        if (!obj[scId]) obj[scId] = {};
+        if (next === 0) {
+          delete obj[scId][pid];
+          if (!Object.keys(obj[scId]).length) delete obj[scId];
+        } else {
+          obj[scId][pid] = next;
+        }
+      };
+      set(deltas);
+      // Старая абсолютная правка больше не нужна — переводим на дельту
+      if (edits[scId]) {
+        delete edits[scId][pid];
+        if (!Object.keys(edits[scId]).length) delete edits[scId];
+      }
+      return;
+    }
+    // Без факта парсера — абсолютное значение (прежнее поведение)
+    if (!edits[scId]) edits[scId] = {};
     if (v === '') delete edits[scId][pid];
     else edits[scId][pid] = v;
   });
-  if (!Object.keys(edits[scId]).length) delete edits[scId];
+  if (!Object.keys(edits[scId] || {}).length) delete edits[scId];
+  await kvPut(env, 'stock_deltas', deltas);
   await kvPut(env, 'stock_edits', edits);
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true, deltas: (deltas && deltas[scId]) || {} });
 }
 
 // Активные 2-минутные брони корзины.
@@ -279,7 +342,11 @@ async function computeEffectiveStock(env, url, excludeOrderId) {
 
 async function handleStock(env, url) {
   const eff = await computeEffectiveStock(env, url);
-  return jsonResponse({ ok: true, stock: eff.stock, updated: eff.updated, deducted: true }, 200, 60);
+  let deltas = {};
+  try {
+    deltas = (await kvGet(env, 'stock_deltas')) || {};
+  } catch (e) { /* дельт нет — отдаём пустые */ }
+  return jsonResponse({ ok: true, stock: eff.stock, updated: eff.updated, deducted: true, deltas: deltas }, 200, 60);
 }
 
 // День недели → ключ расписания (sun..sat), время "HH:MM" → минуты с полуночи
@@ -1513,18 +1580,53 @@ async function handleAdminProducts(request, env) {
   }
 
   if (action === 'reset') {
-    // Вернуть исходные (парсинговые) данные: убрать все оверрайды
-    await kvPut(env, 'product_overrides', {});
-    await kvPut(env, 'sc_product_overrides', {});
+    // Вернуть исходные (парсинговые) данные. Без fields — полный сброс
+    // всех оверрайдов (как раньше). С fields — удаляются только указанные
+    // поля (остальные правки сохраняются). includeSc — затронуть и настройки
+    // Сервис-Центров (теми же полями или целиком).
+    const fields = Array.isArray(body.fields) && body.fields.length ? body.fields : null;
+    const includeSc = body.includeSc === true;
+    const filtered = (map) => {
+      if (!fields) return {};
+      if (!map || typeof map !== 'object') return {};
+      const out = {};
+      Object.keys(map).forEach((pid) => {
+        const o = map[pid];
+        if (!o || typeof o !== 'object') return;
+        const keep = {};
+        Object.keys(o).forEach((k) => {
+          if (fields.indexOf(k) === -1) keep[k] = o[k];
+        });
+        if (Object.keys(keep).length) out[pid] = keep;
+      });
+      return out;
+    };
+    await kvPut(env, 'product_overrides', filtered(await kvGet(env, 'product_overrides')));
+    if (includeSc) {
+      await kvPut(env, 'sc_product_overrides', filtered(await kvGet(env, 'sc_product_overrides')));
+    }
     return jsonResponse({ ok: true });
   }
 
   if (action === 'resetSc') {
-    // Сброс настроек товаров конкретного Сервис-Центра
+    // Сброс настроек товаров конкретного Сервис-Центра (опционально — только
+    // выбранные поля, иначе вся карта филиала)
     const storeId = String(body.storeId || '').trim();
     if (!storeId) return jsonResponse({ ok: false, error: 'storeId required' }, 400);
+    const fields = Array.isArray(body.fields) && body.fields.length ? body.fields : null;
     const map = await kvGet(env, 'sc_product_overrides');
-    delete map[storeId];
+    if (!fields) {
+      delete map[storeId];
+    } else if (map[storeId]) {
+      const storeMap = map[storeId];
+      Object.keys(storeMap).forEach((pid) => {
+        const o = storeMap[pid];
+        if (!o || typeof o !== 'object') return;
+        fields.forEach((f) => { delete o[f]; });
+        if (!Object.keys(o).length) delete storeMap[pid];
+      });
+      if (!Object.keys(storeMap).length) delete map[storeId];
+    }
     await kvPut(env, 'sc_product_overrides', map);
     return jsonResponse({ ok: true });
   }
@@ -1946,13 +2048,25 @@ export default {
       return handleStock(env, url);
     }
 
-    // 1.4.1а Сохранение ручных остатков (суперадмин, по токену)
+    // 1.4.1а Сохранение ручных остатков (суперадмин и СЦ по токену; СЦ — только свой филиал)
     if (path === '/api/stock' && request.method === 'POST') {
       const auth = await verifyToken(env, request.headers.get('Authorization'));
-      if (!auth || auth.role !== 'superadmin') {
+      if (!auth || (auth.role !== 'superadmin' && auth.role !== 'sc')) {
         return jsonResponse({ ok: false, error: 'forbidden' }, 403);
       }
-      return handleStockSave(request, env);
+      let body;
+      try {
+        body = await request.json();
+      } catch (e) {
+        return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+      }
+      if (auth.role === 'sc') {
+        const ownId = await scOwnStoreId(env, auth);
+        if (!ownId || String((body && body.scId) || '') !== String(ownId)) {
+          return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+        }
+      }
+      return handleStockSave(env, url, body);
     }
 
     // 1.4.1б Мероприятия: единый список (events.json + правки из KV)

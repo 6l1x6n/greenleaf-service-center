@@ -13,10 +13,11 @@
   var products = [];
   var stores = [];
   var categories = [];
-  var state = { category: 'all', query: '', stockOnly: true, selectedStoreId: 'all', cityFilter: 'all', storeQuery: '', showAllCatalog: false };
+  var state = { category: 'all', query: '', stockOnly: true, selectedStoreId: 'all', cityFilter: 'all', storeQuery: '', showAllCatalog: false, visibleCount: CATALOG_PAGE_STEP };
 
   var isCatalogPage = document.body && document.body.dataset.catalogPage === '1';
   var MAIN_PAGE_LIMIT = 10;
+  var CATALOG_PAGE_STEP = 48;
   var FILTERS_KEY = 'greenleaf_catalog_filters_v1';
 
   var grid = document.getElementById('grid');
@@ -473,10 +474,22 @@
       var hb = priorityRank(b) || 9;
       return (ha - hb) || (ORDER[effectiveStatus(a)] - ORDER[effectiveStatus(b)]) || (a.name.localeCompare(b.name, 'ru'));
     });
-    if (!isCatalogPage && list.length > MAIN_PAGE_LIMIT) {
-      list = list.slice(0, MAIN_PAGE_LIMIT);
+    var total = list.length;
+    var sliced = list;
+    if (!isCatalogPage) {
+      if (total > MAIN_PAGE_LIMIT) sliced = list.slice(0, MAIN_PAGE_LIMIT);
+    } else if (state.visibleCount < total) {
+      sliced = list.slice(0, state.visibleCount);
     }
-    grid.innerHTML = list.map(rowHtml).join('');
+    grid.innerHTML = sliced.map(rowHtml).join('');
+    var countEl = document.getElementById('catalogCount');
+    if (countEl && isCatalogPage) {
+      countEl.textContent = sliced.length + ' из ' + total;
+    }
+    var moreBtn = document.getElementById('catalogMore');
+    if (moreBtn) {
+      moreBtn.classList.toggle('hidden', !isCatalogPage || sliced.length >= total);
+    }
     var allLink = document.getElementById('catalogAllLink');
     if (allLink) {
       allLink.classList.toggle('hidden', list.length < MAIN_PAGE_LIMIT);
@@ -609,6 +622,7 @@
       var storeId = storeChip.getAttribute('data-select-store');
       state.selectedStoreId = (state.selectedStoreId === storeId && storeId !== 'all') ? 'all' : storeId;
       state.showAllCatalog = false;
+      state.visibleCount = CATALOG_PAGE_STEP;
       try {
         var selStore = stores.find(function (s) { return s.id === state.selectedStoreId; }) || null;
         if (selStore) {
@@ -630,6 +644,7 @@
     var catalogAllBtn = e.target.closest('[data-catalog-all]');
     if (catalogAllBtn) {
       state.showAllCatalog = true;
+      state.visibleCount = CATALOG_PAGE_STEP;
       syncStockToggle();
       renderActiveStoreBanner();
       render();
@@ -676,6 +691,7 @@
     var chip = e.target.closest('[data-cat]');
     if (!chip) return;
     state.category = chip.getAttribute('data-cat');
+    state.visibleCount = CATALOG_PAGE_STEP;
     renderChips();
     render();
     saveFilters();
@@ -683,6 +699,7 @@
 
   search.addEventListener('input', function () {
     state.query = search.value;
+    state.visibleCount = CATALOG_PAGE_STEP;
     render();
     saveFilters();
   });
@@ -694,10 +711,19 @@
   stockOnly.addEventListener('change', function () {
     state.stockOnly = stockOnly.checked;
     state.showAllCatalog = !stockOnly.checked;
+    state.visibleCount = CATALOG_PAGE_STEP;
     render();
     renderChips();
     saveFilters();
   });
+
+  var catalogMore = document.getElementById('catalogMore');
+  if (catalogMore) {
+    catalogMore.addEventListener('click', function () {
+      state.visibleCount += CATALOG_PAGE_STEP;
+      render();
+    });
+  }
 
   function saveFilters() {
     try {

@@ -9,7 +9,7 @@
     content="Полный каталог продукции Greenleaf: наличие, цены, партнёрская цена по подписке, поиск по названию и артикулу.">
   <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=20260814a">
+  <link rel="stylesheet" href="css/style.css?v=20260814b">
 </head>
 
 <body data-catalog-page="1">
@@ -59,8 +59,9 @@
             <div class="chips" id="chips"></div>
           </div>
         </div>
-        <div class="catalog-all-note">Показаны все позиции каталога — <span id="catalogCount">загружаем…</span></div>
+        <div class="catalog-all-note">Показано <span id="catalogCount">загружаем…</span> позиций — подгрузка кнопкой ниже</div>
         <div class="list" id="grid"></div>
+        <button class="btn btn-outline catalog-more hidden" id="catalogMore" type="button">⏬ Показать ещё</button>
         <div class="empty hidden" id="empty">
           Ничего не найдено.<br>
           Оставьте заявку — сообщим, когда товар появится.
@@ -90,11 +91,11 @@
 
   <div class="toast hidden" id="toast"></div>
 
-  <script src="js/ui.js?v=20260813c"></script>
+  <script src="js/ui.js?v=20260814b"></script>
   <script src="js/cities.js"></script>
   <script src="js/auth.js?v=20260813c"></script>
   <script src="js/cart.js"></script>
-  <script src="js/catalog.js?v=20260813c"></script>
+  <script src="js/catalog.js?v=20260814b"></script>
   <script src="js/forms.js?v=20260813c"></script>
 </body>
 
