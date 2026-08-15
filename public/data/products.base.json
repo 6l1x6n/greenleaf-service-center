@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-15T09:18:44+03:00",
+  "updated": "2026-08-15T11:14:25+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -61212,6 +61212,24 @@
       "description": "",
       "stock": {},
       "hidden": false
+    },
+    {
+      "id": "NWA090",
+      "sku": "NWA090",
+      "name": "Nilrich Чай для мужчин",
+      "category": "Напитки и БАДы",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/NWA090.jpg",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false,
+      "pending": true,
+      "image_src": "/data/files/goods/8281/25101713264Ifyu7R6ZO.jpg"
     }
   ]
 }
