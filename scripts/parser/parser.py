@@ -1599,11 +1599,18 @@ def extract_public_description(html):
 def extract_product_image(html):
     """Фото товара с публичной карточки.
 
-    Первое <img itemProp="image"> в слайдере — это фото самого товара
-    (дальше в слайдере идут фото похожих товаров). og:image используем только
-    если это не общая картинка портала (/static/img/index.jpg — её портал
-    подставляет всем страницам, фото товара в ней нет).
+    <img itemProp="image"> в начале страницы — фото самого товара (слайдер
+    галереи). Блок «Другие товары из категории» (похожие товары) тоже содержит
+    itemprop-картинки, и у товаров БЕЗ своего фото первой оказывается картинка
+    чужого товара — поэтому рассматриваем только изображения до этого блока.
+    og:image используем только если это не общая картинка портала
+    (/static/img/index.jpg — её портал подставляет всем страницам, фото
+    товара в ней нет).
     """
+    hm = re.search(r"<h[1-6][^>]*>\s*Другие товары", html, re.IGNORECASE)
+    cut = hm.start() if hm else html.find("Другие товары")
+    if cut > 0:
+        html = html[:cut]
     for m in re.finditer(r"<img[^>]+>", html, re.IGNORECASE):
         tag = m.group(0)
         if 'itemprop="image"' not in tag.lower() and "itemprop='image'" not in tag.lower():
