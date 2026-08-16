@@ -127,12 +127,16 @@
 
   // Для карточек полного каталога фото пока remote-миниатюры портала (-small, 60×60).
   // На лету берём веб-версию -shop (600×600) — парсер позже заменит на локальный файл.
+  // Локальные файлы версионируются Utils.img (сброс кэша при обновлении каталога).
   function imgUrl(p) {
     var img = (p && p.image) || 'assets/images/products/placeholder.svg';
-    if (img.indexOf('http') === 0 && img.indexOf('-small.') !== -1) {
-      img = img.replace('-small.', '-shop.');
+    if (img.indexOf('http') === 0) {
+      if (img.indexOf('-small.') !== -1) {
+        img = img.replace('-small.', '-shop.');
+      }
+      return img;
     }
-    return img;
+    return Utils.img(img);
   }
 
   function rowHtml(p) {
@@ -281,7 +285,7 @@
       var isActive = state.selectedStoreId === s.id;
       return '<article class="sc-card' + (isActive ? ' active' : '') + '" data-select-store="' + Utils.esc(s.id) + '">' +
         '<div class="sc-card-media">' +
-        '<img src="' + Utils.esc(s.image) + '" alt="' + Utils.esc(s.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+        '<img src="' + Utils.esc(Utils.img(s.image)) + '" alt="' + Utils.esc(s.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
         (isActive ? '<span class="sc-card-check">✓ Выбран</span>' : '') +
         '</div>' +
         '<div class="sc-card-body">' +
@@ -319,7 +323,7 @@
     scActiveBannerContainer.innerHTML = '' +
       '<div class="sc-active-banner">' +
       '<div class="sc-banner-info">' +
-      '<img class="sc-banner-img" src="' + Utils.esc(store.image) + '" alt="' + Utils.esc(store.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+      '<img class="sc-banner-img" src="' + Utils.esc(Utils.img(store.image)) + '" alt="' + Utils.esc(store.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
       '<div class="sc-banner-text">' +
       '<h3>🏬 ' + Utils.esc(store.name) + '</h3>' +
       '<p>' + Utils.esc(store.description || '') + '</p>' +
@@ -1064,7 +1068,7 @@
       if (l.sku) p = products.find(function (x) { return x.id === l.sku; }) || null;
       if (!p) p = Utils.productByArticle(products, l.label);
       var media = p
-        ? '<img class="delivery-item-img" src="' + Utils.esc(p.thumb || p.image || 'assets/images/products/placeholder.svg') + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
+        ? '<img class="delivery-item-img" src="' + Utils.esc(Utils.img(p.thumb || p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
         : '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
       return '<div class="delivery-detail-item">' +
         media +
@@ -1372,6 +1376,9 @@ fetch('/api/event-bookings')
       var res = await fetch('data/products.json');
       var data = await res.json();
       products = data.products || [];
+      // Версия каталога для URL картинок (?v=) — кэш браузера/edge сбрасывается
+      // при каждом обновлении каталога, а не раз в неделю (immutable)
+      window.SITE_VER = data.updated || '';
 
       // Серверные оверрайды из Worker (отдаются вместе с каталогом):
       // глобальные правки уже применены к товарам, raw-карта и правки по СЦ — ниже

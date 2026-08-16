@@ -30,6 +30,10 @@ GOODS_ID_CACHE_PATH = os.path.join(BASE_DIR, ".goods_id_map.json")
 # лежит в репозитории, снимается после успешного прохода — дальше парсер
 # работает по обычной «умной» логике (существующие файлы не перекачиваются)
 REPHOTOS_PENDING_PATH = os.path.join(BASE_DIR, ".rephotos_pending")
+# Маркер одноразового добора фото: карточки, у которых API-список не дал
+# photo (path+name есть) — фото берётся с публичной страницы товара.
+# Снимается после успешного прохода, как и rephotos-маркер.
+BACKFILL_PENDING_PATH = os.path.join(BASE_DIR, ".photo_backfill_pending")
 
 PRODUCT_CODE_STRICT_RE = re.compile(r"^[A-Z]{3}\d{3}$")
 BOX_PREFIX_RE = re.compile(
@@ -1057,6 +1061,77 @@ def force_all_photos(base_products, goods, config, limit=None):
     return base_products
 
 
+def backfill_photos(base_products, goods, config):
+    """Одноразовый добор фото для карточек без photo в API-списке.
+
+    Разовое перекачивание (--rephotos) берёт фото только из поля photo
+    API-списка и кэша листинга — карточки без источника остаются со старым
+    «мыльным» файлом (пример: LGW547, 600×600). Для каждого кандидата
+    (в полном списке портала есть path+name, но нет photo) открывается
+    публичная карточка portal_url/shop/<path>/<name>/ и из неё берётся фото
+    товара (extract_product_image), затем скачивается лучший вариант
+    (байт-в-байт, как rephotos). Идемпотентно; включается одноразово
+    маркером .photo_backfill_pending и снимает его после успеха.
+    """
+    by_code = {}
+    for g in goods or []:
+        code = (g.get("code") or "").strip()
+        if code and (g.get("path") or "").strip() and (g.get("name") or "").strip():
+            by_code.setdefault(code, g)
+    base_url = config.get("portal_url", "").rstrip("/")
+    candidates = []
+    for p in base_products:
+        sku = (p.get("sku") or "").strip()
+        if not sku:
+            continue
+        g = by_code.get(sku)
+        if not g or (g.get("photo") or "").strip():
+            continue
+        candidates.append((sku, g))
+    if not candidates:
+        print("Фото (добор): кандидатов нет — карточки без photo в API не найдены")
+        return base_products
+    print(f"Фото (добор): {len(candidates)} карточек без photo в API — берём фото с публичных страниц")
+    by_sku = {p.get("sku"): p for p in base_products if p.get("sku")}
+    done = failed = no_photo = 0
+    for i, (sku, g) in enumerate(candidates, 1):
+        url = base_url + "/shop/" + g["path"].strip("/") + "/" + g["name"].strip("/") + "/"
+        photo = ""
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                html = resp.read().decode("utf-8", "ignore")
+            photo = extract_product_image(html)
+        except Exception:
+            pass
+        if not photo:
+            no_photo += 1
+            continue
+        try:
+            rel = download_product_photo(sku, photo, config, session=None, force=True, compress=False)
+        except Exception:
+            rel = None
+        p = by_sku.get(sku)
+        if rel and p:
+            p["image"] = rel
+            p.pop("photo_404", None)
+            want = os.path.join(ROOT_DIR, "public", rel.replace("/", os.sep))
+            for ext in (".png", ".jpg", ".jpeg"):
+                cur = os.path.join(IMAGES_DIR, sku + ext)
+                if cur != want and os.path.exists(cur):
+                    try:
+                        os.remove(cur)
+                    except Exception:
+                        pass
+            done += 1
+        else:
+            failed += 1
+        if i % 20 == 0 or i == len(candidates):
+            print(f"Фото (добор): {i}/{len(candidates)} — обновлено {done}, не удалось {failed}, без фото на странице {no_photo}")
+    print(f"Фото (добор): обновлено {done}, не удалось {failed}, без фото на публичной странице {no_photo}")
+    return base_products
+
+
 def status_from_qty(qty, low_threshold):
     if qty >= low_threshold:
         return "in_stock"
@@ -1948,6 +2023,20 @@ def main():
                     try:
                         os.remove(REPHOTOS_PENDING_PATH)
                         print("Маркер разового перекачивания фото снят — следующие запуски по обычной логике")
+                    except Exception:
+                        pass
+            # Одноразовый добор фото для карточек, которым API-список не дал photo:
+            # маркер .photo_backfill_pending — один проход, после успеха маркер
+            # снимается (см. backfill_photos)
+            if os.path.exists(BACKFILL_PENDING_PATH):
+                try:
+                    base_products = backfill_photos(base_products, goods_all, config)
+                except Exception as e:
+                    print(f"Фото (добор): не удалось ({e}) — маркер остаётся, повторим в следующий запуск")
+                else:
+                    try:
+                        os.remove(BACKFILL_PENDING_PATH)
+                        print("Маркер добора фото снят")
                     except Exception:
                         pass
             # Доскачиваем качественные фото (-shop 600×600) для карточек полного

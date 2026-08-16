@@ -316,7 +316,7 @@
   function itemHtml(l, unavailable) {
     return '<div class="cart-item' + (unavailable ? ' cart-item-unavailable' : '') + '">' +
       '<button class="cart-item-x" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Удалить из корзины">' + Utils.iconX(13) + '</button>' +
-      '<div class="cart-item-media"><img src="' + Utils.esc(l.p.image || 'assets/images/products/placeholder.svg') + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
+      '<div class="cart-item-media"><img src="' + Utils.esc(Utils.img(l.p.image || 'assets/images/products/placeholder.svg')) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
       '<div class="cart-item-body">' +
       '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
       '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + '</div>' +
@@ -960,6 +960,8 @@
       var res = await fetch('data/products.json');
       var data = await res.json();
       products = data.products || [];
+      // Версия каталога для URL картинок (?v=) — сброс кэша при обновлении
+      window.SITE_VER = data.updated || '';
       // Каталог для модалки «Мои заказы» (названия/фото в чеке) — без доп. запросов
       window.CatalogProducts = products;
       // Серверные оверрайды суперадмина (цены, скидки, скрытие по СЦ) —

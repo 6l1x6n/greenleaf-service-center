@@ -141,7 +141,7 @@
     var cls = 'delivery-item';
     var inner;
     if (p) {
-      var img = p.thumb || p.image || 'assets/images/products/placeholder.svg';
+      var img = imgVersion(p.thumb || p.image || 'assets/images/products/placeholder.svg');
       cls += ' has-prod';
       dataAttr = ' data-del-open="' + Utils.esc(p.id) + '"';
       inner = '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">';
@@ -246,7 +246,7 @@
             var oidShow = o.number ? ('#' + o.number) : (isShort ? oid : (suffix || oid));
             var itemsHtml = (o.items || []).map(function (i) {
               var p = byId[i.productId];
-              var img = p ? (p.thumb || p.image) : '';
+              var img = p ? imgVersion(p.thumb || p.image) : '';
               var name = i.name || (p ? p.name : '') || i.sku || i.productId;
               var unit = Number(i.price) || 0;
               var subtotal = unit ? (unit * (Number(i.qty) || 1)) : 0;
@@ -516,6 +516,14 @@
     return any ? sch : null;
   }
 
+  // Версия в URL локальных картинок (бьёт кэш браузера/edge при обновлении
+  // каталога): assets/…?v=<updated>. Remote-ссылки портала не трогаем.
+  function imgVersion(src) {
+    var v = window.SITE_VER;
+    if (!src || src.indexOf('assets/') !== 0 || !v) return src;
+    return src + (src.indexOf('?') === -1 ? '?' : '&') + 'v=' + encodeURIComponent(v);
+  }
+
   window.Utils = {
     openModal: openModal,
     closeModal: closeModal,
@@ -523,6 +531,7 @@
     fmtPrice: fmtPrice,
     fmtDate: fmtDate,
     esc: esc,
+    img: imgVersion,
     productByLabel: productByLabel,
     productByArticle: productByArticle,
     deliveryItemHtml: deliveryItemHtml,

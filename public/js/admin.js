@@ -20,13 +20,22 @@
   ];
 
   // Карточки полного каталога пока могут ссылаться на remote-миниатюры портала
-  // (-small 60×60) — в таблицах берём веб-версию -shop (600×600)
+  // (-small 60×60) — в таблицах берём веб-версию -shop (600×600). Локальные
+  // файлы версионируются (?v=) — сброс кэша при обновлении каталога.
+  function adminImgVersion(src) {
+    var v = window.SITE_VER;
+    if (!src || src.indexOf('assets/') !== 0 || !v) return src;
+    return src + (src.indexOf('?') === -1 ? '?' : '&') + 'v=' + encodeURIComponent(v);
+  }
   function adminImgUrl(p) {
     var img = (p && (p.thumb || p.image)) || 'assets/images/products/placeholder.svg';
-    if (img.indexOf('http') === 0 && img.indexOf('-small.') !== -1) {
-      img = img.replace('-small.', '-shop.');
+    if (img.indexOf('http') === 0) {
+      if (img.indexOf('-small.') !== -1) {
+        img = img.replace('-small.', '-shop.');
+      }
+      return img;
     }
-    return img;
+    return adminImgVersion(img);
   }
 
   var state = {
@@ -363,7 +372,7 @@
           })
           .catch(function () { return base; });
       });
-    var p2 = loadJSON('data/products.json').then(function (d) { return d.products || []; }).catch(function () { return []; });
+    var p2 = loadJSON('data/products.json').then(function (d) { window.SITE_VER = d.updated || ''; return d.products || []; }).catch(function () { return []; });
     // Поставки — из Worker KV (общие для всех устройств); при недоступности — статика + локальные
     var p3 = fetch('/api/deliveries')
       .then(function (r) { return r.json(); })
