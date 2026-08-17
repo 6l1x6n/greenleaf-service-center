@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-17T07:59:08+03:00",
+  "updated": "2026-08-17T09:50:06+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -61241,6 +61241,22 @@
       "hidden": false,
       "pending": true,
       "image_src": "/data/files/goods/8281/25101713264Ifyu7R6ZO.jpg"
+    },
+    {
+      "id": "ASD001",
+      "sku": "ASD001",
+      "name": "(Кол-во в коробке 20 шт) iLiFE Моющее средство для посуды, 1 кг",
+      "category": "Бытовая химия",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/ASD001.png",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
     }
   ]
 }
