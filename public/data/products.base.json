@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-18T07:46:12+03:00",
+  "updated": "2026-08-18T09:42:38+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -61251,6 +61251,38 @@
       "partner_price": 0,
       "quantity": 0,
       "image": "assets/images/products/ASD001.png",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "SBG004",
+      "sku": "SBG004",
+      "name": "(Кол-во в коробке 20 шт) SEALUXE Мгновенная маска от мелких морщин",
+      "category": "Уход за телом и косметика",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/SBG004.jpg",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "CAC007/K",
+      "sku": "CAC007/K",
+      "name": "(Коробка 24 шт) Carich гель для фиксации волос 80мл",
+      "category": "Уход за телом и косметика",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/CAC007_K.jpg",
       "status": "out",
       "eta": null,
       "incoming": null,
