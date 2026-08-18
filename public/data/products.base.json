@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-18T11:33:08+03:00",
+  "updated": "2026-08-18T13:50:41+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -61283,6 +61283,22 @@
       "partner_price": 0,
       "quantity": 0,
       "image": "assets/images/products/CAC007_K.jpg",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "YP2410007-2",
+      "sku": "YP2410007-2",
+      "name": "Белый чемодан 1030 спортивный стиль (Средний 24 дюйма)",
+      "category": "Прочее",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/YP2410007-2.png",
       "status": "out",
       "eta": null,
       "incoming": null,
