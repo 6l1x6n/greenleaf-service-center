@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-19T09:41:51+03:00",
+  "updated": "2026-08-19T11:34:12+03:00",
   "moves": [
     {
       "number": "3362131",
@@ -38,21 +38,10 @@
       "sum": 372800.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Отправлен",
-      "statusCode": 4,
-      "items": [
-        {
-          "sku": "LGW547",
-          "name": "SUREFIRE Крем-краска для волос с эффектом сияния №4 (естественный черный)",
-          "qty": 48
-        },
-        {
-          "sku": "NWA090",
-          "name": "Nilrich Чай для мужчин",
-          "qty": 40
-        }
-      ],
-      "itemsParsed": true
+      "status": "Принят СЦ",
+      "statusCode": 7,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3334404",

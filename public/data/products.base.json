@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-19T09:42:58+03:00",
+  "updated": "2026-08-19T11:35:07+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -20335,13 +20335,15 @@
       "category": "Уход за телом и косметика",
       "price": 0,
       "partner_price": 0,
-      "quantity": 0,
+      "quantity": 48,
       "image": "assets/images/products/LGW547.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
-      "stock": {},
+      "stock": {
+        "s240534": 48
+      },
       "hidden": false
     },
     {
@@ -61229,17 +61231,18 @@
       "sku": "NWA090",
       "name": "Nilrich Чай для мужчин",
       "category": "Напитки и БАДы",
-      "price": 0,
-      "partner_price": 0,
-      "quantity": 0,
+      "price": 8800,
+      "partner_price": 4400,
+      "quantity": 40,
       "image": "assets/images/products/NWA090.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
-      "stock": {},
+      "stock": {
+        "s240534": 40
+      },
       "hidden": false,
-      "pending": true,
       "image_src": "/data/files/goods/8281/25101713264Ifyu7R6ZO.jpg"
     },
     {
