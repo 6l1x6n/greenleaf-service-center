@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-20T05:37:06+03:00",
+  "updated": "2026-08-20T07:46:53+03:00",
   "moves": [
     {
       "number": "3364027",
@@ -9,8 +9,8 @@
       "sum": 494000.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA265",
@@ -117,8 +117,8 @@
       "sum": 348970.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "CBE037",
