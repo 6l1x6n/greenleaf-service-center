@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-21T07:51:17+03:00",
+  "updated": "2026-08-21T09:44:56+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -61334,6 +61334,38 @@
       "partner_price": 0,
       "quantity": 0,
       "image": "assets/images/products/W0002.jpg",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "WJA036",
+      "sku": "WJA036",
+      "name": "(Кол-во в коробке 48 шт) Чай для похудения марки Sakura Семена боярышника Кассия + Американский женьшень марки Chuangxi Семена Кассии Семена периллы Чай из листьев сенны",
+      "category": "Напитки и БАДы",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/WJA036.jpg",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "KLA008",
+      "sku": "KLA008",
+      "name": "(Кол-во в коробке 72 шт)  CARICH 3D зубная щетка, 3 шт",
+      "category": "Зубная гигиена",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/KLA008.jpg",
       "status": "out",
       "eta": null,
       "incoming": null,
