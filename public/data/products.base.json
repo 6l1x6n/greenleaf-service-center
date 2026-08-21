@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-21T05:38:57+03:00",
+  "updated": "2026-08-21T07:51:17+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -61302,6 +61302,38 @@
       "partner_price": 0,
       "quantity": 0,
       "image": "assets/images/products/YP2410007-2.png",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "LYA045",
+      "sku": "LYA045",
+      "name": "(Кол-во в коробке 8 шт) Greenleaf Кондиционер для белья с ароматом эфирного масла, 2 кг",
+      "category": "Бытовая химия",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/LYA045.jpg",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "W0002",
+      "sku": "W0002",
+      "name": "Ручка",
+      "category": "Прочее",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/W0002.jpg",
       "status": "out",
       "eta": null,
       "incoming": null,
