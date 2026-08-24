@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-24T04:00:06+03:00",
+  "updated": "2026-08-24T05:43:36+03:00",
   "moves": [
     {
       "number": "3372029",
@@ -9,8 +9,8 @@
       "sum": 486380.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "YBA045",
