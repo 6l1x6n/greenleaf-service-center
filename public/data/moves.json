@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-24T05:43:36+03:00",
+  "updated": "2026-08-24T08:04:22+03:00",
   "moves": [
     {
       "number": "3372029",
@@ -43,8 +43,8 @@
       "sum": 2248620.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA050",
@@ -127,8 +127,8 @@
       "sum": 461624.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "CCC038",
