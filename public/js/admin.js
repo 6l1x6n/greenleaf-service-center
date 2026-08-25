@@ -452,8 +452,9 @@
       (collapsed ? '»' : '☰') + '<span class="nav-lbl">' + (collapsed ? 'Показать меню' : 'Скрыть меню') + '</span></button>';
     var html = visibleSections().map(function (k) {
       var s = SECTIONS[k];
+      var labelText = s.label.indexOf(s.icon) === 0 ? s.label.slice(s.icon.length).trim() : s.label.replace(/^[^\p{L}\p{N}]+/u, '').trim();
       return '<button class="admin-nav-btn' + (state.section === k ? ' active' : '') + '" data-section="' + k + '" title="' + h(s.label) + '">' +
-        '<span class="nav-ico">' + s.icon + '</span><span class="nav-lbl">' + h(s.label) + '</span></button>';
+        '<span class="nav-ico">' + s.icon + '</span><span class="nav-lbl">' + h(labelText) + '</span></button>';
     }).join('');
     html = toggleHtml + html;
     html += '<div class="admin-nav-user" style="margin-top:24px; padding-top:16px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted);">Вы вошли как:<br><strong style="color:var(--ink);">' + h(state.user.name) + '</strong><br>' + (isSuper() ? '👑 Суперадмин' : '🏬 Сервис-Центр') + '</div>';
