@@ -1,11 +1,15 @@
 # Сервис-центры Greenleaf — каталог продукции и эко-товаров.
 # Поисковики (Google/Yandex/Bing) индексируют каталог и карточки СЦ.
 # AI-краулеры и прочие боты ограничены: /api/ не индексируют, LLM-ботам сайт закрыт.
+# Брендовые картинки (лого/фавиконки) открыты всем — по ним мессенджеры
+# (Telegram, WhatsApp, VK…) собирают превью ссылок (Open Graph).
 
 User-agent: Googlebot
 Allow: /
 Disallow: /admin/
-Disallow: /assets/
+Disallow: /assets/images/products/
+Disallow: /assets/images/stores/
+Disallow: /assets/images/podpiska/
 Disallow: /data/
 Disallow: /cabinet.html
 Disallow: /api/
@@ -13,7 +17,9 @@ Disallow: /api/
 User-agent: YandexBot
 Allow: /
 Disallow: /admin/
-Disallow: /assets/
+Disallow: /assets/images/products/
+Disallow: /assets/images/stores/
+Disallow: /assets/images/podpiska/
 Disallow: /data/
 Disallow: /cabinet.html
 Disallow: /api/
@@ -21,7 +27,27 @@ Disallow: /api/
 User-agent: Bingbot
 Allow: /
 Disallow: /admin/
-Disallow: /assets/
+Disallow: /assets/images/products/
+Disallow: /assets/images/stores/
+Disallow: /assets/images/podpiska/
+Disallow: /data/
+Disallow: /cabinet.html
+Disallow: /api/
+
+# Краулеры превью мессенджеров и соцсетей: нужен index.html + брендовые картинки
+User-agent: TelegramBot
+User-agent: WhatsApp
+User-agent: facebookexternalhit
+User-agent: Twitterbot
+User-agent: vkShare
+User-agent: Viber
+User-agent: SkypeUriPreview
+User-agent: Slackbot-LinkExpanding
+Allow: /
+Disallow: /admin/
+Disallow: /assets/images/products/
+Disallow: /assets/images/stores/
+Disallow: /assets/images/podpiska/
 Disallow: /data/
 Disallow: /cabinet.html
 Disallow: /api/
@@ -54,10 +80,17 @@ User-agent: MJ12bot
 User-agent: SeekportBot
 Disallow: /
 
-# Все прочие роботы
+# Все прочие роботы: брендовые картинки открыты (превью ссылок),
+# фото товаров/магазинов и данные — закрыты
 User-agent: *
+Allow: /
+Allow: /assets/images/logo.png
+Allow: /assets/images/favicon.png
+Allow: /assets/images/apple-touch-icon.png
 Disallow: /admin/
-Disallow: /assets/
+Disallow: /assets/images/products/
+Disallow: /assets/images/stores/
+Disallow: /assets/images/podpiska/
 Disallow: /data/
 Disallow: /cabinet.html
 Disallow: /api/
