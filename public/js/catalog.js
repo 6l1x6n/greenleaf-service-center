@@ -1101,27 +1101,8 @@
   }
 
   // ---------------- Мероприятия (с бейджем филиала) ----------------
-
-  function applyEventsOverrides(list) {
-    var result = list;
-    try {
-      var saved = localStorage.getItem('greenleaf_admin_events_v1');
-      if (saved) {
-        var arr = JSON.parse(saved);
-        if (Array.isArray(arr)) result = arr;
-      }
-    } catch (e) { }
-    try {
-      var perStore = JSON.parse(localStorage.getItem('greenleaf_sc_events_v1') || '{}');
-      Object.keys(perStore).forEach(function (storeId) {
-        var arr = perStore[storeId];
-        if (!Array.isArray(arr)) return;
-        result = result.filter(function (ev) { return ev.storeId !== storeId; });
-        arr.forEach(function (ev) { result.push(ev); });
-      });
-    } catch (e) { }
-    return result;
-  }
+  // Единственный источник — Worker KV (/api/events). Локальные оверрайды удалены:
+  // старый localStorage воскрешал удалённые суперадмином мероприятия.
 
   var lastEvents = [];
 
@@ -1250,14 +1231,14 @@ fetch('/api/event-bookings')
     fetch('/api/events')
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        var ev = applyEventsOverrides((d && d.events) || []).find(function (x) { return String(x.id) === btn.getAttribute('data-event'); });
+        var ev = ((d && d.events) || []).find(function (x) { return String(x.id) === btn.getAttribute('data-event'); });
         if (ev) eventModal(ev);
       })
       .catch(function () {
         fetch('data/events.json')
           .then(function (r) { return r.json(); })
           .then(function (data) {
-            var ev = applyEventsOverrides(data.events || []).find(function (x) { return String(x.id) === btn.getAttribute('data-event'); });
+            var ev = (data.events || []).find(function (x) { return String(x.id) === btn.getAttribute('data-event'); });
             if (ev) eventModal(ev);
           });
       });
@@ -1487,12 +1468,12 @@ fetch('/api/event-bookings')
 
     fetch('/api/events')
       .then(function (r) { return r.json(); })
-      .then(function (d) { renderEvents(applyEventsOverrides((d && d.events) || [])); })
+      .then(function (d) { renderEvents((d && d.events) || []); })
       .catch(function () {
         fetch('data/events.json')
           .then(function (r) { return r.json(); })
-          .then(function (d) { renderEvents(applyEventsOverrides(d.events || [])); })
-          .catch(function () { renderEvents(applyEventsOverrides([])); });
+          .then(function (d) { renderEvents(d.events || []); })
+          .catch(function () { renderEvents([]); });
       });
   }
 

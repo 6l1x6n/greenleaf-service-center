@@ -6,8 +6,6 @@
     stock: 'greenleaf_sc_custom_products_v1',
     deliveries: 'greenleaf_admin_deliveries_v1',
     scDeliveries: 'greenleaf_sc_deliveries_v1',
-    events: 'greenleaf_admin_events_v1',
-    scEvents: 'greenleaf_sc_events_v1',
     products: 'greenleaf_admin_products_v2',
     notices: 'greenleaf_admin_notices_v1'
   };
@@ -300,18 +298,6 @@
     return result;
   }
 
-  function mergeEvents(base) {
-    var result = applyListOverride(base, KEYS.events);
-    var perStore = lsGet(KEYS.scEvents) || {};
-    Object.keys(perStore).forEach(function (storeId) {
-      var arr = perStore[storeId];
-      if (!Array.isArray(arr)) return;
-      result = result.filter(function (ev) { return ev.storeId !== storeId; });
-      arr.forEach(function (ev) { result.push(ev); });
-    });
-    return result;
-  }
-
   // Сохранение списка поставок: глобальные — в общий оверрайд, филиальные — в пер-филиальную карту.
   // Правки уходят в Worker KV (/api/deliveries) — видны посетителям и СЦ на всех устройствах.
   function saveDeliveries(list) {
@@ -333,22 +319,14 @@
   }
 
   function saveEvents(list) {
-    // Единая БД: правки уходят в Worker KV — сайт и админка видят сразу
-    Auth.api('/api/events', { method: 'POST', body: JSON.stringify({ events: list }) }).catch(function () { });
-    if (isSuper()) {
-      var globals = list.filter(function (ev) { return !ev.storeId; });
-      lsSet(KEYS.events, globals);
-      var map = {};
-      list.filter(function (ev) { return ev.storeId; }).forEach(function (ev) {
-        if (!map[ev.storeId]) map[ev.storeId] = [];
-        map[ev.storeId].push(ev);
-      });
-      lsSet(KEYS.scEvents, map);
-    } else {
-      var perStore = lsGet(KEYS.scEvents) || {};
-      perStore[state.user.id] = list.filter(function (ev) { return ev.storeId === state.user.id; });
-      lsSet(KEYS.scEvents, perStore);
-    }
+    // Единая БД: правки уходят в Worker KV (/api/events) — сайт и админка на всех
+    // устройствах видят одно и то же. Локальных копий больше нет: ошибка сети
+    // не должна выглядеть как успешное удаление.
+    Auth.api('/api/events', { method: 'POST', body: JSON.stringify({ events: list }) })
+      .then(function (res) {
+        if (!res || !res.ok) Utils.showToast('⚠️ Не удалось сохранить мероприятия — проверьте соединение');
+      })
+      .catch(function () { Utils.showToast('⚠️ Сеть недоступна — мероприятия не сохранены'); });
   }
 
   function loadData() {
@@ -380,12 +358,12 @@
       .catch(function () {
         return loadJSON('data/deliveries.json').then(function (d) { return mergeDeliveries(d.deliveries || []); }).catch(function () { return mergeDeliveries([]); });
       });
+    // Мероприятия — из Worker KV (общие для всех устройств); при недоступности — статика
     var p4 = Auth.api('/api/events')
       .then(function (d) { return (d && d.events) || []; })
       .catch(function () {
         return loadJSON('data/events.json').then(function (d) { return d.events || []; }).catch(function () { return []; });
-      })
-      .then(function (list) { return mergeEvents(list); });
+      });
     var p5 = window.StoreStock ? StoreStock.load() : Promise.resolve();
     var p6 = Auth.api('/api/sc-applications').then(function (d) { return (d && d.applications) || []; }).catch(function () { return []; });
     // Полные карточки СЦ (email, креды) — для редактирования; /api/sc-stores

@@ -483,6 +483,7 @@ async function handleEventBook(request, env) {
 }
 
 // Мероприятия: статика events.json + правки суперадмина (KV events) + правки СЦ (KV sc_events)
+// Пустой массив в KV = «суперадмин всё удалил» — статикой НЕ подменяем.
 async function handleEventsGet(env, url) {
   const res = await env.ASSETS.fetch(new URL('/data/events.json', url));
   let base = [];
@@ -491,7 +492,7 @@ async function handleEventsGet(env, url) {
     base = (d && d.events) || (Array.isArray(d) ? d : []);
   }
   const over = await kvGet(env, 'events');
-  if (Array.isArray(over) && over.length) base = over;
+  if (Array.isArray(over)) base = over;
   const scEv = await kvGet(env, 'sc_events');
   Object.keys(scEv).forEach((storeId) => {
     const arr = scEv[storeId];
@@ -499,7 +500,16 @@ async function handleEventsGet(env, url) {
     base = base.filter((ev) => String(ev.storeId || '') !== String(storeId));
     arr.forEach((ev) => base.push(ev));
   });
-  return jsonResponse({ ok: true, events: base }, 200, 600);
+  // TTL 60с: правки видны на других устройствах максимум через минуту
+  return jsonResponse({ ok: true, events: base }, 200, 60);
+}
+
+// Сброс кеша edge для публичного GET после записи (иначе другие устройства
+// до 10 минут видят старый список из Cache API)
+async function purgeEdgeCache(request, path) {
+  try {
+    await caches.default.delete(new URL(path, request.url).toString());
+  } catch (e) { /* нет кеша — не страшно */ }
 }
 
 async function handleEventsSave(request, env, auth) {
@@ -512,6 +522,20 @@ async function handleEventsSave(request, env, auth) {
   const events = Array.isArray(body.events) ? body.events : [];
   if (auth.role === 'superadmin') {
     await kvPut(env, 'events', events);
+    // Суперадмин — единый источник правды: его список заменяет и правки филиалов,
+    // иначе удалённые мероприятия СЦ «воскресали» из sc_events
+    await kvPut(env, 'sc_events', {});
+    // Брони мест удалённых мероприятий больше не нужны
+    try {
+      const alive = {};
+      events.forEach((ev) => { if (ev && ev.id !== undefined && ev.id !== null) alive[String(ev.id)] = true; });
+      const bookings = await kvGet(env, 'event_bookings');
+      let changed = false;
+      Object.keys(bookings).forEach((id) => {
+        if (!alive[id]) { delete bookings[id]; changed = true; }
+      });
+      if (changed) await kvPut(env, 'event_bookings', bookings);
+    } catch (e) { console.error('event_bookings prune:', e); }
   } else {
     // Токен сессии не несёт storeId — ищем свой филиал по логину кабинета
     const scOwnId = await scOwnStoreId(env, auth);
@@ -520,6 +544,7 @@ async function handleEventsSave(request, env, auth) {
     scEv[scOwnId] = events.filter((ev) => String(ev.storeId || '') === String(scOwnId));
     await kvPut(env, 'sc_events', scEv);
   }
+  await purgeEdgeCache(request, '/api/events');
   return jsonResponse({ ok: true });
 }
 
@@ -531,6 +556,7 @@ async function handleEventsSave(request, env, auth) {
 
 // GET /api/deliveries — публичный список: статика deliveries.json → глобальные
 // правки суперадмина (KV deliveries) → пер-филиальные правки СЦ (KV sc_deliveries)
+// Пустой массив в KV = «суперадмин всё удалил» — статикой НЕ подменяем.
 async function handleDeliveriesGet(env, url) {
   const res = await env.ASSETS.fetch(new URL('/data/deliveries.json', url));
   let base = [];
@@ -539,7 +565,7 @@ async function handleDeliveriesGet(env, url) {
     base = (d && d.deliveries) || (Array.isArray(d) ? d : []);
   }
   const over = await kvGet(env, 'deliveries');
-  if (Array.isArray(over) && over.length) base = over;
+  if (Array.isArray(over)) base = over;
   const scDel = await kvGet(env, 'sc_deliveries');
   Object.keys(scDel).forEach((storeId) => {
     const arr = scDel[storeId];
@@ -547,7 +573,8 @@ async function handleDeliveriesGet(env, url) {
     base = base.filter((d) => String(d.storeId || '') !== String(storeId));
     arr.forEach((d) => base.push(d));
   });
-  return jsonResponse({ ok: true, deliveries: base }, 200, 300);
+  // TTL 60с: правки видны на других устройствах максимум через минуту
+  return jsonResponse({ ok: true, deliveries: base }, 200, 60);
 }
 
 // POST /api/deliveries {deliveries: [...]} — суперадмин: весь список; СЦ: только свои
@@ -561,6 +588,9 @@ async function handleDeliveriesSave(request, env, auth) {
   const list = Array.isArray(body.deliveries) ? body.deliveries : [];
   if (auth.role === 'superadmin') {
     await kvPut(env, 'deliveries', list);
+    // Суперадмин — единый источник правды: его список заменяет и правки филиалов,
+    // иначе удалённые поставки СЦ «воскресали» из sc_deliveries
+    await kvPut(env, 'sc_deliveries', {});
   } else {
     const scOwnId = await scOwnStoreId(env, auth);
     if (!scOwnId) return jsonResponse({ ok: false, error: 'forbidden' }, 403);
@@ -568,6 +598,7 @@ async function handleDeliveriesSave(request, env, auth) {
     map[scOwnId] = list.filter((d) => String(d.storeId || '') === String(scOwnId));
     await kvPut(env, 'sc_deliveries', map);
   }
+  await purgeEdgeCache(request, '/api/deliveries');
   return jsonResponse({ ok: true });
 }
 
