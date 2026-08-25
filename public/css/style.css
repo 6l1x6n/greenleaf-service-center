@@ -1794,8 +1794,56 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .admin-nav-btn:hover { background: #edf4ee; }
 .admin-nav-btn.active { background: var(--green); color: #fff; font-weight: 700; box-shadow: 0 4px 14px rgba(27, 107, 63, 0.3); }
 
+.admin-nav-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--muted);
+  font-family: var(--font);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.admin-nav-toggle:hover { background: #edf4ee; color: var(--ink); }
+.admin-nav-toggle .nav-ico { font-size: 15px; line-height: 1; }
+
 .admin-content { flex: 1; padding: 26px 30px 60px; min-width: 0; max-width: 1180px; }
 .admin-title { margin: 0 0 18px; font-size: 24px; letter-spacing: -0.01em; }
+
+/* Свёрнутый сайдбар: узкий «рельс» с иконками */
+@media (min-width: 861px) {
+  .admin-sidebar-collapsed .admin-sidebar {
+    width: 60px;
+    padding: 14px 8px;
+    align-items: center;
+  }
+  .admin-sidebar-collapsed .admin-nav-toggle {
+    justify-content: center;
+    padding: 10px 0;
+    gap: 0;
+  }
+  .admin-sidebar-collapsed .admin-nav-btn {
+    text-align: center;
+    padding: 11px 0;
+    display: flex;
+    justify-content: center;
+  }
+  .admin-sidebar-collapsed .nav-ico { font-size: 18px; }
+  .admin-sidebar-collapsed .nav-lbl,
+  .admin-sidebar-collapsed .admin-nav-user { display: none; }
+  .admin-sidebar-collapsed .admin-content { max-width: none; padding-left: 24px; padding-right: 24px; }
+}
+
+/* Фото товара в таблице «Наличие в СЦ» */
+.av-thumb-cell { width: 54px; text-align: center; vertical-align: middle; }
+.av-thumb-cell .admin-thumb { margin: 0 auto; }
 
 .admin-card {
   background: var(--card);

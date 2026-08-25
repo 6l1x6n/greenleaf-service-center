@@ -67,18 +67,18 @@
   };
 
   var SECTIONS = {
-    overview: { label: '📊 Обзор', roles: ['superadmin'] },
-    cabinet: { label: '📋 Кабинет СЦ', roles: ['sc'] },
-    sc: { label: '🏬 Сервис-Центры', roles: ['superadmin'] },
-    scArchive: { label: '🗄 Архив СЦ', roles: ['superadmin'] },
-    stock: { label: '📦 Остатки товаров', roles: ['sc'] },
-    deliveries: { label: '🚚 Поставки', roles: ['superadmin', 'sc'] },
-    events: { label: '📅 Мероприятия', roles: ['superadmin', 'sc'] },
-    products: { label: '🛒 Товары', roles: ['superadmin'] },
-    catalog: { label: '📦 Наличие в СЦ', roles: ['superadmin'] },
-    orders: { label: '🛒 Заказы', roles: ['superadmin', 'sc'] },
-    applications: { label: '📋 Заявки', roles: ['superadmin'] },
-    notices: { label: '📢 Уведомления СЦ', roles: ['superadmin', 'sc'] }
+    overview: { icon: '📊', label: '📊 Обзор', roles: ['superadmin'] },
+    cabinet: { icon: '📋', label: '📋 Кабинет СЦ', roles: ['sc'] },
+    sc: { icon: '🏬', label: '🏬 Сервис-Центры', roles: ['superadmin'] },
+    scArchive: { icon: '🗄', label: '🗄 Архив СЦ', roles: ['superadmin'] },
+    stock: { icon: '📦', label: '📦 Остатки товаров', roles: ['sc'] },
+    deliveries: { icon: '🚚', label: '🚚 Поставки', roles: ['superadmin', 'sc'] },
+    events: { icon: '📅', label: '📅 Мероприятия', roles: ['superadmin', 'sc'] },
+    products: { icon: '🛒', label: '🛒 Товары', roles: ['superadmin'] },
+    catalog: { icon: '📦', label: '📦 Наличие в СЦ', roles: ['superadmin'] },
+    orders: { icon: '🛒', label: '🛒 Заказы', roles: ['superadmin', 'sc'] },
+    applications: { icon: '📋', label: '📋 Заявки', roles: ['superadmin'] },
+    notices: { icon: '📢', label: '📢 Уведомления СЦ', roles: ['superadmin', 'sc'] }
   };
 
   function h(v) { return Utils.esc(v); }
@@ -447,11 +447,24 @@
 
   function renderNav() {
     var nav = document.getElementById('adminNav');
+    var collapsed = document.getElementById('adminLayout').classList.contains('admin-sidebar-collapsed');
+    var toggleHtml = '<button class="admin-nav-toggle' + (collapsed ? ' collapsed' : '') + '" type="button" data-toggle-sidebar title="' + (collapsed ? 'Показать меню' : 'Скрыть меню') + '">' +
+      (collapsed ? '»' : '☰') + '<span class="nav-lbl">' + (collapsed ? 'Показать меню' : 'Скрыть меню') + '</span></button>';
     var html = visibleSections().map(function (k) {
-      return '<button class="admin-nav-btn' + (state.section === k ? ' active' : '') + '" data-section="' + k + '">' + SECTIONS[k].label + '</button>';
+      var s = SECTIONS[k];
+      return '<button class="admin-nav-btn' + (state.section === k ? ' active' : '') + '" data-section="' + k + '" title="' + h(s.label) + '">' +
+        '<span class="nav-ico">' + s.icon + '</span><span class="nav-lbl">' + h(s.label) + '</span></button>';
     }).join('');
+    html = toggleHtml + html;
     html += '<div class="admin-nav-user" style="margin-top:24px; padding-top:16px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted);">Вы вошли как:<br><strong style="color:var(--ink);">' + h(state.user.name) + '</strong><br>' + (isSuper() ? '👑 Суперадмин' : '🏬 Сервис-Центр') + '</div>';
     nav.innerHTML = html;
+  }
+
+  function toggleSidebar() {
+    var layout = document.getElementById('adminLayout');
+    var collapsed = layout.classList.toggle('admin-sidebar-collapsed');
+    lsSet('adminSidebarCollapsed', collapsed);
+    renderNav();
   }
 
   function renderSection() {
@@ -2436,6 +2449,7 @@
         var stVal = fv('status', p.status);
         var cnt = pe.stock !== undefined ? pe.stock : StoreStock.count(scId, p.id);
         return '<tr' + (isHidden ? ' class="row-hidden"' : '') + '>' +
+          '<td class="av-thumb-cell"><img class="admin-thumb" src="' + h(adminImgUrl(p)) + '" alt="' + h(p.name) + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\';"></td>' +
           '<td><strong>' + h(p.name) + '</strong>' + (isHidden ? ' <span class="badge st-out">скрыт</span>' : '') + '<br><span class="muted-sku">' + h(p.sku) + '</span></td>' +
           '<td><input class="cat-input" type="number" min="0" data-sc-prod="' + h(p.id) + '" data-sc-field="price" data-init="' + h(basePrice) + '" value="' + h(basePrice) + '"></td>' +
           '<td><input class="cat-input" type="number" min="0" data-sc-prod="' + h(p.id) + '" data-sc-field="discount_price" data-init="' + h(baseDisc) + '" value="' + h(baseDisc) + '" placeholder="—"></td>' +
@@ -2451,8 +2465,8 @@
       var pagerTop = info.pages > 1 ? '<div class="admin-pager pager-top">' + pagerHtml(info) + '</div>' : '';
       var pagerBottom = info.pages > 1 ? '<div class="admin-pager">' + pagerHtml(info) + '</div>' : '';
       wrap.innerHTML = pagerTop + '<table class="admin-table"><thead><tr>' +
-        '<th style="min-width:200px;">Товар</th><th>Цена ₸</th><th>Скидка ₸</th><th>Наличие</th><th style="min-width:120px;">Остаток</th><th>Скрыть</th>' +
-        '</tr></thead><tbody>' + (rows || '<tr><td colspan="6" style="color:var(--muted);">Ничего не найдено.</td></tr>') + '</tbody></table>' + pagerBottom;
+        '<th style="min-width:54px;">Фото</th><th style="min-width:200px;">Товар</th><th>Цена ₸</th><th>Скидка ₸</th><th>Наличие</th><th style="min-width:120px;">Остаток</th><th>Скрыть</th>' +
+        '</tr></thead><tbody>' + (rows || '<tr><td colspan="7" style="color:var(--muted);">Ничего не найдено.</td></tr>') + '</tbody></table>' + pagerBottom;
     }
 
     // Текущая страница → буфер: изменённые значения запоминаются,
@@ -2792,6 +2806,9 @@
   function showPanel() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('adminLayout').classList.remove('hidden');
+    if (lsGet('adminSidebarCollapsed')) {
+      document.getElementById('adminLayout').classList.add('admin-sidebar-collapsed');
+    }
     var badge = document.getElementById('adminUserBadge');
     var logout = document.getElementById('adminLogoutBtn');
     if (badge) { badge.classList.remove('hidden'); badge.innerHTML = '🟢 ' + h(state.user.name); }
@@ -2854,6 +2871,10 @@
     });
 
     document.getElementById('adminNav').addEventListener('click', function (e) {
+      if (e.target.closest('[data-toggle-sidebar]')) {
+        toggleSidebar();
+        return;
+      }
       var btn = e.target.closest('[data-section]');
       if (!btn) return;
       openSection(btn.getAttribute('data-section'));
