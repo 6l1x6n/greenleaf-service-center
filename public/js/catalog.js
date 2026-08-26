@@ -2,10 +2,10 @@
   'use strict';
 
   var STATUS = {
-    in_stock: { label: 'В наличии', cls: 'st-in', icon: '✅' },
-    low: { label: 'Заканчивается', cls: 'st-low', icon: '⚠️' },
-    expected: { label: 'Ожидается', cls: 'st-exp', icon: '📦' },
-    out: { label: 'Нет в наличии', cls: 'st-out', icon: '—' }
+    in_stock: { label: 'В наличии', cls: 'st-in', pill: 'sp-in', icon: '✅' },
+    low: { label: 'Заканчивается', cls: 'st-low', pill: 'sp-low', icon: '⚠️' },
+    expected: { label: 'Ожидается', cls: 'st-exp', pill: 'sp-exp', icon: '📦' },
+    out: { label: 'Нет в наличии', cls: 'st-out', pill: 'sp-out', icon: '—' }
   };
 
   var ORDER = { in_stock: 0, low: 1, expected: 2, out: 3 };
@@ -85,17 +85,18 @@
     var so = scOverrideFor(p);
     var eta = so.eta || p.eta;
     var incoming = so.incoming || p.incoming;
-    var extra = '';
+    // Короткая пометка к статусу для мета-строки карточки (без HTML)
+    var note = '';
     if (st === STATUS.low) {
-      extra = '<p class="eta-line">📦 ' + (incoming ? 'Завоз: <b>' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' }) + '</b>' : 'Возьмём в работу — напишите нам') + '</p>';
+      note = incoming ? 'Завоз: ' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' }) : 'Возьмём в работу — напишите нам';
     } else if (st === STATUS.expected) {
-      extra = '<p class="eta-line">Поставка: <b>' + Utils.fmtDate(eta, { day: 'numeric', month: 'long' }) + '</b></p>';
+      note = 'Поставка: ' + Utils.fmtDate(eta, { day: 'numeric', month: 'long' });
     } else if (st === STATUS.out) {
-      extra = '<p class="eta-line">Следующая поставка: <b>' + Utils.fmtDate(eta, { day: 'numeric', month: 'long' }) + '</b></p>';
+      note = 'Следующая поставка: ' + Utils.fmtDate(eta, { day: 'numeric', month: 'long' });
     } else if (incoming) {
-      extra = '<p class="eta-line">Завоз в пути: <b>' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' }) + '</b></p>';
+      note = 'Завоз в пути: ' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' });
     }
-    return { meta: st, extra: extra };
+    return { meta: st, note: note };
   }
 
   // Актуальная цена и скидочная цена: оверрайд СЦ → глобальный оверрайд → базовый товар
@@ -145,10 +146,11 @@
     var img = p.thumb || imgUrl(p);
     var stockInSelectedStore = '';
     if (state.selectedStoreId && state.selectedStoreId !== 'all') {
-      // Для клиентов показываем только статус наличия, без точного количества
+      // Бейдж уже отражает наличие выбранного СЦ; отдельная пометка нужна только
+      // для редкого статуса «Ожидается» в филиале, иначе поставка потеряется
       var storeStock = StoreStock.statusText ? StoreStock.statusText(state.selectedStoreId, p.id) : StoreStock.text(state.selectedStoreId, p.id);
-      if (storeStock !== undefined && String(storeStock).trim() !== '') {
-        stockInSelectedStore = '<div class="eta-line" style="color:var(--green-dark); font-weight:700; margin-top:2px;">📍 В выбранном СЦ: ' + Utils.esc(storeStock) + '</div>';
+      if (storeStock !== undefined && String(storeStock).indexOf('Ожидается') === 0) {
+        stockInSelectedStore = '<span class="meta-note sc-wait">📍 В выбранном СЦ: ' + Utils.esc(storeStock) + '</span>';
       }
     }
 
@@ -181,12 +183,12 @@
       '<span class="row-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 class="row-title" style="cursor:pointer;" data-open-detail="' + Utils.esc(p.id) + '">' + Utils.esc(p.name) + '</h3>' +
       '<div class="row-meta">' +
-      '<span class="badge ' + st.meta.cls + '">' + st.meta.icon + ' ' + st.meta.label + '</span>' +
-      (moveSkuMap[p.id] ? '<span class="badge st-exp">🚚 В пути · ' + Utils.fmtDate(moveSkuMap[p.id].eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>' : '') +
+      '<span class="stock-pill ' + st.meta.pill + '">' + Utils.esc(st.meta.label) + '</span>' +
+      stockInSelectedStore +
+      (moveSkuMap[p.id] ? '<span class="meta-note">🚚 В пути · ' + Utils.fmtDate(moveSkuMap[p.id].eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>' : '') +
+      (st.note ? '<span class="meta-note">' + Utils.esc(st.note) + '</span>' : '') +
       '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
       '</div>' +
-      stockInSelectedStore +
-      st.extra +
       '</div>' +
       '<div class="row-prices">' +
       '<div class="card-prices">' +
@@ -392,15 +394,7 @@
         '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
         '<span class="badge-sale">-50%</span>';
     }
-    var qtyLine = '';
     var sel = selectedStore();
-    if (sel && StoreStock.hasData(sel.id)) {
-      // Только статус, без точного количества
-      var selTxt = StoreStock.statusText ? StoreStock.statusText(sel.id, p.id) : StoreStock.text(sel.id, p.id);
-      if (selTxt !== undefined && String(selTxt).trim() !== '') {
-        qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно в ' + Utils.esc(sel.name) + ': <b>' + Utils.esc(selTxt) + '</b></div>';
-      }
-    }
     var stockRows = '';
     var storeStockLines = [];
     stores.forEach(function (s) {
@@ -430,7 +424,6 @@
       priceHtml +
       '</div>' +
       '<a class="partner-link" href="podpiska.html">Партнёрская цена для подписчиков · Как стать партнёром →</a>' +
-      qtyLine +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
       '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">' +
