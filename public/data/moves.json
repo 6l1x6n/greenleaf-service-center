@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-26T05:42:36+03:00",
+  "updated": "2026-08-26T07:52:30+03:00",
   "moves": [
     {
       "number": "3384172",
@@ -9,8 +9,8 @@
       "sum": 1036430.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA249",
