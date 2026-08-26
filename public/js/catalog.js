@@ -145,21 +145,10 @@
     var img = p.thumb || imgUrl(p);
     var stockInSelectedStore = '';
     if (state.selectedStoreId && state.selectedStoreId !== 'all') {
-      var storeStock = StoreStock.text(state.selectedStoreId, p.id);
+      // Для клиентов показываем только статус наличия, без точного количества
+      var storeStock = StoreStock.statusText ? StoreStock.statusText(state.selectedStoreId, p.id) : StoreStock.text(state.selectedStoreId, p.id);
       if (storeStock !== undefined && String(storeStock).trim() !== '') {
         stockInSelectedStore = '<div class="eta-line" style="color:var(--green-dark); font-weight:700; margin-top:2px;">📍 В выбранном СЦ: ' + Utils.esc(storeStock) + '</div>';
-      }
-    }
-
-    // Глобальный остаток показываем только когда СЦ не выбран — при выбранном филиале
-    // единственный показатель — наличие именно в нём (два числа вводят в заблуждение)
-    var qtyHtml = '';
-    if (!(state.selectedStoreId && state.selectedStoreId !== 'all')) {
-      // Сумма живых остатков по всем СЦ из /api/stock; при недоступности данных — статичное число
-      var totalQty = StoreStock.totalCount ? StoreStock.totalCount(p.id) : null;
-      var qtyNum = totalQty !== null ? totalQty : p.quantity;
-      if (typeof qtyNum === 'number' && qtyNum > 0) {
-        qtyHtml = '<div class="eta-line qty-line' + (p.status === 'low' ? ' qty-line-low' : '') + '">📦 Доступно: <b>' + qtyNum + ' шт.</b></div>';
       }
     }
 
@@ -196,7 +185,6 @@
       (moveSkuMap[p.id] ? '<span class="badge st-exp">🚚 В пути · ' + Utils.fmtDate(moveSkuMap[p.id].eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>' : '') +
       '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
       '</div>' +
-      qtyHtml +
       stockInSelectedStore +
       st.extra +
       '</div>' +
@@ -407,7 +395,8 @@
     var qtyLine = '';
     var sel = selectedStore();
     if (sel && StoreStock.hasData(sel.id)) {
-      var selTxt = StoreStock.text(sel.id, p.id);
+      // Только статус, без точного количества
+      var selTxt = StoreStock.statusText ? StoreStock.statusText(sel.id, p.id) : StoreStock.text(sel.id, p.id);
       if (selTxt !== undefined && String(selTxt).trim() !== '') {
         qtyLine = '<div class="product-stock-item" style="font-weight:700;">📦 Доступно в ' + Utils.esc(sel.name) + ': <b>' + Utils.esc(selTxt) + '</b></div>';
       }
@@ -415,7 +404,8 @@
     var stockRows = '';
     var storeStockLines = [];
     stores.forEach(function (s) {
-      var txt = StoreStock.text(s.id, p.id);
+      // Для клиентов — только статус наличия по СЦ, без количества
+      var txt = StoreStock.statusText ? StoreStock.statusText(s.id, p.id) : StoreStock.text(s.id, p.id);
       if (txt === undefined || String(txt).trim() === '') return;
       storeStockLines.push('<div class="product-stock-item"><span>📍 <strong>' + Utils.esc(s.name) + ':</strong></span> <span>' + Utils.esc(txt) + '</span></div>');
     });
@@ -584,7 +574,7 @@
       var addItem = Cart.get().find(function (i) { return i.id === addId; });
       var addCur = addItem ? (Number(addItem.qty) || 0) : 0;
       if (addMax !== null && addCur >= addMax) {
-        Utils.showToast('⚠️ В филиале доступно только ' + addMax + ' шт.');
+        Utils.showToast('⚠️ В выбранном филиале недостаточно товара');
         return;
       }
       Cart.add(addId, 1);
@@ -605,7 +595,7 @@
       var incItem = Cart.get().find(function (i) { return i.id === incId; });
       var incCur = incItem ? (Number(incItem.qty) || 1) : 1;
       if (incMax !== null && incCur >= incMax) {
-        Utils.showToast('⚠️ В филиале доступно только ' + incMax + ' шт.');
+        Utils.showToast('⚠️ В выбранном филиале недостаточно товара');
         return;
       }
       Cart.add(incId, 1);
@@ -711,7 +701,7 @@
     if (state.selectedStoreId && state.selectedStoreId !== 'all') {
       var max = StoreStock.count(state.selectedStoreId, id);
       if (max !== null && qty > max) {
-        Utils.showToast('⚠️ В филиале доступно только ' + max + ' шт. — количество уменьшено');
+        Utils.showToast('⚠️ Количество уменьшено до доступного в филиале');
         Cart.setQty(id, max);
       }
     }
@@ -1396,12 +1386,6 @@ fetch('/api/event-bookings')
         updatedEl.textContent = 'Обновлено: ' +
           Utils.fmtDate(data.updated, { day: 'numeric', month: 'long' }) + ' ' +
           new Date(data.updated).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      }
-
-      var inStock = products.filter(function (p) { return !p.hidden && (p.status === 'in_stock' || p.status === 'low'); }).length;
-      var heroStockEl = document.getElementById('heroStock');
-      if (heroStockEl) {
-        heroStockEl.textContent = 'В наличии: ' + inStock + ' ' + plural(inStock, ['позиция', 'позиции', 'позиций']);
       }
 
       var countEl = document.getElementById('catalogCount');

@@ -628,6 +628,17 @@
     return t.toLowerCase().indexOf('нет') !== 0 && t.indexOf('Ожидается') === -1;
   }
 
+  // Текст наличия без количества для витрины: «В наличии (26 шт)» → «В наличии»
+  // («нет в наличии», «Ожидается…» — как есть; undefined/null — пробрасываем)
+  function stockStatusText(storeId, productId) {
+    var t = stockText(storeId, productId);
+    if (t === undefined || t === null) return t;
+    t = String(t).trim();
+    t = t.replace(/\s*[（(]\s*\d+\s*шт\s*[.)]\s*/gi, '');
+    t = t.replace(/\s+\d+\s*шт\s*\.?$/i, '').trim();
+    return t;
+  }
+
   // Число из «В наличии (26 шт)» → 26; «Нет…» → 0; «Ожидается…»/без числа → null (лимита нет)
   function stockCount(storeId, productId) {
     var t = stockText(storeId, productId);
@@ -666,6 +677,7 @@
     reload: reloadBaseStock,
     hasData: storeStockData,
     text: stockText,
+    statusText: stockStatusText,
     count: stockCount,
     totalCount: totalCount,
     available: isAvailableInStore,

@@ -742,7 +742,7 @@
       var addItem = Cart.get().find(function (i) { return i.id === addId; });
       if (addItem) addCur = Number(addItem.qty) || 0;
       if (addMax !== null && addCur >= addMax) {
-        Utils.showToast('⚠️ В филиале доступно только ' + addMax + ' шт.');
+        Utils.showToast('⚠️ В выбранном филиале недостаточно товара');
         return;
       }
       Cart.add(addId, 1);
@@ -755,7 +755,7 @@
       var incItem = Cart.get().find(function (i) { return i.id === incId; });
       var incCur = incItem ? (Number(incItem.qty) || 1) : 1;
       if (incMax !== null && incCur >= incMax) {
-        Utils.showToast('⚠️ В филиале доступно только ' + incMax + ' шт.');
+        Utils.showToast('⚠️ В выбранном филиале недостаточно товара');
         return;
       }
       Cart.add(incId, 1);
@@ -784,7 +784,7 @@
     if (isNaN(qty) || qty < 1) return;
     var max = state.storeId ? StoreStock.count(state.storeId, id) : null;
     if (max !== null && qty > max) {
-      Utils.showToast('⚠️ В филиале доступно только ' + max + ' шт. — количество уменьшено');
+      Utils.showToast('⚠️ Количество уменьшено до доступного в филиале');
       Cart.setQty(id, max);
     }
   });
@@ -805,7 +805,7 @@
       if (bad.length) {
         e.preventDefault();
         var l0 = bad[0];
-        Utils.showToast('⚠️ «' + l0.p.name + '» — в филиале доступно только ' + availableCount(l0) + ' шт. Уменьшите количество.');
+        Utils.showToast('⚠️ «' + l0.p.name + '» — указанное количество недоступно в филиале. Уменьшите количество.');
         var inp = document.querySelector('[data-cart-qty="' + l0.p.id + '"]');
         if (inp) blink(inp);
         return;
