@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-29T15:37:26+03:00",
+  "updated": "2026-08-30T09:04:42+03:00",
   "moves": [
     {
       "number": "3409793",
@@ -48,8 +48,8 @@
       "sum": 430000.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA064",
