@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-31T18:04:09+03:00",
+  "updated": "2026-09-01T08:33:12+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -3697,13 +3697,13 @@
       "category": "Уход за телом и косметика",
       "price": 11600,
       "partner_price": 5800,
-      "quantity": 85,
+      "quantity": 82,
       "image": "assets/images/products/CIA064.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 85
+        "s240534": 82
       },
       "description": ""
     },
