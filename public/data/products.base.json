@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-02T07:49:48+03:00",
+  "updated": "2026-09-02T13:28:15+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -62036,6 +62036,38 @@
       "partner_price": 0,
       "quantity": 0,
       "image": "assets/images/products/KAC692.png",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "KAC970",
+      "sku": "KAC970",
+      "name": "(Кол-во в коробке 24 шт) KARDLI Тапочки 2403 в японском стиле, цвет темно-синий, размер 42-43",
+      "category": "Прочее",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/KAC970.png",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "KAC699",
+      "sku": "KAC699",
+      "name": "(Кол-во в коробке 50 шт) Мужская модная хлопковая 1012 серая 42-43",
+      "category": "Прочее",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/KAC699.png",
       "status": "out",
       "eta": null,
       "incoming": null,
