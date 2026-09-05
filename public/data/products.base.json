@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-05T07:33:49+03:00",
+  "updated": "2026-09-05T12:33:28+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -246,13 +246,13 @@
       "category": "Зубная гигиена",
       "price": 1000,
       "partner_price": 500,
-      "quantity": 1,
+      "quantity": 0,
       "image": "assets/images/products/KLA007.jpg",
-      "status": "low",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 1
+        "s240534": 0
       },
       "description": ""
     },
@@ -263,13 +263,13 @@
       "category": "Зубная гигиена",
       "price": 1600,
       "partner_price": 800,
-      "quantity": 7,
+      "quantity": 0,
       "image": "assets/images/products/EAA023.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 7
+        "s240534": 0
       },
       "description": ""
     },
@@ -280,13 +280,13 @@
       "category": "Медицинские изделия",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 63,
+      "quantity": 0,
       "image": "assets/images/products/LPA043.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 63
+        "s240534": 0
       },
       "description": ""
     },
@@ -297,13 +297,13 @@
       "category": "Зубная гигиена",
       "price": 1400,
       "partner_price": 700,
-      "quantity": 40,
+      "quantity": 0,
       "image": "assets/images/products/KLA260.jpeg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 40
+        "s240534": 0
       },
       "description": ""
     },
@@ -314,13 +314,13 @@
       "category": "Зубная гигиена",
       "price": 1400,
       "partner_price": 700,
-      "quantity": 30,
+      "quantity": 0,
       "image": "assets/images/products/KLA261.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 30
+        "s240534": 0
       },
       "description": ""
     },
@@ -331,13 +331,13 @@
       "category": "Бытовая химия",
       "price": 1200,
       "partner_price": 600,
-      "quantity": 8,
+      "quantity": 0,
       "image": "assets/images/products/ASF066.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 8
+        "s240534": 0
       },
       "description": ""
     },
@@ -348,13 +348,13 @@
       "category": "Зубная гигиена",
       "price": 1600,
       "partner_price": 800,
-      "quantity": 7,
+      "quantity": 0,
       "image": "assets/images/products/EAA020.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 7
+        "s240534": 0
       },
       "description": ""
     },
@@ -365,13 +365,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 53,
+      "quantity": 0,
       "image": "assets/images/products/ASF063.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 53
+        "s240534": 0
       },
       "description": ""
     },
@@ -382,13 +382,13 @@
       "category": "Зубная гигиена",
       "price": 1400,
       "partner_price": 700,
-      "quantity": 1,
+      "quantity": 0,
       "image": "assets/images/products/CCC031.jpg",
-      "status": "low",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 1
+        "s240534": 0
       },
       "description": ""
     },
@@ -399,13 +399,13 @@
       "category": "Бытовая химия",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 14,
+      "quantity": 0,
       "image": "assets/images/products/CGA146.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 14
+        "s240534": 0
       },
       "description": ""
     },
@@ -416,13 +416,13 @@
       "category": "Зубная гигиена",
       "price": 2600,
       "partner_price": 1300,
-      "quantity": 1,
+      "quantity": 0,
       "image": "assets/images/products/CCA038.jpg",
-      "status": "low",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 1
+        "s240534": 0
       },
       "description": ""
     },
@@ -433,13 +433,13 @@
       "category": "Зубная гигиена",
       "price": 2400,
       "partner_price": 1200,
-      "quantity": 84,
+      "quantity": 0,
       "image": "assets/images/products/CCA033.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 84
+        "s240534": 0
       },
       "description": ""
     },
@@ -450,13 +450,13 @@
       "category": "Зубная гигиена",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 1,
+      "quantity": 0,
       "image": "assets/images/products/CCB025.jpg",
-      "status": "low",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 1
+        "s240534": 0
       },
       "description": ""
     },
@@ -467,13 +467,13 @@
       "category": "Уход за телом и косметика",
       "price": 3200,
       "partner_price": 1600,
-      "quantity": 6,
+      "quantity": 0,
       "image": "assets/images/products/EBB002.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 6
+        "s240534": 0
       },
       "description": ""
     },
@@ -484,13 +484,13 @@
       "category": "Зубная гигиена",
       "price": 1400,
       "partner_price": 700,
-      "quantity": 12,
+      "quantity": 0,
       "image": "assets/images/products/CCC001.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 12
+        "s240534": 0
       },
       "description": ""
     },
@@ -2388,13 +2388,13 @@
       "category": "Медицинские изделия",
       "price": 6800,
       "partner_price": 3400,
-      "quantity": 2,
+      "quantity": 22,
       "image": "assets/images/products/DAK003.jpg",
-      "status": "low",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 2
+        "s240534": 22
       },
       "description": ""
     },
@@ -2711,13 +2711,13 @@
       "category": "Напитки и БАДы",
       "price": 2800,
       "partner_price": 1400,
-      "quantity": 41,
+      "quantity": 113,
       "image": "assets/images/products/CBE034.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 41
+        "s240534": 113
       },
       "description": ""
     },
@@ -2745,13 +2745,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 99,
+      "quantity": 179,
       "image": "assets/images/products/ASF056.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 99
+        "s240534": 179
       },
       "description": ""
     },
@@ -2762,13 +2762,13 @@
       "category": "Бытовая химия",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 55,
+      "quantity": 135,
       "image": "assets/images/products/ASF055.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 55
+        "s240534": 135
       },
       "description": ""
     },
@@ -2779,13 +2779,13 @@
       "category": "Бытовая химия",
       "price": 7000,
       "partner_price": 3500,
-      "quantity": 11,
+      "quantity": 51,
       "image": "assets/images/products/ASF054.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 11
+        "s240534": 51
       },
       "description": ""
     },
@@ -2796,13 +2796,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 71,
+      "quantity": 151,
       "image": "assets/images/products/ASF053.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 71
+        "s240534": 151
       },
       "description": ""
     },
@@ -3697,13 +3697,13 @@
       "category": "Уход за телом и косметика",
       "price": 11600,
       "partner_price": 5800,
-      "quantity": 72,
+      "quantity": 66,
       "image": "assets/images/products/CIA064.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 72
+        "s240534": 66
       },
       "description": ""
     },
@@ -4224,13 +4224,13 @@
       "category": "Уход за телом и косметика",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 45,
+      "quantity": 65,
       "image": "assets/images/products/CBF016.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 45
+        "s240534": 65
       },
       "description": ""
     },
@@ -6114,14 +6114,14 @@
       "category": "Женская и детская гигиена",
       "price": 1200,
       "partner_price": 600,
-      "quantity": 480,
+      "quantity": 0,
       "image": "assets/images/products/DAD181.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "Ночные менструальные трусики iLiFE с пробиотической технологией созданы для максимальной защиты, уверенности и комфорта во время сна. Мягкая, дышащая конструкция обеспечивает ощущение сухости и свободы движения на протяжении всей ночи.\nИнновационный пробиотический компонент помогает поддерживать естественный баланс микрофлоры, обеспечивая дополнительное ощущение свежести и заботы о женском здоровье. Эргономичная посадка предотвращает протекания и дарит спокойствие даже в самые активные ночи.\nСвойства:\nНадёжная ночная защита от протеканий\nПоддержка естественного баланса микрофлоры\nМягкие и дышащие материалы\nКомфортная посадка без ощущения дискомфорта\nПодходят для чувствительной кожи\nОбеспечивают ощущение свежести и сухости\nИдеальны для ночного использования\nУдобны и безопасны для ежедневного применения в критические дни\nКоличество:\n2 шт\nРазмер:\nM–L\nСостав:\nНетканый материал, целлюлозный пух, полимерный абсорбент влаги, пробиотический чип, дышащая нижняя мембрана.\nСпособ применения:\nИспользуйте как обычное нижнее бельё в период менструации. Меняйте изделие по мере необходимости для поддержания гигиены и комфорта.\nСпособ хранения:\nХранить в сухом прохладном месте, избегая попадания прямых солнечных лучей.",
       "stock": {
-        "s240534": 480
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/275351/25080912304SZgsoZTuO.png"
@@ -20068,14 +20068,14 @@
       "category": "Уход за телом и косметика",
       "price": 0,
       "partner_price": 0,
-      "quantity": 8,
+      "quantity": 17,
       "image": "assets/images/products/SCE033.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 8
+        "s240534": 17
       },
       "hidden": false
     },
@@ -61389,14 +61389,14 @@
       "category": "Уход за телом и косметика",
       "price": 7400,
       "partner_price": 3700,
-      "quantity": 38,
+      "quantity": 0,
       "image": "assets/images/products/KLA025.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "Состав: бикарбонат натрия, лимонная кислота, карбонат натрия, полиэтиленгликол пэг, крахмал, лаурилсульфат натрия, туалетная вода, тонер, эфирное масло морского аниса, эфирное масло лимона, эфирное масло мяты.\nПротивопоказание к применению:\n1. Дети до 3 лет.\n2. Людям с ранами следует использовать с осторожностью.\n3. Людям с чувствительной кожей следует использовать с осторожностью.\nПредупреждение:\nВо время принятия ванны, температура воды не должна быть слишком высокой. Поддерживать температуру воды около 42°С. Не рекомендуется принимать ванну слишком долго, достаточно 15-30 минут.\"\nКоличество 6 штук:\n- мечтательный морской синий цвет – 2 шт;\n- свежий лимонно-желтый цвет – 2 шт;\n- свежий мятно-зеленый цвет – 2 шт.\nОбъем: 50г х 6шт/коробка.",
       "stock": {
-        "s240534": 38
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/9627/2506231249kiI5lrvLUu.jpg"
@@ -61541,14 +61541,14 @@
       "category": "Зубная гигиена",
       "price": 1000,
       "partner_price": 500,
-      "quantity": 181,
+      "quantity": 0,
       "image": "assets/images/products/KLA162.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 181
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/685565/2607131141ObTVzE2AUf.png"
@@ -61560,14 +61560,14 @@
       "category": "Зубная гигиена",
       "price": 2600,
       "partner_price": 1300,
-      "quantity": 66,
+      "quantity": 0,
       "image": "assets/images/products/KLA163.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 66
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/603339/2607291210UDSUz5SWxz.png"
@@ -61843,17 +61843,18 @@
       "sku": "LYA080",
       "name": "GREENLEAF 500 мл Увлажняющий питательный кондиционер",
       "category": "Уход за телом и косметика",
-      "price": 0,
-      "partner_price": 0,
-      "quantity": 0,
+      "price": 4600,
+      "partner_price": 2300,
+      "quantity": 20,
       "image": "assets/images/products/LYA080.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "Погрузите волосы в интенсивное восстановление с бальзамом-ополаскивателем GREENLEAF. Питательная формула помогает мгновенно разгладить волосы, облегчает расчесывание и дарит ощущение мягкости уже после первого применения. Волосы становятся более послушными, гладкими и сияющими, а эффект пушистости и сухости заметно уменьшается.\nАктивный комплекс с экстрактом маточного молочка, гиалуронатом натрия и пантенолом глубоко увлажняет волосы по всей длине, помогает снизить ломкость и уменьшить появление секущихся кончиков. Волосы выглядят более плотными, ухоженными и живыми.\nСредство идеально подходит для регулярного ухода и помогает поддерживать эффект здоровых, блестящих и эластичных волос каждый день.\nСвойства:\nИнтенсивно питает и увлажняет волосы\nДелает волосы гладкими и послушными\nПомогает уменьшить ломкость и сечение кончиков\nОблегчает расчёсывание\nПридаёт мягкость и естественный блеск\nПодходит для ежедневного использования\nУлучшает внешний вид сухих и повреждённых волос\nДелает волосы более ухоженными и плотными\nКоличество:\n500 мл\nАктивные ингредиенты:\nЭкстракт маточного молочка, гиалуронат натрия, гидролизованный гиалуронат натрия, пантенол, масло- и ухаживающие компоненты (диметиконол и производные силиконов), растительные увлажняющие компоненты.\nСпособ применения:\nПосле мытья шампунем нанесите небольшое количество бальзама на влажные волосы по длине, избегая корней. Оставьте на 2–5 минут, затем тщательно смойте водой.",
-      "stock": {},
+      "stock": {
+        "s240534": 20
+      },
       "hidden": false,
-      "pending": true,
       "image_src": "/data/files/goods/202001/2602250702SdjERvvFYS.png"
     },
     {
