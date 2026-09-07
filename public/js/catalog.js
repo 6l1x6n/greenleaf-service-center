@@ -634,11 +634,11 @@
       return;
     }
 
-    // Split-окно поставки: крестик закрывает только правую панель товара
+    // Split-окно поставки: крестик прячет правую панель (список снова по центру)
     var dsplitClose = e.target.closest('[data-dsplit-close]');
     if (dsplitClose) {
-      var dpanel = document.getElementById('dsplitRight');
-      if (dpanel) dpanel.classList.add('hidden');
+      var dsplitBox = document.querySelector('.delivery-split');
+      if (dsplitBox) dsplitBox.classList.remove('has-product');
       document.querySelectorAll('.dsplit-row.active').forEach(function (r) { r.classList.remove('active'); });
       return;
     }
@@ -648,6 +648,40 @@
     if (dsplitProd) {
       e.stopPropagation();
       renderDsplitProduct(Number(dsplitProd.getAttribute('data-dsplit-prod')));
+      return;
+    }
+
+    // Степпер количества в панели товара (меняет только поле ввода)
+    var dsplitStep = e.target.closest('[data-dsplit-inc],[data-dsplit-dec]');
+    if (dsplitStep) {
+      e.stopPropagation();
+      var qInp = document.getElementById('dsplitQty');
+      if (qInp) {
+        var qMax = Math.max(1, parseInt(qInp.getAttribute('data-dsplit-max'), 10) || 999);
+        var qCur = parseInt(qInp.value, 10) || 1;
+        qCur += dsplitStep.hasAttribute('data-dsplit-inc') ? 1 : -1;
+        qInp.value = Math.min(qMax, Math.max(1, qCur));
+      }
+      return;
+    }
+
+    // «В корзину» из панели товара — с выбранным количеством
+    var dsplitAdd = e.target.closest('[data-dsplit-add]');
+    if (dsplitAdd) {
+      e.stopPropagation();
+      var addPid = dsplitAdd.getAttribute('data-dsplit-add');
+      var qInp2 = document.getElementById('dsplitQty');
+      var qMax2 = qInp2 ? (Math.max(1, parseInt(qInp2.getAttribute('data-dsplit-max'), 10) || 999)) : 999;
+      var qVal = qInp2 ? (parseInt(qInp2.value, 10) || 1) : 1;
+      Cart.add(addPid, Math.min(qMax2, Math.max(1, qVal)));
+      Utils.showToast('🛒 Добавлено в корзину');
+      return;
+    }
+
+    // Неактивная кнопка — короткое пояснение
+    if (e.target.closest('[data-dsplit-noavail]')) {
+      e.stopPropagation();
+      Utils.showToast('⚠️ Товара нет в наличии — уточните сроки в WhatsApp');
       return;
     }
 
@@ -909,17 +943,29 @@
     return { text: 'Готовится к отправке', cls: 'mv-prep', arrived: false };
   }
 
+  // Дата уже прошла (сравнение по дням, без времени)
+  function isPastDay(d) {
+    if (!d || isNaN(d.getTime())) return false;
+    var t = new Date();
+    t.setHours(0, 0, 0, 0);
+    var x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime() < t.getTime();
+  }
+
   function moveEtaText(d) {
     if (d.statusCode === 7) return '<div class="move-eta">✅ Прибыла — товары уже на складе СЦ</div>';
     if (d.statusCode === 0) {
       var r = moveEtaRange(d);
       var mMin = Utils.fmtDate(r.min, { day: 'numeric', month: 'short' });
       var mMax = Utils.fmtDate(r.max, { day: 'numeric', month: 'short' });
-      return '<div class="move-eta">📅 Прибудет ≈ ' + mMin + ' – ' + mMax + '</div>';
+      var late0 = isPastDay(r.max) ? ' <span class="move-eta-late">(Завоз задерживается)</span>' : '';
+      return '<div class="move-eta">📅 Прибудет ≈ ' + mMin + ' – ' + mMax + late0 + '</div>';
     }
     var eta = moveEta(d);
     var etaStr = eta.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-    return '<div class="move-eta">📅 Прибудет ≈ ' + etaStr + '</div>';
+    var late = isPastDay(eta) ? ' <span class="move-eta-late">(Завоз задерживается)</span>' : '';
+    return '<div class="move-eta">📅 Прибудет ≈ ' + etaStr + late + '</div>';
   }
 
   // Визуал «фуры» по стадии: на складе → в пути → прибыла
@@ -1112,21 +1158,40 @@
       head +
       (rows ? '<div class="delivery-detail-list dsplit-list">' + rows + '</div>' : '<p class="modal-product">Состав накладной уточняется</p>') +
       '</div>' +
-      '<div class="delivery-split-right hidden" id="dsplitRight">' +
-      '<button class="dsplit-close" data-dsplit-close="1" aria-label="Закрыть детали товара">✕</button>' +
-      '<div id="dsplitBody"></div>' +
+      '<div class="delivery-split-right" id="dsplitRight">' +
+      '<div class="dsplit-panel-head"><span>Детали товара</span><button class="dsplit-close" data-dsplit-close="1" aria-label="Закрыть детали товара">✕</button></div>' +
+      '<div id="dsplitBody"><p class="modal-product dsplit-idle">Выберите товар из списка — здесь появятся фото и детали.</p></div>' +
       '</div>' +
       '</div>',
       true, 'modal-delivery'
     );
   }
 
-  // Карточка товара в правой половине окна поставки (с плавной анимацией)
+  // Карточка товара в правой половине окна поставки (с плавной анимацией).
+  // Кнопка «В корзину» — только если товар в наличии, со степпером количества;
+  // иначе — неактивная с пояснением при наведении/нажатии.
+  function dsplitAvail(p) {
+    if (!p) return false;
+    if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+      return StoreStock.available(p, state.selectedStoreId);
+    }
+    var st = effectiveStatus(p);
+    return st === 'in_stock' || st === 'low';
+  }
+
+  function dsplitCap(p) {
+    if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+      var m = StoreStock.count(state.selectedStoreId, p.id);
+      if (m !== null && m !== undefined) return Math.max(1, Math.min(m, 999));
+    }
+    return 999;
+  }
+
   function renderDsplitProduct(i) {
     var it = dsplitItems[i];
     var body = document.getElementById('dsplitBody');
-    var panel = document.getElementById('dsplitRight');
-    if (!it || !body || !panel) return;
+    var split = document.querySelector('.delivery-split');
+    if (!it || !body || !split) return;
     document.querySelectorAll('.dsplit-row').forEach(function (r, n) {
       r.classList.toggle('active', n === i);
     });
@@ -1157,6 +1222,20 @@
         var txt = StoreStock.statusText ? StoreStock.statusText(state.selectedStoreId, p.id) : StoreStock.text(state.selectedStoreId, p.id);
         if (txt !== undefined && String(txt).trim() !== '') stockLine = '<div class="dsplit-stock">📍 ' + Utils.esc(txt) + '</div>';
       }
+      var buyHtml = '';
+      if (dsplitAvail(p)) {
+        var cap = dsplitCap(p);
+        buyHtml = '<div class="dsplit-buy">' +
+          '<div class="qty-stepper">' +
+          '<button class="qty-btn" data-dsplit-dec="1" aria-label="Уменьшить">−</button>' +
+          '<input class="qty-input" id="dsplitQty" type="number" min="1" max="' + cap + '" value="1" data-dsplit-max="' + cap + '" aria-label="Количество">' +
+          '<button class="qty-btn" data-dsplit-inc="1" aria-label="Увеличить">+</button>' +
+          '</div>' +
+          '<button class="btn btn-primary btn-sm" data-dsplit-add="' + Utils.esc(p.id) + '">🛒 В корзину</button>' +
+          '</div>';
+      } else {
+        buyHtml = '<div class="dsplit-buy"><button class="btn btn-primary btn-sm is-disabled" style="flex:1;" data-dsplit-noavail="1" title="Товара нет в наличии">🛒 В корзину</button></div>';
+      }
       body.innerHTML =
         '<div class="dsplit-media"><img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'"></div>' +
         '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
@@ -1165,9 +1244,10 @@
         '<div style="margin-top:6px;"><span class="stock-pill ' + st.meta.pill + '">' + Utils.esc(st.meta.label) + '</span></div>' +
         '<div class="card-prices" style="margin-top:6px;">' + priceHtml + '</div>' +
         stockLine +
-        '<div style="display:flex; gap:10px; margin-top:12px;"><button class="btn btn-primary btn-sm" style="flex:1;" data-cart-add="' + Utils.esc(p.id) + '">🛒 В корзину</button></div>';
+        buyHtml;
     }
-    panel.classList.remove('hidden');
+    // Плавный переход: список сужается влево, панель выезжает справа
+    split.classList.add('has-product');
     // Перезапуск анимации появления при каждом выборе товара
     body.classList.remove('dsplit-anim');
     void body.offsetWidth;

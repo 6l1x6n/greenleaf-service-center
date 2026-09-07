@@ -1154,18 +1154,26 @@ a:hover { text-decoration: none; }
 .delivery-more { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; }
 
 /* ---------- Поставка: одно окно — список слева, товар справа ---------- */
-.modal.modal-delivery { max-width: 960px; }
-.delivery-split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.modal.modal-delivery { max-width: 960px; padding-top: 54px; }
+/* Изначально список один по центру; после выбора товара — плавный переход в split */
+.delivery-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0fr); gap: 0; align-items: start; max-width: 640px; margin: 0 auto; transition: max-width 0.32s ease, grid-template-columns 0.32s ease, gap 0.32s ease; }
+.delivery-split.has-product { max-width: 1000px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 18px; }
 .delivery-split-left { min-width: 0; }
-.delivery-split-left h3 { padding-right: 0; }
 .dsplit-list { max-height: 52vh; }
 .dsplit-row { transition: border-color 0.15s ease, background 0.15s ease; }
 .dsplit-row:hover { border-color: var(--green); background: var(--green-soft); }
 .dsplit-row.active { border-color: var(--green); background: var(--green-soft); }
 .dsplit-go { color: var(--green); font-weight: 800; }
-.delivery-split-right { position: relative; min-width: 0; background: var(--green-soft); border: 1px solid #d5e8d8; border-radius: var(--radius-sm); padding: 16px; }
-.dsplit-close { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer; transition: transform 0.2s ease, background 0.15s ease; }
+.delivery-split-right { min-width: 0; overflow: hidden; opacity: 0; visibility: hidden; background: var(--green-soft); border: 1px solid #d5e8d8; border-radius: var(--radius-sm); padding: 0 16px; max-height: 0; transition: opacity 0.25s ease, visibility 0s linear 0.32s, padding 0.32s ease, max-height 0.32s ease; }
+.delivery-split.has-product .delivery-split-right { opacity: 1; visibility: visible; padding: 16px; max-height: 70vh; overflow-y: auto; transition: opacity 0.3s ease 0.05s, visibility 0s, padding 0.32s ease, max-height 0.32s ease; }
+.dsplit-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; font-weight: 800; color: var(--green-dark); font-size: 15px; }
+.dsplit-close { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer; transition: transform 0.2s ease, background 0.15s ease; }
 .dsplit-close:hover { background: var(--line); color: var(--ink); transform: rotate(90deg); }
+.dsplit-idle { color: var(--muted); }
+.dsplit-buy { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.dsplit-buy .btn { flex: 1; }
+.btn.is-disabled { opacity: 0.55; cursor: not-allowed; }
+.move-eta-late { color: var(--danger); font-weight: 800; }
 .dsplit-anim { animation: dsplitIn 0.28s cubic-bezier(0.16, 0.84, 0.44, 1); }
 @keyframes dsplitIn { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: translateX(0); } }
 .dsplit-media { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 10px; }
