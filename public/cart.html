@@ -110,7 +110,7 @@
             </div>
 
             <label class="cart-partner-label" for="partnerId">ID партнёра Greenleaf <small>(если подписаны — цена станет партнёрской)</small></label>
-            <input class="search" id="partnerId" name="partner_id" placeholder="например ab12345678" autocomplete="off" inputmode="text">
+            <input class="search" id="partnerId" name="partner_id" placeholder="например kz12345678" autocomplete="off" inputmode="text">
             <p class="partner-hint" id="partnerHint"></p>
 
             <div class="pay-tabs">
@@ -129,7 +129,7 @@
             </div>
 
             <div class="pay-panel hidden" data-pay-panel="cash">
-              <p class="form-note">Оплатите наличными при получении. Укажите время — подготовим заказ заранее.</p>
+              <p class="form-note">Оплатите наличными при получении. По желанию укажите время — подготовим заказ заранее.</p>
             </div>
 
             <form class="form" data-type="order" id="orderForm">
@@ -148,9 +148,9 @@
               <input name="name" placeholder="Ваше имя *" required>
               <input name="phone" type="tel" placeholder="+7 (___) ___-__-__ *" required>
               <div class="cash-fields hidden" data-cash-fields>
-                <label for="pickupDate">Дата приезда</label>
+                <label for="pickupDate">Дата приезда (по желанию)</label>
                 <select id="pickupDate" name="pickup_date"></select>
-                <label for="pickupTime">Время приезда</label>
+                <label for="pickupTime">Время приезда (по желанию)</label>
                 <select id="pickupTime" name="pickup_time"></select>
                 <p class="form-note" id="pickupHint" style="margin-top:6px;"></p>
               </div>

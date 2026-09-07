@@ -1828,7 +1828,7 @@ function buildText(data) {
   const orderMeta = [
     '💳 ' + (data.payment || '—'),
     data.order_store ? '🏬 Филиал: ' + data.order_store : null,
-    data.pickup_date ? '📅 Приезд: ' + ruDate(data.pickup_date) + (data.pickup_time ? ' в ' + data.pickup_time : '') : null,
+    '📅 Приезд: ' + (data.pickup_date ? ruDate(data.pickup_date) + (data.pickup_time ? ' в ' + data.pickup_time : '') : 'не уточнили'),
     data.partner_id ? '🎫 Партнёр: ' + data.partner_id + (data.order_partner_mode === '1' ? ' (−50%)' : '') : null
   ].filter(Boolean);
   const orderTotals = [

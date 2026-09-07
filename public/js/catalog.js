@@ -116,9 +116,21 @@
   function rowCartControl(p) {
     var item = Cart.get().find(function (i) { return i.id === p.id; });
     if (item) {
+      var cur = Number(item.qty) || 1;
+      var rawMax = (state.selectedStoreId && state.selectedStoreId !== 'all')
+        ? StoreStock.count(state.selectedStoreId, p.id)
+        : null;
+      var cap = (rawMax === null || rawMax === undefined) ? 999 : Math.max(1, Math.min(rawMax, 999));
+      // Корзина могла хранить больше, чем сейчас доступно (остаток упал
+      // после добавления): показываем срезанное значение, как в корзине.
+      // Нулевой остаток не трогаем — такие позиции фильтруются из заказа.
+      if (rawMax !== null && rawMax !== undefined && rawMax > 0 && cur > cap) {
+        cur = cap;
+        try { Cart.setQty(p.id, cap); } catch (e) { }
+      }
       return '<div class="qty-stepper" data-cart-row="' + Utils.esc(p.id) + '">' +
         '<button class="qty-btn" data-cart-dec="' + Utils.esc(p.id) + '" aria-label="Уменьшить">−</button>' +
-        '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(p.id) + '" min="1" max="999" value="' + (Number(item.qty) || 1) + '" aria-label="Количество">' +
+        '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(p.id) + '" min="1" max="' + cap + '" value="' + cur + '" aria-label="Количество">' +
         '<button class="qty-btn" data-cart-inc="' + Utils.esc(p.id) + '" aria-label="Увеличить">+</button>' +
         '</div>' +
         '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины">' + Utils.iconX(12) + '</button>';
@@ -622,6 +634,23 @@
       return;
     }
 
+    // Split-окно поставки: крестик закрывает только правую панель товара
+    var dsplitClose = e.target.closest('[data-dsplit-close]');
+    if (dsplitClose) {
+      var dpanel = document.getElementById('dsplitRight');
+      if (dpanel) dpanel.classList.add('hidden');
+      document.querySelectorAll('.dsplit-row.active').forEach(function (r) { r.classList.remove('active'); });
+      return;
+    }
+
+    // Клик по позиции в окне поставки — детали справа, то же окно
+    var dsplitProd = e.target.closest('[data-dsplit-prod]');
+    if (dsplitProd) {
+      e.stopPropagation();
+      renderDsplitProduct(Number(dsplitProd.getAttribute('data-dsplit-prod')));
+      return;
+    }
+
     var delOpenEl = e.target.closest('[data-del-open]');
     if (delOpenEl) {
       var delP = products.find(function (x) { return x.id === delOpenEl.getAttribute('data-del-open') && !x.hidden; });
@@ -1025,19 +1054,29 @@
     }).join('');
   }
 
-  // Модалка состава поставки: картинки + наименования каждой позиции
+  // Модалка поставки: ОДНО окно — слева список позиций, справа плавно
+  // выезжает карточка товара (фото + детали), закрывается крестиком.
+  // Вторую модалку поверх не открываем, чтобы поставка не терялась.
+  var dsplitItems = [];
+
   function deliveryDetailModal(d) {
-    var lines = [];
     var raw = d.items;
+    dsplitItems = [];
     if (Array.isArray(raw)) {
       raw.forEach(function (it) {
         var label = it && (it.name || it.sku || '');
-        if (label) lines.push({ label: String(label).trim(), qty: it.qty ? ' × ' + it.qty : '', sku: it && it.sku });
+        if (!String(label).trim()) return;
+        // Накладные: товар строго по артикулу (sku — ID товара), без угадывания по названию
+        var p = null;
+        if (it && it.sku) p = products.find(function (x) { return x.id === it.sku; }) || null;
+        if (!p) p = Utils.productByArticle(products, label);
+        dsplitItems.push({ label: String(label).trim(), qty: it.qty ? ' × ' + it.qty : '', p: p });
       });
     } else if (typeof raw === 'string') {
       String(raw).split(/[;,]/).forEach(function (t) {
         var s = String(t).trim();
-        if (s) lines.push({ label: s, qty: '' });
+        if (!s) return;
+        dsplitItems.push({ label: s, qty: '', p: Utils.productByArticle(products, s) });
       });
     }
     var storeName = '';
@@ -1045,27 +1084,94 @@
       var st = stores.find(function (x) { return x.id === d.storeId; });
       if (st) storeName = st.name;
     }
-    var rows = lines.map(function (l) {
-      // Накладные: товар строго по артикулу (sku — ID товара), без угадывания по названию
-      var p = null;
-      if (l.sku) p = products.find(function (x) { return x.id === l.sku; }) || null;
-      if (!p) p = Utils.productByArticle(products, l.label);
-      var media = p
-        ? '<img class="delivery-item-img" src="' + Utils.esc(Utils.img(p.thumb || p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
+    var dt = d.date ? Utils.fmtDate(String(d.date) + 'T00:00:00', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    var head = '';
+    if (d.statusCode !== undefined) {
+      var mst = moveStatusLabel(d);
+      head = '<div class="move-top"><span class="move-status ' + mst.cls + '">' + mst.text + '</span>' +
+        (d.number ? '<span class="move-num">№' + Utils.esc(d.number) + '</span>' : '') + '</div>' +
+        moveRoadHtml(d, Math.round(moveProgress(d) * 100)) + moveEtaText(d);
+    }
+    var rows = dsplitItems.map(function (l, i) {
+      var media = l.p
+        ? '<img class="delivery-item-img" src="' + Utils.esc(Utils.img(l.p.thumb || l.p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
         : '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
-      return '<div class="delivery-detail-item">' +
+      return '<div class="delivery-detail-item dsplit-row" data-dsplit-prod="' + i + '" style="cursor:pointer;" title="Показать детали товара">' +
         media +
         '<span class="delivery-detail-name">' + Utils.esc(l.label) + '</span>' +
         (l.qty ? '<span class="muted-sku">' + Utils.esc(l.qty) + '</span>' : '') +
+        '<span class="dsplit-go">→</span>' +
         '</div>';
     }).join('');
-    var dt = d.date ? Utils.fmtDate(String(d.date) + 'T00:00:00', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
     Utils.openModal(
+      '<div class="delivery-split">' +
+      '<div class="delivery-split-left">' +
       '<h3>🚚 Поставка' + (dt ? ' · ' + dt : '') + '</h3>' +
       (storeName ? '<p class="modal-product"><b>' + Utils.esc(storeName) + '</b></p>' : '') +
       (d.note ? '<p>' + Utils.esc(d.note) + '</p>' : '') +
-      (rows ? '<div class="delivery-detail-list">' + rows + '</div>' : '<p class="modal-product">Состав накладной уточняется</p>')
+      head +
+      (rows ? '<div class="delivery-detail-list dsplit-list">' + rows + '</div>' : '<p class="modal-product">Состав накладной уточняется</p>') +
+      '</div>' +
+      '<div class="delivery-split-right hidden" id="dsplitRight">' +
+      '<button class="dsplit-close" data-dsplit-close="1" aria-label="Закрыть детали товара">✕</button>' +
+      '<div id="dsplitBody"></div>' +
+      '</div>' +
+      '</div>',
+      true, 'modal-delivery'
     );
+  }
+
+  // Карточка товара в правой половине окна поставки (с плавной анимацией)
+  function renderDsplitProduct(i) {
+    var it = dsplitItems[i];
+    var body = document.getElementById('dsplitBody');
+    var panel = document.getElementById('dsplitRight');
+    if (!it || !body || !panel) return;
+    document.querySelectorAll('.dsplit-row').forEach(function (r, n) {
+      r.classList.toggle('active', n === i);
+    });
+    if (!it.p) {
+      body.innerHTML =
+        '<div class="dsplit-empty-photo delivery-item-clock">⏳</div>' +
+        '<h4 class="dsplit-name">' + Utils.esc(it.label) + '</h4>' +
+        '<p class="modal-product">Товар ещё не в каталоге — фото и цена появятся после парсинга.</p>';
+    } else {
+      var p = it.p;
+      var prices = effectivePrices(p);
+      var st = statusInfo(p);
+      var priceHtml = '';
+      if (!(prices.price > 0)) {
+        priceHtml = '<span class="price-ask">Цена по запросу</span>';
+      } else {
+        var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
+        if (disc) {
+          priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span> ' +
+            '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>';
+        } else {
+          priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span> ' +
+            '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>';
+        }
+      }
+      var stockLine = '';
+      if (state.selectedStoreId && state.selectedStoreId !== 'all') {
+        var txt = StoreStock.statusText ? StoreStock.statusText(state.selectedStoreId, p.id) : StoreStock.text(state.selectedStoreId, p.id);
+        if (txt !== undefined && String(txt).trim() !== '') stockLine = '<div class="dsplit-stock">📍 ' + Utils.esc(txt) + '</div>';
+      }
+      body.innerHTML =
+        '<div class="dsplit-media"><img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'"></div>' +
+        '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
+        '<h4 class="dsplit-name">' + Utils.esc(p.name) + '</h4>' +
+        '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
+        '<div style="margin-top:6px;"><span class="stock-pill ' + st.meta.pill + '">' + Utils.esc(st.meta.label) + '</span></div>' +
+        '<div class="card-prices" style="margin-top:6px;">' + priceHtml + '</div>' +
+        stockLine +
+        '<div style="display:flex; gap:10px; margin-top:12px;"><button class="btn btn-primary btn-sm" style="flex:1;" data-cart-add="' + Utils.esc(p.id) + '">🛒 В корзину</button></div>';
+    }
+    panel.classList.remove('hidden');
+    // Перезапуск анимации появления при каждом выборе товара
+    body.classList.remove('dsplit-anim');
+    void body.offsetWidth;
+    body.classList.add('dsplit-anim');
   }
 
   function buildMoveSkuMap(moves) {    moveSkuMap = {};
@@ -1335,6 +1441,14 @@ fetch('/api/event-bookings')
     }
 
     await StoreStock.load();
+
+    // Остатки подтянулись — срезаем корзину до доступных (100 → 50),
+    // иначе в степпере светилось бы старое завышенное число
+    try {
+      if (window.Cart && Cart.clampToStock) {
+        if (Cart.clampToStock() > 0 && window.Utils) Utils.showToast('⚠️ Количество уменьшено до доступного в филиале');
+      }
+    } catch (e) { }
 
     try {
       var res = await fetch('data/products.json');

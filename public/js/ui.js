@@ -9,7 +9,7 @@
 
   var store = null;
 
-  function openModal(html, wide) {
+  function openModal(html, wide, extraCls) {
     modalBody.innerHTML = html;
     var modalEl = overlay.querySelector('.modal');
     if (modalEl) {
@@ -18,6 +18,8 @@
       } else {
         modalEl.classList.remove('modal-wide');
       }
+      modalEl.classList.remove('modal-delivery');
+      if (extraCls) modalEl.classList.add(extraCls);
     }
     overlay.classList.remove('hidden');
     document.body.style.overflow = 'hidden';

@@ -30,13 +30,38 @@
     return load().reduce(function (s, i) { return s + (Number(i.qty) || 0); }, 0);
   }
 
+  // Выбранный СЦ (тот же ключ, что в catalog.js / cart-page.js)
+  function selectedStoreId() {
+    try {
+      var s = JSON.parse(localStorage.getItem('greenleaf_sc_selected_v1') || 'null');
+      return (s && s.id) ? String(s.id) : null;
+    } catch (e) { return null; }
+  }
+
+  // Доступный остаток для товара в выбранном СЦ (null — данных нет, лимита нет)
+  function stockMax(id) {
+    try {
+      if (!window.StoreStock || !StoreStock.count) return null;
+      var sid = selectedStoreId();
+      if (!sid) return null;
+      return StoreStock.count(sid, id);
+    } catch (e) { return null; }
+  }
+
+  // Верхний предел количества: остаток в выбранном СЦ (если известен), иначе 999
+  function capFor(id) {
+    var m = stockMax(id);
+    return (m === null || m === undefined) ? 999 : Math.max(1, Math.min(m, 999));
+  }
+
   function add(id, qty) {
     var items = load();
     var found = items.find(function (i) { return i.id === id; });
+    var cap = capFor(id);
     if (found) {
-      found.qty = (Number(found.qty) || 0) + (Number(qty) || 1);
+      found.qty = Math.min((Number(found.qty) || 0) + (Number(qty) || 1), cap);
     } else {
-      items.push({ id: id, qty: Number(qty) || 1 });
+      items.push({ id: id, qty: Math.min(Math.max(1, Number(qty) || 1), cap) });
     }
     save(items);
   }
@@ -45,8 +70,24 @@
     var items = load();
     var found = items.find(function (i) { return i.id === id; });
     if (!found) return;
-    found.qty = Math.max(1, Number(qty) || 1);
+    found.qty = Math.min(Math.max(1, Number(qty) || 1), capFor(id));
     save(items);
+  }
+
+  // Срезать корзину до доступных остатков (например 100 → 50).
+  // Возвращает число исправленных позиций. Не трогает товары без данных
+  // об остатке (max null) и нулевые остатки (их скрытием занимается страница).
+  function clampToStock() {
+    var items = load();
+    var changed = 0;
+    items.forEach(function (i) {
+      var m = stockMax(i.id);
+      if (m === null || m === undefined || m <= 0) return;
+      var cap = Math.min(m, 999);
+      if ((Number(i.qty) || 0) > cap) { i.qty = cap; changed++; }
+    });
+    if (changed) save(items);
+    return changed;
   }
 
   function remove(id) {
@@ -80,6 +121,13 @@
     var id = inp.getAttribute('data-cart-qty');
     var qty = parseInt(inp.value, 10);
     if (isNaN(qty) || qty < 1) qty = 1;
+    var cap = capFor(id);
+    if (qty > cap) {
+      qty = cap;
+      try {
+        if (window.Utils && Utils.showToast && cap < 999) Utils.showToast('⚠️ Количество уменьшено до доступного в филиале');
+      } catch (err) { }
+    }
     if (qty > 999) qty = 999;
     setQty(id, qty);
   });
@@ -89,6 +137,8 @@
     count: count,
     add: add,
     setQty: setQty,
+    clampToStock: clampToStock,
+    stockMax: stockMax,
     remove: remove,
     clear: clear,
     onChange: function (fn) { listeners.push(fn); },

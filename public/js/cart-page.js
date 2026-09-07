@@ -59,6 +59,26 @@
     return StoreStock.count(state.storeId, l.p.id);
   }
 
+  // Срезать позиции корзины до доступных остатков (100 → 50 при остатке 50).
+  // Вызывается при рендере/смене филиала/загрузке остатков. Возвращает число срезов.
+  var inClamp = false;
+  function clampLinesToStock() {
+    if (inClamp || !state.storeId || !window.StoreStock) return 0;
+    var fixed = 0;
+    var snapshot = Cart.get();
+    inClamp = true;
+    try {
+      snapshot.forEach(function (i) {
+        var m = StoreStock.count(state.storeId, i.id);
+        if (m === null || m === undefined || m <= 0) return;
+        var cap = Math.min(m, 999);
+        if ((Number(i.qty) || 0) > cap) { Cart.setQty(i.id, cap); fixed++; }
+      });
+    } finally { inClamp = false; }
+    if (fixed > 0 && window.Utils) Utils.showToast('⚠️ Количество уменьшено до доступного в филиале');
+    return fixed;
+  }
+
   function lineQtyValid(l) {
     var max = availableCount(l);
     return max === null || l.qty <= max;
@@ -160,8 +180,18 @@
         }
         if (d && d.error === 'not enough' && window.Utils) {
           var pid = d.product && d.product.productId;
+          var avail = d.product && d.product.available;
           var p = products.find(function (x) { return x.id === pid; });
           var name = p ? p.name : (pid || 'товар');
+          // Сервер знает точный остаток: срезаем позицию до него (100 → 50),
+          // а не блокируем весь заказ — бронь перевыпустим под новый состав
+          if (avail !== null && avail !== undefined && Number(avail) > 0) {
+            Utils.showToast('⚠️ «' + name + '» — осталось ' + avail + ' шт., количество уменьшено');
+            try { Cart.setQty(pid, Math.max(1, Math.min(Number(avail), 999))); } catch (e) { }
+            reserve.signature = '';
+            retryReserve(800);
+            return;
+          }
           Utils.showToast('⚠️ «' + name + '» сейчас зарезервирован другим покупателем — измените количество');
         }
         expiredState();
@@ -393,6 +423,7 @@
   }
 
   function render() {
+    clampLinesToStock();
     var t = totals();
 
     if (!t.all.length) {
@@ -605,8 +636,9 @@
     });
     var date = document.getElementById('pickupDate');
     var time = document.getElementById('pickupTime');
-    if (date) date.required = method === 'cash';
-    if (time) time.required = method === 'cash';
+    // Дата и время приезда необязательны для любого способа оплаты
+    if (date) date.required = false;
+    if (time) time.required = false;
     if (method === 'cash') {
       kaspiPaid = false;
       paymentStarted = false;
@@ -635,13 +667,9 @@
   }
 
   function cashFieldsOk() {
-    if (state.payment !== 'cash') return true;
-    var date = document.getElementById('pickupDate');
-    var time = document.getElementById('pickupTime');
-    var ok = true;
-    if (!date.value) { blink(date); ok = false; }
-    if (!time.value) { blink(time); ok = false; }
-    return ok;
+    // Дата и время приезда необязательны — проверка только заполненных
+    // значений осталась в submit-обработчике ниже
+    return true;
   }
 
   function kaspiQr() {
@@ -895,7 +923,7 @@
       if (hint) {
         hint.textContent = valid
           ? '✅ Подтверждён: применяются партнёрские цены (−50%)'
-          : partnerInput.value.trim() ? 'ID партнёра не распознан — цены розничные. Формат: 2 буквы + 8 цифр (ab12345678).' : '';
+          : partnerInput.value.trim() ? 'ID партнёра не распознан — цены розничные. Формат: 2 буквы + 8 цифр (kz12345678).' : '';
         hint.className = 'partner-hint' + (valid ? ' ok' : '');
       }
       render();

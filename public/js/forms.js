@@ -98,11 +98,10 @@
       return;
     }
 
-    // Заказы (корзина) — валидация своих полей
+    // Заказы (корзина) — дата/время приезда необязательны: только имя и телефон
     if (data.type === 'order') {
-      var isCash = data.payment === 'Наличные при получении';
-      if (!data.name || !data.phone || (isCash && (!data.pickup_date || !data.pickup_time))) {
-        markInvalid(form, isCash ? ['name', 'phone', 'pickup_date', 'pickup_time'] : ['name', 'phone']);
+      if (!data.name || !data.phone) {
+        markInvalid(form, ['name', 'phone']);
         return;
       }
     }
