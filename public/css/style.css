@@ -896,15 +896,17 @@ a:hover { text-decoration: none; }
 .row-remove:hover { border-color: var(--danger) !important; color: var(--danger) !important; background: #fdf0f0 !important; }
 
 @media (max-width: 900px) {
+  /* Мобильная карточка: верх — фото + текст на всю ширину,
+     низ одним рядом — цены слева, кнопки справа */
   .product-row {
-    grid-template-columns: 72px minmax(0, 1fr) auto auto;
-    grid-template-areas: "media body prices actions";
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    grid-template-areas: "media body body" "media prices actions";
     gap: 8px 12px;
+    align-items: center;
   }
   .row-media img { width: 72px; height: 72px; }
-  .row-prices { align-items: flex-start; }
-  /* Кнопки всегда справа, компактно, без прыжков и отдельной строки */
-  .row-actions { flex-wrap: nowrap; }
+  .row-prices { align-items: flex-start; justify-content: center; }
+  .row-actions { flex-wrap: nowrap; justify-content: flex-end; }
   .row-actions .btn { flex: none; padding: 8px 12px; font-size: 13px; white-space: nowrap; }
   .row-actions .qty-stepper { flex: none; }
 }
@@ -912,7 +914,7 @@ a:hover { text-decoration: none; }
 @media (max-width: 560px) {
   .product-row {
     grid-template-columns: 64px minmax(0, 1fr) auto;
-    grid-template-areas: "media body actions" "prices prices prices";
+    grid-template-areas: "media body body" "media prices actions";
     gap: 6px 10px;
     padding: 10px 12px;
   }
@@ -2968,6 +2970,7 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .ai-qty .qty-val { min-width: 22px; font-size: 13px; }
 .ai-qty .qty-btn:disabled { opacity: 0.35; cursor: default; }
 .ai-qty .qty-btn:disabled:hover { background: transparent; }
+.ai-qty.is-empty .qty-val { color: var(--muted); }
 .ai-incart { font-size: 10.5px; font-weight: 800; color: var(--green-dark); white-space: nowrap; }
 
 /* Кнопка «Показать ещё N» с иконками остальных товаров */

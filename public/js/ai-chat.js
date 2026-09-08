@@ -355,9 +355,9 @@
 
   function stepperHtml(id) {
     var q = aiQty(id);
-    return '<div class="ai-qty" title="Количество">' +
+    return '<div class="ai-qty' + (q <= 0 ? ' is-empty' : '') + '" title="Количество">' +
       '<button class="qty-btn" type="button" data-ai-dec="' + esc(id) + '" aria-label="Уменьшить"' + (q <= 0 ? ' disabled' : '') + '>−</button>' +
-      '<span class="qty-val" data-ai-qtyval="' + esc(id) + '">' + Math.max(1, q) + '</span>' +
+      '<span class="qty-val" data-ai-qtyval="' + esc(id) + '">' + q + '</span>' +
       '<button class="qty-btn" type="button" data-ai-inc="' + esc(id) + '" aria-label="Увеличить">+</button>' +
       '</div>' +
       (q > 0 ? '<span class="ai-incart">🛒 ' + q + '</span>' : '');
