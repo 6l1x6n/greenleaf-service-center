@@ -1802,7 +1802,8 @@ async function handleProductsJson(request, env, url) {
 const AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
 const AI_MAX_HISTORY = 4;
 const AI_MAX_PRODUCTS = 8;
-const AI_RATE_PER_HOUR = 20;
+const AI_RATE_PER_HOUR = 60; // с одного устройства (по токену)
+const AI_RATE_PER_IP_HOUR = 300; // страховка с IP (от смены токенов скриптом)
 const AI_CACHE_TTL = 3600;
 
 const AI_STOP = { 'для': 1, 'и': 1, 'в': 1, 'на': 1, 'с': 1, 'со': 1, 'при': 1, 'от': 1, 'из': 1, 'по': 1, 'до': 1, 'не': 1, 'как': 1, 'что': 1, 'это': 1, 'есть': 1, 'мне': 1, 'подскажите': 1, 'подскажи': 1, 'какие': 1, 'какой': 1, 'какая': 1, 'чем': 1, 'или': 1, 'а': 1, 'же': 1, 'ли': 1 };
@@ -2109,20 +2110,24 @@ async function handleAiChat(request, env, url) {
     return { role: m.role, text: String(m.text).slice(0, 500) };
   });
 
-  // Rate-limit: 20 запросов/час с IP (fail-open при ошибке KV)
-  const ip = aiClientIp(request);
-  const rlKey = 'ai_rl:' + aiHash(ip);
-  try {
+  // ID устройства (тот же токен, что у «Моих заказов»): у каждого свой лимит —
+  // соседи по одному IP мобильного оператора чужой лимит не едят.
+  const ct = String((body && body.ct) || '').trim().slice(0, 64);
+  const hasCt = ct.length >= 16;
+  const hasAI = !!(env.AI && typeof env.AI.run === 'function');
+
+  // Проверка и прирост лимита: устройство 60/час + страховка 300/час с IP
+  // (ловит только смену токенов скриптом; fail-open при ошибке KV).
+  async function checkRateLimit(ip, key, perHour) {
     const now = Date.now();
-    const rlRaw = await env.SC_STORES.get(rlKey);
-    let rl = rlRaw ? JSON.parse(rlRaw) : null;
+    const raw = await env.SC_STORES.get(key);
+    let rl = raw ? JSON.parse(raw) : null;
     if (!rl || !rl.reset || rl.reset < now) rl = { n: 0, reset: now + 3600000 };
-    if (rl.n >= AI_RATE_PER_HOUR) {
-      return jsonResponse({ ok: false, error: 'rate', message: 'Слишком много вопросов — попробуйте через час или напишите нам в WhatsApp' }, 429);
-    }
+    if (rl.n >= perHour) return false;
     rl.n += 1;
-    await env.SC_STORES.put(rlKey, JSON.stringify(rl), { expirationTtl: 3700 });
-  } catch (e) { /* KV недоступен — пропускаем лимит */ }
+    await env.SC_STORES.put(key, JSON.stringify(rl), { expirationTtl: 3700 });
+    return true;
+  }
 
   const catalog = await loadAiCatalog(env, url, storeId);
   const found = aiSearch(catalog, q, storeId, AI_MAX_PRODUCTS);
@@ -2160,6 +2165,7 @@ async function handleAiChat(request, env, url) {
   }
 
   // Кэш одинаковых вопросов (1 час): повторный вопрос = 0 нейронов
+  // и 0 единиц лимита — проверка кеша идёт ДО счётчика.
   const cacheKey = 'ai_cache:' + aiHash(aiNorm(q) + '|' + (storeId || 'all'));
   try {
     const cachedRaw = await env.SC_STORES.get(cacheKey);
@@ -2171,10 +2177,25 @@ async function handleAiChat(request, env, url) {
     }
   } catch (e) { /* мимо кеша */ }
 
-  // Нет модели/биндинга — сразу шаблон (сайт работает и без AI)
-  if (!env.AI || typeof env.AI.run !== 'function') {
+  // Нет модели/биндинга — сразу шаблон (сайт работает и без AI, лимит не тратим)
+  if (!hasAI) {
     return jsonResponse({ ok: true, reply: templateReply(), products: products, offline: true });
   }
+
+  // Лимит тратит только реальный вызов ИИ
+  const ip = aiClientIp(request);
+  try {
+    if (hasCt) {
+      const okDev = await checkRateLimit(ip, 'ai_rl_d:' + aiHash(ip + '|' + ct), AI_RATE_PER_HOUR);
+      if (!okDev) {
+        return jsonResponse({ ok: false, error: 'rate', message: 'Много вопросов подряд — лимит 60 в час с устройства. Подождите немного или напишите нам в WhatsApp' }, 429);
+      }
+    }
+    const okIp = await checkRateLimit(ip, 'ai_rl:' + aiHash(ip), AI_RATE_PER_IP_HOUR);
+    if (!okIp) {
+      return jsonResponse({ ok: false, error: 'rate', message: 'Слишком много вопросов с вашего адреса — попробуйте через час или напишите нам в WhatsApp' }, 429);
+    }
+  } catch (e) { /* KV недоступен — пропускаем лимит */ }
 
   const prodLines = products.map(function (p, idx) {
     const avail = p.stockState === 'in' ? ' (в наличии)'

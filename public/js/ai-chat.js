@@ -303,6 +303,10 @@
       return { role: m.role, text: m.text };
     });
 
+    // ID устройства для личного лимита (тот же токен, что у «Моих заказов»)
+    var ct = '';
+    try { ct = (window.Utils && Utils.clientToken) ? Utils.clientToken() : (localStorage.getItem('greenleaf_client_token_v1') || ''); } catch (e) { }
+
     fetch('/api/ai-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -310,7 +314,8 @@
         q: q,
         history: histToSend,
         storeId: st.id,
-        storeName: st.name
+        storeName: st.name,
+        ct: ct
       })
     })
       .then(function (r) { return r.json(); })
