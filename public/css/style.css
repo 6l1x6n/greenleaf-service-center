@@ -2922,6 +2922,32 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .ai-prod-stock { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
 .ai-prod-stock.ok { background: #e6f4ea; color: #1b6b3f; }
 .ai-prod-stock.no { background: #fdeeee; color: #b23b3b; }
+.ai-prod-stock.na { background: #eef1f4; color: #5b6b76; }
+
+/* Пузырь «печатает…» — три прыгающие точки */
+.ai-typing { display: inline-flex; align-items: center; gap: 5px; padding: 6px 4px; }
+.ai-typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: ai-blink 1.2s infinite;
+}
+.ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes ai-blink {
+  0%, 60%, 100% { opacity: 0.25; transform: none; }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* Десктоп: Айдос справа. Корзина тоже справа — когда она видна,
+   она уезжает вверх (body.has-cart), Айдос всегда снизу. */
+@media (min-width: 641px) {
+  .ai-fab { left: auto; right: 20px; }
+  .ai-panel { left: auto; right: 20px; }
+  body.has-cart .cart-fab { bottom: 94px; }
+  body.has-cart .ai-panel { bottom: 164px; }
+}
 .ai-prod-btns { display: flex; flex-direction: column; gap: 4px; flex: none; }
 .ai-prod-btns .btn { padding: 4px 10px; font-size: 12px; }
 .ai-foot { flex: none; display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: #fff; }

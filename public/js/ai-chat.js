@@ -3,7 +3,7 @@
 
   var FAB_KEY = 'greenleaf_ai_fab_hidden_v1';
   var HIST_KEY = 'greenleaf_ai_hist_v1';
-  var MAX_HIST = 20;
+  var MAX_HIST = 10;
 
   var fab = document.getElementById('aiFab');
   var panel = document.getElementById('aiPanel');
@@ -78,7 +78,7 @@
     try { localStorage.setItem(FAB_KEY, '1'); } catch (e) { }
     closePanel();
     applyFabVisibility();
-    toast('Кнопка менеджера скрыта — вернуть можно через меню «🤖 ИИ-менеджер»');
+    toast('Кнопка Айдоса скрыта — вернуть можно через меню «Менеджер Айдос»');
   }
 
   function showFab() {
@@ -92,7 +92,7 @@
     panel.classList.remove('hidden');
     if (!greeted && !hist.length) {
       greeted = true;
-      addBotHtml('Здравствуйте! Я помогу подобрать товары Greenleaf. Напишите, что ищете — например, «что есть для мозга» или «какие витаминки есть».');
+      addBotHtml('Здравствуйте! Я Айдос, помогу подобрать товары Greenleaf. Напишите, что ищете — например, «что есть для мозга» или «какие витаминки есть».');
       renderChips();
     }
     setTimeout(function () {
@@ -177,7 +177,7 @@
       if (nav) nav.classList.remove('open');
     }
     if (e.target.closest('#aiClose')) closePanel();
-    if (e.target.closest('#aiHide')) hideFab();
+    if (e.target.closest('#aiHide')) closePanel(); // «−» только сворачивает, кнопка остаётся
     var chip = e.target.closest('[data-ai-chip]');
     if (chip) {
       openPanel();
@@ -232,6 +232,16 @@
     return d;
   }
 
+  // Пузырь «печатает…» с анимированными точками (пока ждём ответ сервера)
+  function addTyping() {
+    var d = document.createElement('div');
+    d.className = 'ai-msg bot ai-typing-msg';
+    d.innerHTML = '<span class="ai-typing" aria-label="Айдос печатает"><span></span><span></span><span></span></span>';
+    body.appendChild(d);
+    scrollBottom();
+    return d;
+  }
+
   function renderChips() {
     var d = document.createElement('div');
     d.className = 'ai-chips';
@@ -245,9 +255,12 @@
 
   function prodCard(p) {
     var price = Number(p.price) > 0 ? fmtPrice(p.price) : 'Цена по запросу';
-    var stock = p.inStock
+    var st = p.stockState || (p.inStock ? 'in' : 'out');
+    var stock = st === 'in'
       ? '<span class="ai-prod-stock ok">В наличии</span>'
-      : '<span class="ai-prod-stock no">Нет в наличии</span>';
+      : st === 'out'
+        ? '<span class="ai-prod-stock no">Нет в наличии</span>'
+        : '<span class="ai-prod-stock na">Наличие уточняйте</span>';
     return '<div class="ai-prod">' +
       '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
       '<div class="ai-prod-info">' +
@@ -269,7 +282,7 @@
   function setOffline(off) {
     if (!statusEl) return;
     statusEl.classList.toggle('off', !!off);
-    statusEl.textContent = off ? 'Эко-режим (без ИИ)' : 'Online • отвечает кратко';
+    statusEl.textContent = off ? 'Эко-режим (без ИИ)' : 'Online';
   }
 
   // ---------------- Запрос ----------------
@@ -283,15 +296,19 @@
     setBusy(true);
     closeChips();
     addUser(q);
-    var typing = addBotHtml('<span class="ai-msg typing">Печатает…</span>');
+    var typing = addTyping();
     var st = selectedStore();
+    // Серверу — только текст реплик (без карточек, чтобы не раздувать запрос)
+    var histToSend = hist.slice(-4).map(function (m) {
+      return { role: m.role, text: m.text };
+    });
 
     fetch('/api/ai-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         q: q,
-        history: hist.slice(-4),
+        history: histToSend,
         storeId: st.id,
         storeName: st.name
       })
@@ -327,7 +344,7 @@
           scrollBottom();
         }
         hist.push({ role: 'user', text: q });
-        hist.push({ role: 'assistant', text: String(d.reply || '').slice(0, 500) });
+        hist.push({ role: 'assistant', text: String(d.reply || '').slice(0, 500), products: Array.isArray(d.products) ? d.products : [] });
         saveHist(hist);
       })
       .catch(function () {
@@ -361,15 +378,42 @@
     }
   });
 
-  // Восстановить старые реплики (только текст, без карточек — экономия DOM)
+  // Восстановить историю (текст + карточки товаров — переживают перезагрузку)
   (function restore() {
-    hist.slice(-6).forEach(function (m) {
+    hist.slice(-MAX_HIST).forEach(function (m) {
       var d = document.createElement('div');
       d.className = 'ai-msg ' + (m.role === 'user' ? 'user' : 'bot');
-      d.textContent = m.text;
+      if (m.role === 'user' || !m.products || !m.products.length) {
+        d.textContent = m.text;
+      } else {
+        d.innerHTML = esc(m.text).replace(/\n/g, '<br>');
+        var wrap = document.createElement('div');
+        wrap.className = 'ai-prods';
+        wrap.innerHTML = m.products.map(prodCard).join('');
+        d.appendChild(wrap);
+      }
       body.appendChild(d);
     });
+    if (hist.length) scrollBottom();
   })();
+
+  // Метка «корзина видна» для раскладки кнопок справа на десктопе.
+  // cartFab переключается из cart.js — следим через observer + события.
+  function syncHasCart() {
+    try {
+      var cf = document.getElementById('cartFab');
+      document.body.classList.toggle('has-cart', !!(cf && !cf.classList.contains('hidden')));
+    } catch (e) { }
+  }
+  try {
+    var cf0 = document.getElementById('cartFab');
+    if (cf0 && window.MutationObserver) {
+      new MutationObserver(syncHasCart).observe(cf0, { attributes: true, attributeFilter: ['class'] });
+    }
+  } catch (e) { }
+  document.addEventListener('cart:change', function () { setTimeout(syncHasCart, 50); });
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(syncHasCart, 50); });
+  syncHasCart();
 
   applyFabVisibility();
 })();

@@ -1878,9 +1878,9 @@ function aiClientIp(request) {
   return String(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '').split(',')[0].trim().slice(0, 64) || 'unknown';
 }
 
-// Каталог для ИИ: база + глобальные оверрайды цен/скрытия (без тяжёлых
-// эффективных остатков — наличие берём из факта парсера + дельт).
-async function loadAiCatalog(env, url) {
+// Каталог для ИИ: база + глобальные оверрайды цен/скрытия.
+// Наличие — эффективное (как витрина: факт − холды − заказы), если выбран СЦ.
+async function loadAiCatalog(env, url, storeId) {
   const res = await env.ASSETS.fetch(new URL('/data/products.base.json', url));
   if (!res.ok) return [];
   let data;
@@ -1896,8 +1896,13 @@ async function loadAiCatalog(env, url) {
   } catch (e) { /* без оверрайдов */ }
   let stock = {};
   try {
-    const base = await loadBaseStock(env, url);
-    stock = base.stock || {};
+    if (storeId) {
+      const eff = await computeEffectiveStock(env, url);
+      stock = eff.stock || {};
+    } else {
+      const base = await loadBaseStock(env, url);
+      stock = base.stock || {};
+    }
   } catch (e) { /* без остатков */ }
   const out = [];
   for (let i = 0; i < list.length; i++) {
@@ -1922,60 +1927,129 @@ async function loadAiCatalog(env, url) {
 }
 
 // Наличие товара: по выбранному СЦ или суммарно по всем филиалам.
-// count: число шт (>0), 0 — нет, -1 — данных нет (не прячем товар).
+// state: 'in' — есть, 'out' — нет, 'unknown' — данных нет (прочерк).
+// «Нет данных» — НЕ «в наличии»: иначе карточки без остатков врали бы бейджем.
 function aiAvail(p, storeId) {
   const stock = p.stock || {};
   function cnt(txt) {
     const t = String(txt == null ? '' : txt).trim();
-    if (!t || t.indexOf('Ожидается') !== -1) return -1;
+    if (!t || t === '—' || t === '-' || t.indexOf('Ожидается') !== -1) return -1;
     if (t.toLowerCase().indexOf('нет') === 0) return 0;
     const m = t.match(/(\d+)\s*шт/);
     return m ? parseInt(m[1], 10) : -1;
   }
   if (storeId && stock[storeId]) {
     const c = cnt(stock[storeId][p.id]);
-    return { count: c, has: c !== 0 };
+    if (c > 0) return { count: c, state: 'in' };
+    if (c === 0 || String(p.status || '') === 'out') return { count: Math.max(0, c), state: 'out' };
+    return { count: -1, state: 'unknown' };
   }
-  let sum = 0, any = false, allZero = true;
+  let best = -1, measured = false, allZero = true;
   Object.keys(stock).forEach(function (sid) {
     const c = cnt(stock[sid][p.id]);
-    if (c >= 0) { any = true; sum += c; if (c > 0) allZero = false; }
+    if (c >= 0) {
+      measured = true;
+      if (c > best) best = c;
+      if (c > 0) allZero = false;
+    }
   });
-  if (!any) return { count: -1, has: true }; // данных нет — не прячем
-  return { count: sum, has: !allZero };
+  if (best > 0) return { count: best, state: 'in' };
+  if (String(p.status || '') === 'out' || (measured && allZero)) return { count: 0, state: 'out' };
+  return { count: -1, state: 'unknown' };
 }
 
-// Детерминированный скоринг: артикул → вхождение запроса → токены.
-// Возвращает топ-N (сначала в наличии).
+// Совпадение токена: короткие (<5 букв) — только по границе слова,
+// чтобы «кофе» не тянуло «кофейный» (очки), а «мыло» — «мыльный» мимоходом.
+function aiTokHit(norm, tok) {
+  if (!tok) return false;
+  if (tok.length < 5) {
+    return norm === tok || norm.indexOf(' ' + tok + ' ') !== -1 ||
+      norm.indexOf(tok + ' ') === 0 || norm.slice(-tok.length - 1) === ' ' + tok;
+  }
+  return norm.indexOf(tok) !== -1;
+}
+
+// Алиасы простонародных названий → товары каталога.
+// Источник правды — «инструкция для Айдоса.md» в корне репозитория.
+// pin — артикулы, которые принудительно ставятся в топ подборки;
+// search — токены, по которым ищем ВМЕСТО буквального запроса
+// (иначе «туалетная бумага» притащит мокрую CEA068 буквально).
+const AI_ALIAS = [
+  {
+    keys: ['иглоукалыван', 'иголк', 'акупунктур'],
+    search: ['бальзам', 'расслабляющ', 'трав'],
+    pin: ['CIA064'],
+    note: '"иглоукалывание" у клиентов = Расслабляющий бальзам на травах (CIA064); иглоукалывания как услуги в каталоге нет — так и скажи.'
+  },
+  {
+    keys: ['туалетн'], need: ['бумаг'],
+    search: ['рулонов', 'салфетк', 'бамбук'],
+    pin: ['CEA084', 'CEA079'],
+    note: '"туалетная бумага" = Рулоновые салфетки из бамбукового волокна (CEA084); если их нет — предложи другие бамбуковые салфетки (CEA079). "Женскую мокрую туалетную бумагу" как замену НЕ предлагай — это другой товар.'
+  },
+  {
+    keys: ['седин', 'чернит', 'чернящ'],
+    search: ['седин', 'чернит', 'lgj008'],
+    pin: ['LGJ008'],
+    note: '"шампунь от седины / чернящий шампунь" = только артикул LGJ008 (в его названии про седину ни слова — верь подборке, а не названию).'
+  },
+  {
+    keys: ['зелен'], need: ['мыло'],
+    search: ['хозяйствен', 'мыло', 'сода', 'энзим'],
+    pin: ['ASF068', 'ASF036'],
+    note: '"зелёное мыло" у клиентов = Хозяйственное мыло с содой и энзимами (ASF068).'
+  }
+];
+
+function aiAliasFor(toks) {
+  for (let a = 0; a < AI_ALIAS.length; a++) {
+    const al = AI_ALIAS[a];
+    const hitKey = al.keys.some(function (k) {
+      return toks.some(function (t) { return t.indexOf(k) === 0 || k.indexOf(t) === 0; });
+    });
+    if (!hitKey) continue;
+    if (al.need && !al.need.some(function (n) {
+      return toks.some(function (t) { return t.indexOf(n) === 0 || n.indexOf(t) === 0; });
+    })) continue;
+    return al;
+  }
+  return null;
+}
+
+// Детерминированный скоринг: артикул → алиас → вхождение запроса → токены.
+// Возвращает {products, alias}: сначала в наличии, чужих — максимум 2
+// (если есть хоть что-то в наличии/неизвестное), пины алиаса — в самом топе.
 function aiSearch(catalog, query, storeId, limit) {
   const q = aiNorm(query);
-  if (!q) return [];
+  if (!q) return { products: [], alias: null };
   const toks = aiTokens(query);
-  const syns = aiSynonyms(toks);
+  const alias = aiAliasFor(toks);
+  const syns = alias ? [] : aiSynonyms(toks);
+  const useToks = alias ? alias.search : toks;
   const scored = [];
   for (let i = 0; i < catalog.length; i++) {
     const p = catalog[i];
     let score = 0;
     if (p.sku && p.sku.toLowerCase() === q) score += 100;
-    else if (p.norm && p.norm.indexOf(q) !== -1 && q.length >= 4) score += 40;
-    for (let t = 0; t < toks.length; t++) {
-      const variants = aiStemVariants(toks[t]);
+    else if (!alias && p.norm && p.norm.indexOf(q) !== -1 && q.length >= 4) score += 40;
+    for (let t = 0; t < useToks.length; t++) {
+      const variants = aiStemVariants(useToks[t]);
       for (let v = 0; v < variants.length; v++) {
-        if (p.norm.indexOf(variants[v]) !== -1) {
+        if (aiTokHit(p.norm, variants[v])) {
           score += v === 0 ? (variants[v].length >= 6 ? 6 : 3) : 2;
           break;
         }
       }
     }
     for (let s = 0; s < syns.length; s++) {
-      if (p.norm.indexOf(syns[s]) !== -1) score += 2;
+      if (aiTokHit(p.norm, syns[s])) score += 2;
     }
     if (!score) continue;
     const av = aiAvail(p, storeId);
-    if (!av.has) score -= 25; // нет в наличии — вниз, но не выкидываем
-    else if (av.count > 0) score += 5;
+    if (av.state === 'out') score -= 25; // нет в наличии — вниз, но не выкидываем
+    else if (av.state === 'in') score += 5;
     if (p.status === 'in_stock' || p.status === 'low') score += 2;
-    scored.push({ p: p, score: score });
+    scored.push({ p: p, score: score, av: av });
   }
   scored.sort(function (a, b) { return b.score - a.score; });
   // Дедуп: карточки «(Кол-во в коробке N шт) …» — дубли товара.
@@ -1995,7 +2069,25 @@ function aiSearch(catalog, query, storeId, limit) {
       seen[key] = scored[d];
     }
   }
-  return deduped.map(function (s) { return s.p; });
+  // Раскладка: в наличии → неизвестно → нет (чужих максимум 2, если есть другие)
+  const inS = [], unk = [], outS = [];
+  deduped.forEach(function (s) {
+    (s.av.state === 'in' ? inS : s.av.state === 'out' ? outS : unk).push(s);
+  });
+  const cutOut = (inS.length + unk.length) > 0 ? outS.slice(0, 2) : outS;
+  let result = inS.concat(unk, cutOut).map(function (s) { return s.p; });
+  // Пины алиаса — принудительно в топ (напр. LGJ008 не найти по названию)
+  if (alias && alias.pin) {
+    const have = {};
+    result.forEach(function (p) { have[p.id] = 1; });
+    const pinned = [];
+    alias.pin.forEach(function (id) {
+      const f = catalog.find(function (c) { return String(c.id) === String(id); });
+      if (f && !have[f.id]) { pinned.push(f); have[f.id] = 1; }
+    });
+    result = pinned.concat(result).slice(0, limit || AI_MAX_PRODUCTS);
+  }
+  return { products: result, alias: alias };
 }
 
 async function handleAiChat(request, env, url) {
@@ -2032,14 +2124,15 @@ async function handleAiChat(request, env, url) {
     await env.SC_STORES.put(rlKey, JSON.stringify(rl), { expirationTtl: 3700 });
   } catch (e) { /* KV недоступен — пропускаем лимит */ }
 
-  const catalog = await loadAiCatalog(env, url);
+  const catalog = await loadAiCatalog(env, url, storeId);
   const found = aiSearch(catalog, q, storeId, AI_MAX_PRODUCTS);
-  const products = found.map(function (p) {
+  const aliasNote = found.alias ? found.alias.note : '';
+  const products = found.products.map(function (p) {
     const av = aiAvail(p, storeId);
     return {
       id: p.id, sku: p.sku, name: p.name, category: p.category,
       price: p.price, image: p.image, status: p.status,
-      inStock: av.has, count: av.count
+      inStock: av.state === 'in', stockState: av.state, count: av.count
     };
   });
 
@@ -2084,22 +2177,27 @@ async function handleAiChat(request, env, url) {
   }
 
   const prodLines = products.map(function (p, idx) {
+    const avail = p.stockState === 'in' ? ' (в наличии)'
+      : p.stockState === 'out' ? ' (нет в наличии)' : ' (наличие уточняйте)';
     return (idx + 1) + '. ' + p.name + ' [' + p.category + '] — ' +
-      (p.price > 0 ? p.price + ' ₸' : 'цена по запросу') +
-      (p.inStock ? ' (в наличии)' : ' (нет в наличии)') + ' {id:' + p.id + '}';
+      (p.price > 0 ? p.price + ' ₸' : 'цена по запросу') + avail + ' {id:' + p.id + '}';
   }).join('\n');
 
   const histLines = history.map(function (m) {
-    return (m.role === 'user' ? 'Клиент: ' : 'Менеджер: ') + m.text;
+    return (m.role === 'user' ? 'Клиент: ' : 'Айдос: ') + m.text;
   }).join('\n');
 
-  const system = 'Ты — краткий менеджер магазина эко-товаров Greenleaf (бытовая химия iLife, ' +
+  const system = 'Ты — Айдос, менеджер магазина эко-товаров Greenleaf (бытовая химия iLife, ' +
     'косметика SEALUXE, гигиена CARICH и др.). ' +
     'Магазин: ' + (shop.addr || 'адрес уточняйте') + '. Часы: ' + (shop.hours || 'уточняйте') +
     '. Телефон: ' + (shop.phone || '—') + '. WhatsApp: ' + (shop.wa || '—') + '.' +
     (storeName ? ' Филиал клиента: ' + storeName + '.' : '') +
+    (aliasNote ? ' Важно: ' + aliasNote : '') +
     ' Отвечай по-русски, по делу, 2-4 предложения. ' +
-    'Правила: говори только о товарах из списка ниже, цены и наличие не выдумывай; ' +
+    'Правила: говори только о товарах из списка ниже, цены не выдумывай; ' +
+    '«в наличии» называй ТОЛЬКО товары с пометкой (в наличии); ' +
+    'товары с пометкой (нет в наличии) предлагай лишь как «пока нет — уточните поставку»; ' +
+    'с пометкой (наличие уточняйте) — «наличие уточняйте в WhatsApp»; ' +
     'назови 2-3 лучших и чем они отличаются; если список пуст, а вопрос про адрес/часы/доставку — ' +
     'ответь по данным магазина выше; если товара нет — честно скажи и предложи WhatsApp; ' +
     'без диагнозов и слов «лечит» — только общие свойства; ' +
