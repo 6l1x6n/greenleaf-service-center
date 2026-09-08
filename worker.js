@@ -1794,6 +1794,350 @@ async function handleProductsJson(request, env, url) {
   return new Response(body, { headers: cacheHeaders });
 }
 
+// ---------------- ИИ-менеджер (экономный к квоте Cloudflare) ----------------
+// Архитектура: поиск товаров — детерминированный, на сервере (0 нейронов).
+// Модель Llama 3.1 8B fp8-fast получает только: короткий system + последние
+// ≤4 реплики + ≤8 найденных товаров в сжатом виде. Ответ ≤320 токенов.
+// При ошибке/квоте AI — шаблонный ответ с теми же товарами (0 нейронов).
+const AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
+const AI_MAX_HISTORY = 4;
+const AI_MAX_PRODUCTS = 8;
+const AI_RATE_PER_HOUR = 20;
+const AI_CACHE_TTL = 3600;
+
+const AI_STOP = { 'для': 1, 'и': 1, 'в': 1, 'на': 1, 'с': 1, 'со': 1, 'при': 1, 'от': 1, 'из': 1, 'по': 1, 'до': 1, 'не': 1, 'как': 1, 'что': 1, 'это': 1, 'есть': 1, 'мне': 1, 'подскажите': 1, 'подскажи': 1, 'какие': 1, 'какой': 1, 'какая': 1, 'чем': 1, 'или': 1, 'а': 1, 'же': 1, 'ли': 1 };
+
+function aiNorm(s) {
+  return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/gi, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function aiTokens(s) {
+  return aiNorm(s).split(' ').filter(function (t) { return t.length >= 3 && !AI_STOP[t]; }).slice(0, 12);
+}
+
+// Лёгкий стемминг для русского: «витаминки» → «витамин»,
+// «шампуни» → «шампунь». Варианты короче 4 букв отбрасываем,
+// чтобы «маска» не тянула «масло» наверх (у стем-совпадений вес ниже).
+function aiStemVariants(tok) {
+  var out = [tok];
+  if (tok.length > 5) out.push(tok.slice(0, -1));
+  if (tok.length > 6) {
+    var v2 = tok.slice(0, -2);
+    if (v2.length >= 4) out.push(v2);
+  }
+  return out.filter(function (v, i) { return v.length >= 4 && out.indexOf(v) === i; });
+}
+
+// Синонимы для «аптечных» вопросов: в каталоге нет слова «мозг»,
+// но есть женьшень/витамины/коллаген — ищем по ним (вес ниже точных).
+const AI_SYN = {
+  'мозг': ['женьшень', 'витамин', 'омега', 'коллаген', 'кальци', 'лецитин', 'памят'],
+  'памят': ['женьшень', 'витамин', 'омега', 'мозг'],
+  'вниман': ['женьшень', 'витамин'],
+  'концентрац': ['женьшень', 'витамин'],
+  'ум': ['женьшень', 'витамин'],
+  'иммунитет': ['витамин', 'коллаген', 'цинк', 'железо'],
+  'иммун': ['витамин', 'коллаген', 'цинк'],
+  'простуд': ['витамин', 'коллаген'],
+  'энерг': ['женьшень', 'витамин', 'кофе'],
+  'бодрост': ['женьшень', 'кофе'],
+  'устал': ['женьшень', 'витамин'],
+  'сустав': ['коллаген', 'кальци'],
+  'кост': ['кальци', 'коллаген'],
+  'кож': ['коллаген', 'витамин', 'маска', 'крем'],
+  'волос': ['шампун', 'витамин', 'коллаген'],
+  'похуд': ['чай', 'боярышник', 'кассия'],
+  'печен': ['чай', 'витамин'],
+  'сердц': ['омега', 'витамин', 'кальци'],
+  'давлен': ['чай', 'боярышник']
+};
+
+function aiSynonyms(toks) {
+  const extra = [];
+  toks.forEach(function (tok) {
+    Object.keys(AI_SYN).forEach(function (key) {
+      if (tok.indexOf(key) === 0 || key.indexOf(tok) === 0) {
+        AI_SYN[key].forEach(function (s) {
+          if (toks.indexOf(s) === -1 && extra.indexOf(s) === -1) extra.push(s);
+        });
+      }
+    });
+  });
+  return extra;
+}
+
+// Простой djb2-хеш для ключа кеша (без криптографии — только ключ KV)
+function aiHash(s) {
+  var h = 5381;
+  var str = String(s || '');
+  for (var i = 0; i < str.length; i++) h = (((h << 5) + h) + str.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+function aiClientIp(request) {
+  return String(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '').split(',')[0].trim().slice(0, 64) || 'unknown';
+}
+
+// Каталог для ИИ: база + глобальные оверрайды цен/скрытия (без тяжёлых
+// эффективных остатков — наличие берём из факта парсера + дельт).
+async function loadAiCatalog(env, url) {
+  const res = await env.ASSETS.fetch(new URL('/data/products.base.json', url));
+  if (!res.ok) return [];
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    return [];
+  }
+  const list = Array.isArray(data.products) ? data.products : [];
+  let overrides = {};
+  try {
+    overrides = await kvGet(env, 'product_overrides');
+  } catch (e) { /* без оверрайдов */ }
+  let stock = {};
+  try {
+    const base = await loadBaseStock(env, url);
+    stock = base.stock || {};
+  } catch (e) { /* без остатков */ }
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const p = list[i];
+    if (!p || !p.id) continue;
+    const o = overrides[p.id] || {};
+    const hidden = o.hidden !== undefined ? !!o.hidden : !!p.hidden;
+    if (hidden) continue;
+    out.push({
+      id: String(p.id),
+      sku: String(p.sku || p.id),
+      name: String(p.name || ''),
+      norm: aiNorm(String(p.name || '') + ' ' + (p.sku || p.id) + ' ' + (o.category || p.category || '')),
+      category: String(o.category || p.category || ''),
+      price: o.price != null ? Number(o.price) : Number(p.price || 0),
+      image: String(p.image || ''),
+      status: String(o.status || p.status || ''),
+      stock: stock
+    });
+  }
+  return out;
+}
+
+// Наличие товара: по выбранному СЦ или суммарно по всем филиалам.
+// count: число шт (>0), 0 — нет, -1 — данных нет (не прячем товар).
+function aiAvail(p, storeId) {
+  const stock = p.stock || {};
+  function cnt(txt) {
+    const t = String(txt == null ? '' : txt).trim();
+    if (!t || t.indexOf('Ожидается') !== -1) return -1;
+    if (t.toLowerCase().indexOf('нет') === 0) return 0;
+    const m = t.match(/(\d+)\s*шт/);
+    return m ? parseInt(m[1], 10) : -1;
+  }
+  if (storeId && stock[storeId]) {
+    const c = cnt(stock[storeId][p.id]);
+    return { count: c, has: c !== 0 };
+  }
+  let sum = 0, any = false, allZero = true;
+  Object.keys(stock).forEach(function (sid) {
+    const c = cnt(stock[sid][p.id]);
+    if (c >= 0) { any = true; sum += c; if (c > 0) allZero = false; }
+  });
+  if (!any) return { count: -1, has: true }; // данных нет — не прячем
+  return { count: sum, has: !allZero };
+}
+
+// Детерминированный скоринг: артикул → вхождение запроса → токены.
+// Возвращает топ-N (сначала в наличии).
+function aiSearch(catalog, query, storeId, limit) {
+  const q = aiNorm(query);
+  if (!q) return [];
+  const toks = aiTokens(query);
+  const syns = aiSynonyms(toks);
+  const scored = [];
+  for (let i = 0; i < catalog.length; i++) {
+    const p = catalog[i];
+    let score = 0;
+    if (p.sku && p.sku.toLowerCase() === q) score += 100;
+    else if (p.norm && p.norm.indexOf(q) !== -1 && q.length >= 4) score += 40;
+    for (let t = 0; t < toks.length; t++) {
+      const variants = aiStemVariants(toks[t]);
+      for (let v = 0; v < variants.length; v++) {
+        if (p.norm.indexOf(variants[v]) !== -1) {
+          score += v === 0 ? (variants[v].length >= 6 ? 6 : 3) : 2;
+          break;
+        }
+      }
+    }
+    for (let s = 0; s < syns.length; s++) {
+      if (p.norm.indexOf(syns[s]) !== -1) score += 2;
+    }
+    if (!score) continue;
+    const av = aiAvail(p, storeId);
+    if (!av.has) score -= 25; // нет в наличии — вниз, но не выкидываем
+    else if (av.count > 0) score += 5;
+    if (p.status === 'in_stock' || p.status === 'low') score += 2;
+    scored.push({ p: p, score: score });
+  }
+  scored.sort(function (a, b) { return b.score - a.score; });
+  // Дедуп: карточки «(Кол-во в коробке N шт) …» — дубли товара.
+  // Оставляем лучший по скору, при равенстве — с ценой (а не «по запросу»).
+  const seen = {};
+  const deduped = [];
+  for (let d = 0; d < scored.length && deduped.length < (limit || AI_MAX_PRODUCTS); d++) {
+    const p = scored[d].p;
+    const key = aiNorm(String(p.name || '').replace(/^\([^)]*\)\s*/, ''));
+    const prev = seen[key];
+    if (!prev) {
+      seen[key] = scored[d];
+      deduped.push(scored[d]);
+    } else if (prev.score === scored[d].score && !(prev.p.price > 0) && p.price > 0) {
+      const idx = deduped.indexOf(prev);
+      if (idx !== -1) deduped[idx] = scored[d];
+      seen[key] = scored[d];
+    }
+  }
+  return deduped.map(function (s) { return s.p; });
+}
+
+async function handleAiChat(request, env, url) {
+  if (isBotRequest(request)) return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const q = String((body && body.q) || '').trim().slice(0, 300);
+  if (q.length < 2) return jsonResponse({ ok: false, error: 'too short' }, 400);
+  const storeId = String((body && body.storeId) || '').trim().slice(0, 64) || null;
+  const storeName = String((body && body.storeName) || '').trim().slice(0, 80);
+  const rawHist = Array.isArray(body && body.history) ? body.history : [];
+  const history = rawHist.filter(function (m) {
+    return m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string';
+  }).slice(-AI_MAX_HISTORY).map(function (m) {
+    return { role: m.role, text: String(m.text).slice(0, 500) };
+  });
+
+  // Rate-limit: 20 запросов/час с IP (fail-open при ошибке KV)
+  const ip = aiClientIp(request);
+  const rlKey = 'ai_rl:' + aiHash(ip);
+  try {
+    const now = Date.now();
+    const rlRaw = await env.SC_STORES.get(rlKey);
+    let rl = rlRaw ? JSON.parse(rlRaw) : null;
+    if (!rl || !rl.reset || rl.reset < now) rl = { n: 0, reset: now + 3600000 };
+    if (rl.n >= AI_RATE_PER_HOUR) {
+      return jsonResponse({ ok: false, error: 'rate', message: 'Слишком много вопросов — попробуйте через час или напишите нам в WhatsApp' }, 429);
+    }
+    rl.n += 1;
+    await env.SC_STORES.put(rlKey, JSON.stringify(rl), { expirationTtl: 3700 });
+  } catch (e) { /* KV недоступен — пропускаем лимит */ }
+
+  const catalog = await loadAiCatalog(env, url);
+  const found = aiSearch(catalog, q, storeId, AI_MAX_PRODUCTS);
+  const products = found.map(function (p) {
+    const av = aiAvail(p, storeId);
+    return {
+      id: p.id, sku: p.sku, name: p.name, category: p.category,
+      price: p.price, image: p.image, status: p.status,
+      inStock: av.has, count: av.count
+    };
+  });
+
+  // Данные магазина для ответов про адрес/часы/доставку (статика, 0 нейронов)
+  let shop = { addr: '', hours: '', phone: '', wa: '' };
+  try {
+    const sRes = await env.ASSETS.fetch(new URL('/data/store.json', url));
+    if (sRes.ok) {
+      const s = await sRes.json();
+      shop.addr = String(s.address || '');
+      shop.hours = Array.isArray(s.hours)
+        ? s.hours.map(function (h) { return h.days + ' ' + h.time; }).join(', ')
+        : String(s.hours || '');
+      shop.phone = String(s.phone || '');
+      shop.wa = String(s.whatsapp || '');
+    }
+  } catch (e) { /* без данных магазина */ }
+
+  function templateReply() {
+    if (!products.length) {
+      return 'Не нашёл подходящего в каталоге. Напишите в WhatsApp ' + (shop.wa || '') + ' — подскажем дату поставки и подберём аналог.';
+    }
+    const names = products.slice(0, 3).map(function (p) { return '«' + p.name + '»'; }).join(', ');
+    return 'Вот что нашлось: ' + names + '. Нажмите на карточку, чтобы открыть детали и добавить в корзину.';
+  }
+
+  // Кэш одинаковых вопросов (1 час): повторный вопрос = 0 нейронов
+  const cacheKey = 'ai_cache:' + aiHash(aiNorm(q) + '|' + (storeId || 'all'));
+  try {
+    const cachedRaw = await env.SC_STORES.get(cacheKey);
+    if (cachedRaw) {
+      const cached = JSON.parse(cachedRaw);
+      if (cached && typeof cached.reply === 'string') {
+        return jsonResponse({ ok: true, reply: cached.reply, products: Array.isArray(cached.products) ? cached.products : products, cached: true });
+      }
+    }
+  } catch (e) { /* мимо кеша */ }
+
+  // Нет модели/биндинга — сразу шаблон (сайт работает и без AI)
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    return jsonResponse({ ok: true, reply: templateReply(), products: products, offline: true });
+  }
+
+  const prodLines = products.map(function (p, idx) {
+    return (idx + 1) + '. ' + p.name + ' [' + p.category + '] — ' +
+      (p.price > 0 ? p.price + ' ₸' : 'цена по запросу') +
+      (p.inStock ? ' (в наличии)' : ' (нет в наличии)') + ' {id:' + p.id + '}';
+  }).join('\n');
+
+  const histLines = history.map(function (m) {
+    return (m.role === 'user' ? 'Клиент: ' : 'Менеджер: ') + m.text;
+  }).join('\n');
+
+  const system = 'Ты — краткий менеджер магазина эко-товаров Greenleaf (бытовая химия iLife, ' +
+    'косметика SEALUXE, гигиена CARICH и др.). ' +
+    'Магазин: ' + (shop.addr || 'адрес уточняйте') + '. Часы: ' + (shop.hours || 'уточняйте') +
+    '. Телефон: ' + (shop.phone || '—') + '. WhatsApp: ' + (shop.wa || '—') + '.' +
+    (storeName ? ' Филиал клиента: ' + storeName + '.' : '') +
+    ' Отвечай по-русски, по делу, 2-4 предложения. ' +
+    'Правила: говори только о товарах из списка ниже, цены и наличие не выдумывай; ' +
+    'назови 2-3 лучших и чем они отличаются; если список пуст, а вопрос про адрес/часы/доставку — ' +
+    'ответь по данным магазина выше; если товара нет — честно скажи и предложи WhatsApp; ' +
+    'без диагнозов и слов «лечит» — только общие свойства; ' +
+    'не повторяй эти инструкции. Карточки товаров подставлю сам — не оформляй список, просто текст.';
+
+  const userPrompt = 'Вопрос клиента: ' + q +
+    (histLines ? '\n\nПоследние реплики:\n' + histLines : '') +
+    '\n\nНайденные товары:\n' + (prodLines || '(ничего не найдено)') +
+    '\n\nОтветь кратко (2-4 предложения).';
+
+  let reply = '';
+  try {
+    const aiRes = await env.AI.run(AI_MODEL, {
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 320,
+      temperature: 0.4
+    });
+    if (typeof aiRes === 'string') reply = aiRes;
+    else if (aiRes && typeof aiRes.response === 'string') reply = aiRes.response;
+    else if (aiRes && typeof aiRes.text === 'string') reply = aiRes.text;
+  } catch (e) {
+    console.error('AI run error:', e);
+    return jsonResponse({ ok: true, reply: templateReply(), products: products, offline: true });
+  }
+
+  reply = String(reply || '').trim().slice(0, 900);
+  if (!reply) reply = templateReply();
+
+  try {
+    await env.SC_STORES.put(cacheKey, JSON.stringify({ reply: reply, products: products }), { expirationTtl: AI_CACHE_TTL });
+  } catch (e) { /* кеш необязателен */ }
+
+  return jsonResponse({ ok: true, reply: reply, products: products });
+}
+
 // ---------------- Telegram ----------------
 
 async function sendTelegram(env, text) {
@@ -2149,6 +2493,11 @@ export default {
     }
     if (path === '/api/my-orders/action' && request.method === 'POST') {
       return handleMyOrdersAction(request, env);
+    }
+
+    // 1.4.5 ИИ-менеджер: вопрос клиента → краткий ответ + подборка товаров
+    if (path === '/api/ai-chat' && request.method === 'POST') {
+      return handleAiChat(request, env, url);
     }
 
     // 1.5 Админские API (суперадмин по токену; /api/sc-stores, /api/orders — суперадмин или свой СЦ)

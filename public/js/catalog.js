@@ -1658,5 +1658,11 @@ fetch('/api/event-bookings')
     render();
   };
 
+  // Хук для ИИ-менеджера: открыть модалку товара из чата по id
+  window.CatalogOpenDetail = function (id) {
+    var p = products.find(function (x) { return String(x.id) === String(id) && !x.hidden; });
+    if (p) openProductDetailModal(p);
+  };
+
   init();
 })();
