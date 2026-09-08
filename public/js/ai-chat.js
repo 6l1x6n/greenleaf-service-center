@@ -78,7 +78,7 @@
     try { localStorage.setItem(FAB_KEY, '1'); } catch (e) { }
     closePanel();
     applyFabVisibility();
-    toast('Кнопка Исы скрыта — вернуть можно через меню «Менеджер Иса»');
+    toast('Скрыто. Вернуть: меню → «Менеджер Иса»');
   }
 
   function showFab() {
@@ -96,6 +96,7 @@
       renderChips();
     }
     setTimeout(function () {
+      try { body.scrollTop = body.scrollHeight; } catch (e) { }
       try { input.focus(); } catch (e) { }
     }, 60);
   }
@@ -204,17 +205,28 @@
       openPanel();
       ask(chip.getAttribute('data-ai-chip') || '');
     }
-    var add = e.target.closest('[data-ai-add]');
-    if (add) {
-      var id = add.getAttribute('data-ai-add');
+    // Степпер идёт раньше деталей: клик по +/− не открывает карточку
+    var inc = e.target.closest('[data-ai-inc]');
+    if (inc) {
+      var iid = inc.getAttribute('data-ai-inc');
+      if (!window.Cart || !Cart.add) { toast('Откройте каталог, чтобы добавить товар'); return; }
+      if (aiQty(iid) >= aiMax(iid)) { toast('⚠️ В выбранном филиале недостаточно товара'); return; }
+      try { Cart.add(iid, 1); } catch (err) { toast('Не удалось добавить в корзину'); return; }
+      refreshAiSteppers();
+      return;
+    }
+    var dec = e.target.closest('[data-ai-dec]');
+    if (dec) {
+      var did = dec.getAttribute('data-ai-dec');
+      var dq = aiQty(did);
+      if (dq <= 0) return;
       try {
-        if (window.Cart && Cart.add) {
-          Cart.add(id, 1);
-          toast('🛒 Добавлено в корзину');
-        } else {
-          toast('Откройте каталог, чтобы добавить товар');
-        }
-      } catch (err) { toast('Не удалось добавить в корзину'); }
+        if (!window.Cart) return;
+        if (dq <= 1) Cart.remove(did);
+        else Cart.setQty(did, dq - 1);
+      } catch (err) { }
+      refreshAiSteppers();
+      return;
     }
     var det = e.target.closest('[data-ai-detail]');
     if (det) {
@@ -224,6 +236,19 @@
         else location.href = 'catalog.html';
       } catch (err) { location.href = 'catalog.html'; }
     }
+  });
+
+  // Enter по карточке (не по степперу) — тоже открывает подробности
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || /INPUT|TEXTAREA/.test(String(document.activeElement && document.activeElement.tagName || ''))) return;
+    var card = e.target && e.target.closest ? e.target.closest('.ai-prod') : null;
+    if (!card || e.target.closest('[data-ai-inc],[data-ai-dec]')) return;
+    var pid2 = card.getAttribute('data-ai-detail');
+    if (!pid2) return;
+    try {
+      if (window.CatalogOpenDetail) window.CatalogOpenDetail(pid2);
+      else location.href = 'catalog.html';
+    } catch (err) { location.href = 'catalog.html'; }
   });
 
   document.addEventListener('keydown', function (e) {
@@ -309,6 +334,45 @@
     scrollBottom();
   }
 
+  // Кол-во товара в корзине (0 — нет) и потолок по остатку филиала
+  function aiQty(id) {
+    try {
+      if (!window.Cart || !Cart.get) return 0;
+      var it = Cart.get().find(function (i) { return String(i.id) === String(id); });
+      return it ? (Number(it.qty) || 0) : 0;
+    } catch (e) { return 0; }
+  }
+
+  function aiMax(id) {
+    try {
+      if (window.Cart && Cart.stockMax) {
+        var m = Cart.stockMax(id);
+        if (m !== null && m !== undefined) return Math.max(1, Math.min(m, 999));
+      }
+    } catch (e) { }
+    return 999;
+  }
+
+  function stepperHtml(id) {
+    var q = aiQty(id);
+    return '<div class="ai-qty" title="Количество">' +
+      '<button class="qty-btn" type="button" data-ai-dec="' + esc(id) + '" aria-label="Уменьшить"' + (q <= 0 ? ' disabled' : '') + '>−</button>' +
+      '<span class="qty-val" data-ai-qtyval="' + esc(id) + '">' + Math.max(1, q) + '</span>' +
+      '<button class="qty-btn" type="button" data-ai-inc="' + esc(id) + '" aria-label="Увеличить">+</button>' +
+      '</div>' +
+      (q > 0 ? '<span class="ai-incart">🛒 ' + q + '</span>' : '');
+  }
+
+  // Обновить все степперы в чате (после изменений корзины)
+  function refreshAiSteppers() {
+    body.querySelectorAll('.ai-prod').forEach(function (card) {
+      var id = card.getAttribute('data-ai-detail');
+      if (!id) return;
+      var side = card.querySelector('.ai-prod-side');
+      if (side) side.innerHTML = stepperHtml(id);
+    });
+  }
+
   function prodCard(p) {
     var price = Number(p.price) > 0 ? fmtPrice(p.price) : 'Цена по запросу';
     var st = p.stockState || (p.inStock ? 'in' : 'out');
@@ -317,16 +381,13 @@
       : st === 'out'
         ? '<span class="ai-prod-stock no">Нет в наличии</span>'
         : '<span class="ai-prod-stock na">Наличие уточняйте</span>';
-    return '<div class="ai-prod">' +
+    return '<div class="ai-prod" data-ai-detail="' + esc(p.id) + '" tabindex="0" role="button" title="Нажмите, чтобы открыть подробности">' +
       '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
       '<div class="ai-prod-info">' +
       '<div class="ai-prod-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>' +
       '<div class="ai-prod-meta"><span class="ai-prod-price">' + esc(price) + '</span>' + stock + '</div>' +
       '</div>' +
-      '<div class="ai-prod-btns">' +
-      '<button class="btn btn-primary" type="button" data-ai-add="' + esc(p.id) + '">В корзину</button>' +
-      '<button class="btn btn-outline" type="button" data-ai-detail="' + esc(p.id) + '">Подробнее</button>' +
-      '</div>' +
+      '<div class="ai-prod-side">' + stepperHtml(p.id) + '</div>' +
       '</div>';
   }
 
@@ -464,7 +525,7 @@
       new MutationObserver(syncHasCart).observe(cf0, { attributes: true, attributeFilter: ['class'] });
     }
   } catch (e) { }
-  document.addEventListener('cart:change', function () { setTimeout(syncHasCart, 50); });
+  document.addEventListener('cart:change', function () { setTimeout(function () { syncHasCart(); refreshAiSteppers(); }, 50); });
   document.addEventListener('DOMContentLoaded', function () { setTimeout(syncHasCart, 50); });
   syncHasCart();
 

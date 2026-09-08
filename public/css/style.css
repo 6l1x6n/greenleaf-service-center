@@ -897,26 +897,29 @@ a:hover { text-decoration: none; }
 
 @media (max-width: 900px) {
   .product-row {
-    grid-template-columns: 72px minmax(0, 1fr) auto;
-    grid-template-areas: "media body prices" "media actions actions";
+    grid-template-columns: 72px minmax(0, 1fr) auto auto;
+    grid-template-areas: "media body prices actions";
     gap: 8px 12px;
   }
   .row-media img { width: 72px; height: 72px; }
   .row-prices { align-items: flex-start; }
-  .row-actions { flex-wrap: wrap; }
+  /* Кнопки всегда справа, компактно, без прыжков и отдельной строки */
+  .row-actions { flex-wrap: nowrap; }
+  .row-actions .btn { flex: none; padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+  .row-actions .qty-stepper { flex: none; }
 }
 
 @media (max-width: 560px) {
   .product-row {
-    grid-template-columns: 64px minmax(0, 1fr);
-    grid-template-areas: "media body" "prices prices" "actions actions";
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-areas: "media body actions" "prices prices prices";
     gap: 6px 10px;
     padding: 10px 12px;
   }
   .row-media img { width: 64px; height: 64px; }
   .row-prices { flex-direction: row; align-items: center; flex-wrap: wrap; }
   .row-prices .partner-link { margin-left: 6px; }
-  .row-actions .btn { flex: 1; }
+  .row-actions .btn { flex: none; padding: 7px 10px; font-size: 12.5px; white-space: nowrap; }
 }
 
 .grid {
@@ -2858,6 +2861,7 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 .ai-body {
   flex: 1 1 auto;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -2948,8 +2952,23 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   body.has-cart .cart-fab { bottom: 94px; }
   body.has-cart .ai-panel { bottom: 164px; }
 }
-.ai-prod-btns { display: flex; flex-direction: column; gap: 4px; flex: none; }
-.ai-prod-btns .btn { padding: 4px 10px; font-size: 12px; }
+.ai-prod { cursor: pointer; }
+.ai-prod:hover { border-color: var(--green); }
+.ai-prod-side { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: none; }
+.ai-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--green-soft);
+  overflow: hidden;
+}
+.ai-qty .qty-btn { width: 26px; height: 26px; font-size: 15px; }
+.ai-qty .qty-val { min-width: 22px; font-size: 13px; }
+.ai-qty .qty-btn:disabled { opacity: 0.35; cursor: default; }
+.ai-qty .qty-btn:disabled:hover { background: transparent; }
+.ai-incart { font-size: 10.5px; font-weight: 800; color: var(--green-dark); white-space: nowrap; }
 
 /* Кнопка «Показать ещё N» с иконками остальных товаров */
 .ai-more-btn {
