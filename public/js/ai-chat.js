@@ -78,7 +78,7 @@
     try { localStorage.setItem(FAB_KEY, '1'); } catch (e) { }
     closePanel();
     applyFabVisibility();
-    toast('Кнопка Айдоса скрыта — вернуть можно через меню «Менеджер Айдос»');
+    toast('Кнопка Исы скрыта — вернуть можно через меню «Менеджер Иса»');
   }
 
   function showFab() {
@@ -92,7 +92,7 @@
     panel.classList.remove('hidden');
     if (!greeted && !hist.length) {
       greeted = true;
-      addBotHtml('Здравствуйте! Я Айдос, помогу подобрать товары Greenleaf. Напишите, что ищете — например, «что есть для мозга» или «какие витаминки есть».');
+      addBotHtml('Здравствуйте! Я Иса, помогу подобрать товары Greenleaf. Напишите, что ищете — например, «что есть для мозга» или «какие витаминки есть».');
       renderChips();
     }
     setTimeout(function () {
@@ -178,6 +178,27 @@
     }
     if (e.target.closest('#aiClose')) closePanel();
     if (e.target.closest('#aiHide')) closePanel(); // «−» только сворачивает, кнопка остаётся
+    var more = e.target.closest('[data-ai-more]');
+    if (more) {
+      var w = more.closest('.ai-prods');
+      if (w) {
+        more.classList.add('hidden');
+        w.querySelector('.ai-prods-more').classList.remove('hidden');
+        w.querySelector('[data-ai-hide-list]').classList.remove('hidden');
+        scrollBottom();
+      }
+      return;
+    }
+    var hideList = e.target.closest('[data-ai-hide-list]');
+    if (hideList) {
+      var w2 = hideList.closest('.ai-prods');
+      if (w2) {
+        w2.querySelector('.ai-prods-more').classList.add('hidden');
+        hideList.classList.add('hidden');
+        w2.querySelector('[data-ai-more]').classList.remove('hidden');
+      }
+      return;
+    }
     var chip = e.target.closest('[data-ai-chip]');
     if (chip) {
       openPanel();
@@ -236,7 +257,7 @@
   function addTyping() {
     var d = document.createElement('div');
     d.className = 'ai-msg bot ai-typing-msg';
-    d.innerHTML = '<span class="ai-typing" aria-label="Айдос печатает"><span></span><span></span><span></span></span>';
+    d.innerHTML = '<span class="ai-typing" aria-label="Иса печатает"><span></span><span></span><span></span></span>';
     body.appendChild(d);
     scrollBottom();
     return d;
@@ -250,6 +271,41 @@
       return '<button class="ai-chip" type="button" data-ai-chip="' + esc(t) + '">' + esc(t) + '</button>';
     }).join('');
     body.appendChild(d);
+    scrollBottom();
+  }
+
+  // Подборка товаров: ≤3 — все сразу; больше — первые 2 + кнопка
+  // с иконками остальных (раскрыть) + «Скрыть» внизу списка.
+  var AI_VISIBLE_COUNT = 2;
+  var AI_COLLAPSE_FROM = 3;
+
+  function moreBtnHtml(hiddenProds) {
+    var thumbs = hiddenProds.slice(0, 5).map(function (p) {
+      return '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+    }).join('');
+    var extra = hiddenProds.length > 5 ? '<span class="ai-more-n">+' + (hiddenProds.length - 5) + '</span>' : '';
+    return '<button class="ai-more-btn" type="button" data-ai-more>' +
+      '<span class="ai-more-thumbs">' + thumbs + extra + '</span>' +
+      '<span class="ai-more-txt">Показать ещё ' + hiddenProds.length + '</span>' +
+      '<span class="ai-more-chev">▾</span>' +
+      '</button>';
+  }
+
+  function renderProducts(box, products) {
+    if (!products || !products.length) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'ai-prods';
+    if (products.length <= AI_COLLAPSE_FROM) {
+      wrap.innerHTML = products.map(prodCard).join('');
+    } else {
+      var vis = products.slice(0, AI_VISIBLE_COUNT);
+      var rest = products.slice(AI_VISIBLE_COUNT);
+      wrap.innerHTML = vis.map(prodCard).join('') +
+        moreBtnHtml(rest) +
+        '<div class="ai-prods-more hidden">' + rest.map(prodCard).join('') + '</div>' +
+        '<button class="ai-hide-link hidden" type="button" data-ai-hide-list>Скрыть ▲</button>';
+    }
+    box.appendChild(wrap);
     scrollBottom();
   }
 
@@ -341,13 +397,7 @@
         }
         setOffline(!!d.offline);
         var box = addBotHtml(html);
-        if (d.products && d.products.length) {
-          var wrap = document.createElement('div');
-          wrap.className = 'ai-prods';
-          wrap.innerHTML = d.products.map(prodCard).join('');
-          box.appendChild(wrap);
-          scrollBottom();
-        }
+        renderProducts(box, d.products);
         hist.push({ role: 'user', text: q });
         hist.push({ role: 'assistant', text: String(d.reply || '').slice(0, 500), products: Array.isArray(d.products) ? d.products : [] });
         saveHist(hist);
@@ -390,14 +440,12 @@
       d.className = 'ai-msg ' + (m.role === 'user' ? 'user' : 'bot');
       if (m.role === 'user' || !m.products || !m.products.length) {
         d.textContent = m.text;
+        body.appendChild(d);
       } else {
         d.innerHTML = esc(m.text).replace(/\n/g, '<br>');
-        var wrap = document.createElement('div');
-        wrap.className = 'ai-prods';
-        wrap.innerHTML = m.products.map(prodCard).join('');
-        d.appendChild(wrap);
+        body.appendChild(d);
+        renderProducts(d, m.products);
       }
-      body.appendChild(d);
     });
     if (hist.length) scrollBottom();
   })();

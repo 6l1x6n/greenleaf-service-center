@@ -2950,6 +2950,57 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 }
 .ai-prod-btns { display: flex; flex-direction: column; gap: 4px; flex: none; }
 .ai-prod-btns .btn { padding: 4px 10px; font-size: 12px; }
+
+/* Кнопка «Показать ещё N» с иконками остальных товаров */
+.ai-more-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: #fff;
+  border: 1px dashed #bcdcc3;
+  border-radius: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.ai-more-btn:hover { background: var(--green-soft); border-style: solid; }
+.ai-more-thumbs { display: inline-flex; align-items: center; flex: none; }
+.ai-more-thumbs img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #eef3ee;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  margin-left: -7px;
+}
+.ai-more-thumbs img:first-child { margin-left: 0; }
+.ai-more-n {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--green-dark);
+  background: var(--green-soft);
+  border-radius: 999px;
+  padding: 2px 7px;
+  margin-left: 4px;
+}
+.ai-more-txt { flex: 1 1 auto; text-align: left; font-size: 13px; font-weight: 700; color: var(--green-dark); }
+.ai-more-chev { color: var(--muted); font-size: 13px; }
+.ai-prods-more { display: flex; flex-direction: column; gap: 8px; }
+.ai-hide-link {
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 12px;
+  font-family: inherit;
+}
+.ai-hide-link:hover { color: var(--green-dark); }
 .ai-foot { flex: none; display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: #fff; }
 .ai-input {
   flex: 1 1 auto;

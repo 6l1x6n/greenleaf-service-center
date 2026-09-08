@@ -1970,8 +1970,20 @@ function aiTokHit(norm, tok) {
   return norm.indexOf(tok) !== -1;
 }
 
+// Интенты вопроса (0 нейронов): сейчас — детский («детям можно?»).
+// Детские товары — вверх, хозяйственно-уборочные — вниз.
+const AI_INTENT_KIDS_Q = ['дет', 'ребен', 'малыш', 'baby', 'kids', 'младен'];
+const AI_INTENT_KIDS_HIT = ['детск', 'baby', 'kids', 'малыш', 'ребен'];
+const AI_INTENT_KIDS_ANTI = ['кухн', 'хозяйствен', 'уборк', 'чистящ', 'авто', 'обув', 'пол'];
+
+function aiHasKidsIntent(toks) {
+  return toks.some(function (t) {
+    return AI_INTENT_KIDS_Q.some(function (k) { return t.indexOf(k) === 0 || k.indexOf(t) === 0; });
+  });
+}
+
 // Алиасы простонародных названий → товары каталога.
-// Источник правды — «инструкция для Айдоса.md» в корне репозитория.
+// Источник правды — «инструкция для Исы.md» в корне репозитория.
 // pin — артикулы, которые принудительно ставятся в топ подборки;
 // search — токены, по которым ищем ВМЕСТО буквального запроса
 // (иначе «туалетная бумага» притащит мокрую CEA068 буквально).
@@ -2027,10 +2039,12 @@ function aiSearch(catalog, query, storeId, limit) {
   const alias = aiAliasFor(toks);
   const syns = alias ? [] : aiSynonyms(toks);
   const useToks = alias ? alias.search : toks;
+  const kids = !alias && aiHasKidsIntent(toks);
   const scored = [];
   for (let i = 0; i < catalog.length; i++) {
     const p = catalog[i];
     let score = 0;
+    let antiHit = false;
     if (p.sku && p.sku.toLowerCase() === q) score += 100;
     else if (!alias && p.norm && p.norm.indexOf(q) !== -1 && q.length >= 4) score += 40;
     for (let t = 0; t < useToks.length; t++) {
@@ -2045,9 +2059,15 @@ function aiSearch(catalog, query, storeId, limit) {
     for (let s = 0; s < syns.length; s++) {
       if (aiTokHit(p.norm, syns[s])) score += 2;
     }
-    if (!score) continue;
+    if (kids) {
+      if (AI_INTENT_KIDS_HIT.some(function (h) { return aiTokHit(p.norm, h); })) score += 8;
+      if (AI_INTENT_KIDS_ANTI.some(function (a) { return aiTokHit(p.norm, a); })) { score -= 10; antiHit = true; }
+    }
+    if (score <= 0) continue;
     const av = aiAvail(p, storeId);
-    if (av.state === 'out') score -= 25; // нет в наличии — вниз, но не выкидываем
+    // Нет в наличии — вниз, но не выкидываем (кроме задемпленного мусора).
+    // Пол для детской кухни и т.п. при детском вопросе должен исчезнуть вовсе.
+    if (av.state === 'out') score = antiHit ? score - 25 : Math.max(1, score - 25);
     else if (av.state === 'in') score += 5;
     if (p.status === 'in_stock' || p.status === 'low') score += 2;
     scored.push({ p: p, score: score, av: av });
@@ -2205,10 +2225,10 @@ async function handleAiChat(request, env, url) {
   }).join('\n');
 
   const histLines = history.map(function (m) {
-    return (m.role === 'user' ? 'Клиент: ' : 'Айдос: ') + m.text;
+    return (m.role === 'user' ? 'Клиент: ' : 'Иса: ') + m.text;
   }).join('\n');
 
-  const system = 'Ты — Айдос, менеджер магазина эко-товаров Greenleaf (бытовая химия iLife, ' +
+  const system = 'Ты — Иса, менеджер магазина эко-товаров Greenleaf (бытовая химия iLife, ' +
     'косметика SEALUXE, гигиена CARICH и др.). ' +
     'Магазин: ' + (shop.addr || 'адрес уточняйте') + '. Часы: ' + (shop.hours || 'уточняйте') +
     '. Телефон: ' + (shop.phone || '—') + '. WhatsApp: ' + (shop.wa || '—') + '.' +
@@ -2217,6 +2237,8 @@ async function handleAiChat(request, env, url) {
     ' Отвечай по-русски, по делу, 2-4 предложения. ' +
     'Правила: говори только о товарах из списка ниже, цены не выдумывай; ' +
     '«в наличии» называй ТОЛЬКО товары с пометкой (в наличии); ' +
+    'если вопрос про детей — рекомендуй только детские или с пометкой для детей, ' +
+    'хозяйственные/кухонные/для пола детям не предлагать; ' +
     'товары с пометкой (нет в наличии) предлагай лишь как «пока нет — уточните поставку»; ' +
     'с пометкой (наличие уточняйте) — «наличие уточняйте в WhatsApp»; ' +
     'назови 2-3 лучших и чем они отличаются; если список пуст, а вопрос про адрес/часы/доставку — ' +
