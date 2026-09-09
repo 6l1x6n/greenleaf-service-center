@@ -2222,7 +2222,8 @@ async function handleAiChat(request, env, url) {
 
   // Кэш одинаковых вопросов (1 час): повторный вопрос = 0 нейронов
   // и 0 единиц лимита — проверка кеша идёт ДО счётчика.
-  const cacheKey = 'ai_cache:' + aiHash(aiNorm(q) + '|' + (storeId || 'all'));
+  // Версия в ключе: после правок промпта старые ответы не переиспользуем.
+  const cacheKey = 'ai_cache:v2:' + aiHash(aiNorm(q) + '|' + (storeId || 'all'));
   try {
     const cachedRaw = await env.SC_STORES.get(cacheKey);
     if (cachedRaw) {
