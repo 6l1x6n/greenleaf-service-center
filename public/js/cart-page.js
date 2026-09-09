@@ -356,7 +356,7 @@
       '<div class="cart-item-ctrl">' +
       '<div class="qty-stepper">' +
       '<button class="qty-btn" data-cart-dec="' + Utils.esc(l.p.id) + '" aria-label="Уменьшить">−</button>' +
-      '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(l.p.id) + '" min="1" max="' + (function () { var m = availableCount(l); return m === null ? 999 : m; }()) + '" value="' + l.qty + '" aria-label="Количество">' +
+      '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(l.p.id) + '" min="0" max="' + (function () { var m = availableCount(l); return m === null ? 999 : m; }()) + '" value="' + l.qty + '" aria-label="Количество">' +
       '<button class="qty-btn" data-cart-inc="' + Utils.esc(l.p.id) + '" aria-label="Увеличить">+</button>' +
       '</div>' +
       '<button class="cart-item-trash" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Убрать из корзины">' + Utils.iconTrash(15) + '</button>' +

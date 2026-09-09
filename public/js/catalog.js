@@ -113,29 +113,29 @@
     return !!(o && Object.keys(o).length);
   }
 
-  function rowCartControl(p) {
+  // Единый контрол количества в строке: всегда степпер (0 = нет в корзине).
+  // + добавляет, − убавляет/убирает, ручной ввод задаёт абсолютное количество.
+  // Крестик рисуем всегда (задизейблен при 0), чтобы ширина колонки не прыгала.
+  function rowCartControl(p, withDetail) {
     var item = Cart.get().find(function (i) { return i.id === p.id; });
-    if (item) {
-      var cur = Number(item.qty) || 1;
-      var rawMax = (state.selectedStoreId && state.selectedStoreId !== 'all')
-        ? StoreStock.count(state.selectedStoreId, p.id)
-        : null;
-      var cap = (rawMax === null || rawMax === undefined) ? 999 : Math.max(1, Math.min(rawMax, 999));
-      // Корзина могла хранить больше, чем сейчас доступно (остаток упал
-      // после добавления): показываем срезанное значение, как в корзине.
-      // Нулевой остаток не трогаем — такие позиции фильтруются из заказа.
-      if (rawMax !== null && rawMax !== undefined && rawMax > 0 && cur > cap) {
-        cur = cap;
-        try { Cart.setQty(p.id, cap); } catch (e) { }
-      }
-      return '<div class="qty-stepper" data-cart-row="' + Utils.esc(p.id) + '">' +
-        '<button class="qty-btn" data-cart-dec="' + Utils.esc(p.id) + '" aria-label="Уменьшить">−</button>' +
-        '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(p.id) + '" min="1" max="' + cap + '" value="' + cur + '" aria-label="Количество">' +
-        '<button class="qty-btn" data-cart-inc="' + Utils.esc(p.id) + '" aria-label="Увеличить">+</button>' +
-        '</div>' +
-        '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины">' + Utils.iconX(12) + '</button>';
+    var cur = item ? (Number(item.qty) || 0) : 0;
+    var rawMax = (state.selectedStoreId && state.selectedStoreId !== 'all')
+      ? StoreStock.count(state.selectedStoreId, p.id)
+      : null;
+    var cap = (rawMax === null || rawMax === undefined) ? 999 : Math.max(1, Math.min(rawMax, 999));
+    // Корзина могла хранить больше, чем сейчас доступно (остаток упал
+    // после добавления): показываем срезанное значение, как в корзине.
+    if (item && rawMax !== null && rawMax !== undefined && rawMax > 0 && cur > cap) {
+      cur = cap;
+      try { Cart.setQty(p.id, cap); } catch (e) { }
     }
-    return '<button class="btn btn-primary btn-sm" data-cart-add="' + Utils.esc(p.id) + '">🛒 В корзину</button>';
+    return '<div class="qty-stepper' + (cur <= 0 ? ' is-empty' : '') + '" data-cart-row="' + Utils.esc(p.id) + '">' +
+      '<button class="qty-btn" data-cart-dec="' + Utils.esc(p.id) + '" aria-label="Уменьшить"' + (cur <= 0 ? ' disabled' : '') + '>−</button>' +
+      '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(p.id) + '" min="0" max="' + cap + '" value="' + cur + '" aria-label="Количество">' +
+      '<button class="qty-btn" data-cart-inc="' + Utils.esc(p.id) + '" aria-label="Увеличить">+</button>' +
+      '</div>' +
+      '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины"' + (cur <= 0 ? ' disabled' : '') + '>' + Utils.iconX(12) + '</button>' +
+      (withDetail === false ? '' : '<button class="btn btn-outline btn-sm" data-open-detail="' + Utils.esc(p.id) + '">🔍 Подробнее</button>');
   }
 
   // Для карточек полного каталога фото пока remote-миниатюры портала (-small, 60×60).
@@ -210,7 +210,6 @@
       '</div>' +
       '<div class="row-actions">' +
       rowCartControl(p) +
-      '<button class="btn btn-outline btn-sm" data-open-detail="' + Utils.esc(p.id) + '">🔍 Подробнее</button>' +
       '</div>' +
       '</article>';
   }
@@ -438,8 +437,8 @@
       '<a class="partner-link" href="podpiska.html">Партнёрская цена для подписчиков · Как стать партнёром →</a>' +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
-      '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">' +
-      '<button class="btn btn-primary" style="flex:1;" data-cart-add="' + Utils.esc(p.id) + '">🛒 Добавить в корзину</button>' +
+      '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center;">' +
+      '<div class="modal-cart-ctrl" data-modal-cart="' + Utils.esc(p.id) + '" style="display:flex; gap:10px; align-items:center;">' + rowCartControl(p, false) + '</div>' +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -584,11 +583,6 @@
       }
       Cart.add(addId, 1);
       Utils.showToast('🛒 Добавлено в корзину');
-      var modalBtn = cartAdd.closest('.modal') ? cartAdd : null;
-      if (modalBtn) {
-        modalBtn.innerHTML = '✅ В корзине';
-        modalBtn.disabled = true;
-      }
       return;
     }
 
@@ -598,7 +592,7 @@
       var incId = cartInc.getAttribute('data-cart-inc');
       var incMax = (state.selectedStoreId && state.selectedStoreId !== 'all') ? StoreStock.count(state.selectedStoreId, incId) : null;
       var incItem = Cart.get().find(function (i) { return i.id === incId; });
-      var incCur = incItem ? (Number(incItem.qty) || 1) : 1;
+      var incCur = incItem ? (Number(incItem.qty) || 0) : 0;
       if (incMax !== null && incCur >= incMax) {
         Utils.showToast('⚠️ В выбранном филиале недостаточно товара');
         return;
@@ -747,20 +741,27 @@
     }
   });
 
-  // Ручной ввод количества — клампинг по остатку выбранного СЦ
+  // Ручной ввод количества: 0 убирает из корзины, ввод при отсутствии
+  // товара сразу кладёт его (с клампингом по остатку выбранного СЦ)
   document.addEventListener('change', function (e) {
     var inp = e.target.closest('[data-cart-qty]');
     if (!inp) return;
     var id = inp.getAttribute('data-cart-qty');
     var qty = parseInt(inp.value, 10);
-    if (isNaN(qty) || qty < 1) return;
+    if (isNaN(qty)) return;
+    if (qty <= 0) { Cart.remove(id); return; }
     if (state.selectedStoreId && state.selectedStoreId !== 'all') {
       var max = StoreStock.count(state.selectedStoreId, id);
       if (max !== null && qty > max) {
-        Utils.showToast('⚠️ Количество уменьшено до доступного в филиале');
-        Cart.setQty(id, max);
+        Utils.showToast(max > 0 ? '⚠️ Количество уменьшено до доступного в филиале' : '⚠️ Товара нет в наличии');
+        if (max <= 0) { Cart.remove(id); return; }
+        qty = max;
       }
     }
+    if (qty > 999) qty = 999;
+    var ex = Cart.get().find(function (i) { return i.id === id; });
+    if (ex) Cart.setQty(id, qty);
+    else Cart.add(id, qty);
   });
 
   var scSearch = document.getElementById('scSearch');
@@ -862,9 +863,13 @@
       if (!p) return;
       var actions = row.querySelector('.row-actions');
       if (actions) {
-        actions.innerHTML = rowCartControl(p) +
-          '<button class="btn btn-outline btn-sm" data-open-detail="' + Utils.esc(p.id) + '">🔍 Подробнее</button>';
+        actions.innerHTML = rowCartControl(p);
       }
+    });
+    // Степпер в открытой модалке товара — туда же
+    document.querySelectorAll('[data-modal-cart]').forEach(function (box) {
+      var mp = products.find(function (x) { return x.id === box.getAttribute('data-modal-cart'); });
+      if (mp) box.innerHTML = rowCartControl(mp, false);
     });
   });
 

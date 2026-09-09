@@ -120,7 +120,8 @@
     if (!inp) return;
     var id = inp.getAttribute('data-cart-qty');
     var qty = parseInt(inp.value, 10);
-    if (isNaN(qty) || qty < 1) qty = 1;
+    if (isNaN(qty)) return;
+    if (qty <= 0) { remove(id); return; }
     var cap = capFor(id);
     if (qty > cap) {
       qty = cap;
@@ -129,7 +130,10 @@
       } catch (err) { }
     }
     if (qty > 999) qty = 999;
-    setQty(id, qty);
+    var items = load();
+    var found = items.find(function (i) { return i.id === id; });
+    if (found) setQty(id, qty);
+    else add(id, qty);
   });
 
   window.Cart = {
