@@ -2029,6 +2029,25 @@ function aiAliasFor(toks) {
   return null;
 }
 
+// Знания о подписке (источник — страница podpiska.html; цифры — из слов владельца).
+// Подмешиваются в system ТОЛЬКО при sub-интенте — обычные вопросы токены не тратят.
+const AI_SUB_KNOW = 'Подписка Greenleaf (партнёрство): купоны — электронная валюта; ' +
+  'покупая товар, 50% цены платишь деньгами, вторые 50% списываются купонами. ' +
+  'Пакеты: Бронза 50 000 ₸ → 135 000 купонов (для себя, скидка 50% без бизнеса); ' +
+  'Золото 138 000 ₸ → 542 800 купонов (быстрый старт, шире стартовый набор); ' +
+  'Платина 188 000 ₸ → 678 500 купонов (самый популярный, максимальные выплаты по маркетинг-плану); ' +
+  'Бриллиант 564 000 ₸ → 2 025 000 купонов (для магазинов и торговых точек). ' +
+  'Чем дороже пакет, тем больше купонов в подарок; Платина и Бриллиант открывают повышенные ' +
+  'бинарные и линейные бонусы, на Бронзе заработок сильно ограничен.';
+
+const AI_SUB_KEYS = ['подписк', 'партнер', 'партнёр', 'регистрац', 'купон', 'бронз', 'золот', 'платин', 'бриллиант', 'бизнес', 'франшиз', 'маркетинг'];
+
+function aiHasSubIntent(toks) {
+  return toks.some(function (t) {
+    return AI_SUB_KEYS.some(function (k) { return t.indexOf(k) === 0 || k.indexOf(t) === 0; });
+  });
+}
+
 // Детерминированный скоринг: артикул → алиас → вхождение запроса → токены.
 // Возвращает {products, alias}: сначала в наличии, чужих — максимум 2
 // (если есть хоть что-то в наличии/неизвестное), пины алиаса — в самом топе.
@@ -2130,6 +2149,9 @@ async function handleAiChat(request, env, url) {
     return { role: m.role, text: String(m.text).slice(0, 500) };
   });
 
+  // Интент подписки — по токенам вопроса (дешевле некуда: без ИИ)
+  const subIntent = aiHasSubIntent(aiTokens(q));
+
   // ID устройства (тот же токен, что у «Моих заказов»): у каждого свой лимит —
   // соседи по одному IP мобильного оператора чужой лимит не едят.
   const ct = String((body && body.ct) || '').trim().slice(0, 64);
@@ -2177,11 +2199,25 @@ async function handleAiChat(request, env, url) {
   } catch (e) { /* без данных магазина */ }
 
   function templateReply() {
+    if (subIntent) {
+      return 'Подписка Greenleaf: пакеты Бронза (50 000 ₸), Золото (138 000 ₸), Платина (188 000 ₸) и Бриллиант (564 000 ₸) — скидка 50% на товары и купоны на покупки. Подробности — на странице подписки.';
+    }
     if (!products.length) {
       return 'Не нашёл подходящего в каталоге. Напишите в WhatsApp ' + (shop.wa || '') + ' — подскажем дату поставки и подберём аналог.';
     }
     const names = products.slice(0, 3).map(function (p) { return '«' + p.name + '»'; }).join(', ');
     return 'Вот что нашлось: ' + names + '. Нажмите на карточку, чтобы открыть детали и добавить в корзину.';
+  }
+
+  // Кнопки под сообщением (решает сервер, 0 нейронов):
+  // подписка → страница подписки; упоминание WhatsApp → чат wa.me.
+  function aiActions(replyText) {
+    const acts = [];
+    if (subIntent) acts.push({ type: 'link', label: '📋 Подробнее о подписке', url: 'podpiska.html' });
+    if (/whatsapp/i.test(String(replyText || '')) && shop.wa) {
+      acts.push({ type: 'wa', label: '💬 Написать в WhatsApp', url: 'https://wa.me/' + shop.wa });
+    }
+    return acts;
   }
 
   // Кэш одинаковых вопросов (1 час): повторный вопрос = 0 нейронов
@@ -2192,14 +2228,17 @@ async function handleAiChat(request, env, url) {
     if (cachedRaw) {
       const cached = JSON.parse(cachedRaw);
       if (cached && typeof cached.reply === 'string') {
-        return jsonResponse({ ok: true, reply: cached.reply, products: Array.isArray(cached.products) ? cached.products : products, cached: true });
+        const cProds = Array.isArray(cached.products) ? cached.products : products;
+        const cActs = Array.isArray(cached.actions) ? cached.actions : aiActions(cached.reply);
+        return jsonResponse({ ok: true, reply: cached.reply, products: cProds, actions: cActs, cached: true });
       }
     }
   } catch (e) { /* мимо кеша */ }
 
   // Нет модели/биндинга — сразу шаблон (сайт работает и без AI, лимит не тратим)
   if (!hasAI) {
-    return jsonResponse({ ok: true, reply: templateReply(), products: products, offline: true });
+    const tReply = templateReply();
+    return jsonResponse({ ok: true, reply: tReply, products: products, actions: aiActions(tReply), offline: true });
   }
 
   // Лимит тратит только реальный вызов ИИ
@@ -2234,8 +2273,10 @@ async function handleAiChat(request, env, url) {
     '. Телефон: ' + (shop.phone || '—') + '. WhatsApp: ' + (shop.wa || '—') + '.' +
     (storeName ? ' Филиал клиента: ' + storeName + '.' : '') +
     (aliasNote ? ' Важно: ' + aliasNote : '') +
+    (subIntent ? ' Подписка: ' + AI_SUB_KNOW + ' Про подписку отвечай максимум 3-4 предложения с цифрами отсюда и одной фразой про страницу подписки; кнопки подставит сайт, сам ссылок не оформляй.' : '') +
     ' Отвечай по-русски, по делу, 2-4 предложения. ' +
     'Правила: говори только о товарах из списка ниже, цены не выдумывай; ' +
+    'вопрос про подписку — отвечай по блоку подписки, товары из списка не навязывай; ' +
     '«в наличии» называй ТОЛЬКО товары с пометкой (в наличии); ' +
     'если вопрос про детей — рекомендуй только детские или с пометкой для детей, ' +
     'хозяйственные/кухонные/для пола детям не предлагать; ' +
@@ -2266,17 +2307,19 @@ async function handleAiChat(request, env, url) {
     else if (aiRes && typeof aiRes.text === 'string') reply = aiRes.text;
   } catch (e) {
     console.error('AI run error:', e);
-    return jsonResponse({ ok: true, reply: templateReply(), products: products, offline: true });
+    const eReply = templateReply();
+    return jsonResponse({ ok: true, reply: eReply, products: products, actions: aiActions(eReply), offline: true });
   }
 
   reply = String(reply || '').trim().slice(0, 900);
   if (!reply) reply = templateReply();
+  const actions = aiActions(reply);
 
   try {
-    await env.SC_STORES.put(cacheKey, JSON.stringify({ reply: reply, products: products }), { expirationTtl: AI_CACHE_TTL });
+    await env.SC_STORES.put(cacheKey, JSON.stringify({ reply: reply, products: products, actions: actions }), { expirationTtl: AI_CACHE_TTL });
   } catch (e) { /* кеш необязателен */ }
 
-  return jsonResponse({ ok: true, reply: reply, products: products });
+  return jsonResponse({ ok: true, reply: reply, products: products, actions: actions });
 }
 
 // ---------------- Telegram ----------------

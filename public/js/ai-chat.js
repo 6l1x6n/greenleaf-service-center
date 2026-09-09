@@ -299,6 +299,20 @@
     scrollBottom();
   }
 
+  // Кнопки под сообщением (решает сервер: подписка / WhatsApp)
+  function renderActions(box, actions) {
+    if (!actions || !actions.length) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'ai-actions';
+    wrap.innerHTML = actions.map(function (a) {
+      var ext = /^https?:/i.test(a.url || '');
+      return '<a class="ai-act' + (a.type === 'wa' ? ' ai-act-wa' : '') + '" href="' + esc(a.url || '#') + '"' +
+        (ext ? ' target="_blank" rel="noopener"' : '') + '>' + esc(a.label || 'Подробнее') + '</a>';
+    }).join('');
+    box.appendChild(wrap);
+    scrollBottom();
+  }
+
   // Подборка товаров: ≤3 — все сразу; больше — первые 2 + кнопка
   // с иконками остальных (раскрыть) + «Скрыть» внизу списка.
   var AI_VISIBLE_COUNT = 2;
@@ -459,8 +473,10 @@
         setOffline(!!d.offline);
         var box = addBotHtml(html);
         renderProducts(box, d.products);
+        var acts = Array.isArray(d.actions) ? d.actions : [];
+        renderActions(box, acts);
         hist.push({ role: 'user', text: q });
-        hist.push({ role: 'assistant', text: String(d.reply || '').slice(0, 500), products: Array.isArray(d.products) ? d.products : [] });
+        hist.push({ role: 'assistant', text: String(d.reply || '').slice(0, 500), products: Array.isArray(d.products) ? d.products : [], actions: acts });
         saveHist(hist);
       })
       .catch(function () {
@@ -499,13 +515,14 @@
     hist.slice(-MAX_HIST).forEach(function (m) {
       var d = document.createElement('div');
       d.className = 'ai-msg ' + (m.role === 'user' ? 'user' : 'bot');
-      if (m.role === 'user' || !m.products || !m.products.length) {
+      if (m.role === 'user' || (!m.products && !m.actions)) {
         d.textContent = m.text;
         body.appendChild(d);
       } else {
         d.innerHTML = esc(m.text).replace(/\n/g, '<br>');
         body.appendChild(d);
         renderProducts(d, m.products);
+        renderActions(d, m.actions);
       }
     });
     if (hist.length) scrollBottom();

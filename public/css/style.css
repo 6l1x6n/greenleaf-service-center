@@ -188,17 +188,23 @@ a:hover { text-decoration: none; }
     overflow-y: auto;
   }
   .nav.open { display: flex; }
-  .nav a { padding: 13px 14px; font-size: 17px; border-radius: 12px; width: 100%; }
+  .nav a { padding: 12px 14px; font-size: 16px; font-weight: 700; border-radius: 12px; width: 100%; }
+  /* Кнопки в шторке — такие же ровные строки, как ссылки (без «призрачных» рамок) */
   .nav .nav-btn {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    margin-top: 8px;
-    padding: 13px 14px;
+    justify-content: flex-start;
+    margin-top: 0;
+    padding: 12px 14px;
     font-size: 16px;
+    font-weight: 700;
     border-radius: 12px;
+    border-color: transparent;
+    background: var(--green-soft);
+    color: var(--green-dark);
     width: 100%;
   }
+  .nav .nav-btn:hover { background: var(--green-dark); color: #fff; border-color: transparent; }
 }
 
 /* «Мои заказы»/«Войти» остаются в шапке до 570px — в бургер уходят только на очень узких */
@@ -3023,6 +3029,25 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   font-family: inherit;
 }
 .ai-hide-link:hover { color: var(--green-dark); }
+
+/* Кнопки под сообщением Исы (подписка / WhatsApp) */
+.ai-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ai-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--green-dark);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 8px 16px;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.ai-act:hover { background: var(--green); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(10, 53, 32, 0.25); color: #fff; }
+.ai-act-wa { background: var(--wa); }
+.ai-act-wa:hover { background: #1eb95a; }
 .ai-foot { flex: none; display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: #fff; }
 .ai-input {
   flex: 1 1 auto;
