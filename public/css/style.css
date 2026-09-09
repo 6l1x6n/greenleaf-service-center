@@ -903,7 +903,9 @@ a:hover { text-decoration: none; }
 
 @media (max-width: 900px) {
   /* Мобильная карточка: верх — фото + текст на всю ширину,
-     низ одним рядом — цены слева, кнопки справа */
+     низ одним рядом — цены слева, одна кнопка справа.
+     «Подробнее» прячем: детали открываются по фото/названию.
+     Ниша действий фиксирована — степпер не прыгает. */
   .product-row {
     grid-template-columns: 72px minmax(0, 1fr) auto;
     grid-template-areas: "media body body" "media prices actions";
@@ -911,8 +913,9 @@ a:hover { text-decoration: none; }
     align-items: center;
   }
   .row-media img { width: 72px; height: 72px; }
-  .row-prices { align-items: flex-start; justify-content: center; }
-  .row-actions { flex-wrap: nowrap; justify-content: flex-end; }
+  .row-prices { align-items: flex-start; justify-content: center; white-space: normal; }
+  .row-actions { flex-wrap: nowrap; justify-content: flex-end; min-width: 128px; }
+  .row-actions [data-open-detail] { display: none; }
   .row-actions .btn { flex: none; padding: 8px 12px; font-size: 13px; white-space: nowrap; }
   .row-actions .qty-stepper { flex: none; }
 }
@@ -925,9 +928,10 @@ a:hover { text-decoration: none; }
     padding: 10px 12px;
   }
   .row-media img { width: 64px; height: 64px; }
-  .row-prices { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .row-prices { flex-direction: row; align-items: center; flex-wrap: wrap; white-space: normal; }
   .row-prices .partner-link { margin-left: 6px; }
-  .row-actions .btn { flex: none; padding: 7px 10px; font-size: 12.5px; white-space: nowrap; }
+  .row-actions { min-width: 118px; }
+  .row-actions .btn { flex: none; padding: 7px 12px; font-size: 12.5px; white-space: nowrap; }
 }
 
 .grid {
