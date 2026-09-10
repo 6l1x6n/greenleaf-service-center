@@ -431,12 +431,14 @@
   // Разметка лупы для зоны .zoom-zone (каталог, модалка товара, чат).
   // Клип и fisheye-фильтр применяются внутри SVG — там clip-path работает
   // после фильтра, и увеличенное фото не вылезает квадратом за круг.
+  // .zoom-glass — чисто декоративный слой liquid glass поверх (стили в CSS),
+  // на базовые фото и механику лупы не влияет.
   function lensHtml() {
     return '<span class="zoom-lens" aria-hidden="true">' +
       '<svg class="zoom-lens-svg" viewBox="0 0 100 100" preserveAspectRatio="none">' +
       '<circle cx="50" cy="50" r="50" fill="#fff"/>' +
       '<image filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none" image-rendering="optimizeQuality"/>' +
-      '</svg></span>';
+      '</svg><span class="zoom-glass" aria-hidden="true"></span></span>';
   }
 
   var WEEK_DAYS = [['mon', 'Пн'], ['tue', 'Вт'], ['wed', 'Ср'], ['thu', 'Чт'], ['fri', 'Пт'], ['sat', 'Сб'], ['sun', 'Вс']];
