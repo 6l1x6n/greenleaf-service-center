@@ -415,8 +415,9 @@ a:hover { text-decoration: none; }
   overflow: hidden;
   box-shadow: var(--shadow);
   display: flex;
-  flex-direction: column;
-  flex: 0 0 min(300px, 82vw);
+  flex-direction: row;
+  flex: 0 0 min(340px, 86vw);
+  min-height: 132px;
   scroll-snap-align: start;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -425,7 +426,7 @@ a:hover { text-decoration: none; }
 .sc-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: rgba(27, 107, 63, 0.5); }
 .sc-card.active { border-color: var(--green); box-shadow: 0 0 0 3px rgba(27, 107, 63, 0.16), var(--shadow-lg); }
 
-.sc-card-media { position: relative; aspect-ratio: 16 / 8; background: var(--green-soft); overflow: hidden; }
+.sc-card-media { position: relative; flex: 0 0 128px; background: var(--green-soft); overflow: hidden; }
 .sc-card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
 .sc-card:hover .sc-card-media img { transform: scale(1.06); }
 .sc-card-check {
@@ -457,7 +458,8 @@ a:hover { text-decoration: none; }
   .sc-grid {
     gap: 10px;
   }
-  .sc-card-media { aspect-ratio: 16 / 10; }
+  .sc-card { flex-basis: min(300px, 86vw); min-height: 118px; }
+  .sc-card-media { flex-basis: 108px; }
   .sc-card-body { padding: 10px 12px 12px; gap: 4px; }
   .sc-card-title { font-size: 13.5px; }
   .sc-card-line { font-size: 11.5px; }
@@ -2821,10 +2823,10 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   text-decoration: none;
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, bottom 0.35s ease;
 }
-/* Крестик очистки корзины (только ПК): бейджем на правом-верхнем углу фаба */
+/* Крестик очистки корзины (только ПК): бейджем на правом верхнем углу фаба */
 .cart-fab-clear {
   position: fixed;
-  right: 12px;
+  right: 8px;
   bottom: 70px;
   z-index: 46;
   width: 24px;
@@ -2847,13 +2849,13 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 @media (max-width: 640px) {
   .cart-fab-clear { display: none !important; }
 }
-/* Подъём кнопок над футером + wiggle при подходе к низу */
-body.is-bottom .cart-fab { transform: translateY(var(--fab-lift, 64px)); }
-body.is-bottom .cart-fab:hover { transform: translateY(var(--fab-lift, 64px)) translateY(-2px); }
-body.is-bottom .cart-fab-clear { transform: translateY(var(--fab-lift, 64px)); }
-body.is-bottom .cart-fab-clear:hover { transform: translateY(var(--fab-lift, 64px)) scale(1.1); }
-body.is-bottom .ai-fab { transform: translateY(var(--fab-lift, 64px)); }
-body.is-bottom .ai-fab:hover { transform: translateY(var(--fab-lift, 64px)) translateY(-2px); }
+/* Подъём кнопок над футером + wiggle при подходе к низу (минус — вверх) */
+body.is-bottom .cart-fab { transform: translateY(calc(var(--fab-lift, 64px) * -1)); }
+body.is-bottom .cart-fab:hover { transform: translateY(calc(var(--fab-lift, 64px) * -1)) translateY(-2px); }
+body.is-bottom .cart-fab-clear { transform: translateY(calc(var(--fab-lift, 64px) * -1)); }
+body.is-bottom .cart-fab-clear:hover { transform: translateY(calc(var(--fab-lift, 64px) * -1)) scale(1.1); }
+body.is-bottom .ai-fab { transform: translateY(calc(var(--fab-lift, 64px) * -1)); }
+body.is-bottom .ai-fab:hover { transform: translateY(calc(var(--fab-lift, 64px) * -1)) translateY(-2px); }
 body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transition: bottom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .fab-wiggle { animation: fabWiggle 0.5s ease; }
 @keyframes fabWiggle {
@@ -2865,9 +2867,9 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
 }
 @media (max-width: 640px) {
   body.is-bottom .cart-fab,
-  body.is-bottom .ai-fab { transform: translateY(var(--fab-lift, 56px)); }
+  body.is-bottom .ai-fab { transform: translateY(calc(var(--fab-lift, 56px) * -1)); }
   body.is-bottom .cart-fab:hover,
-  body.is-bottom .ai-fab:hover { transform: translateY(var(--fab-lift, 56px)); }
+  body.is-bottom .ai-fab:hover { transform: translateY(calc(var(--fab-lift, 56px) * -1)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .cart-fab, .ai-fab, .cart-fab-clear { transition: none; }
@@ -3422,13 +3424,13 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
   .ai-panel {
     left: 8px;
     right: 8px;
-    bottom: calc(8px + env(safe-area-inset-bottom, 0px) + var(--fab-lift, 0px));
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     width: auto;
     max-width: none;
     height: calc(100vh - 170px);
-    height: calc(100svh - 120px);
-    height: calc(100dvh - 120px);
-    max-height: none;
+    height: calc(100svh - 140px);
+    height: calc(100dvh - 140px);
+    max-height: 560px;
     border-radius: 18px 18px 14px 14px;
     transition: bottom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
@@ -3438,8 +3440,14 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
   .ai-chip { padding: 10px 15px; font-size: 13.5px; min-height: 40px; }
   .ai-act { padding: 10px 18px; font-size: 14px; min-height: 44px; }
   .ai-send { width: 48px; height: 48px; font-size: 18px; }
-  .ai-prod { --ai-ctrl-w: 84px; }
-  .ai-add { height: 32px; font-size: 12px; }
+  .ai-prod { flex-wrap: wrap; }
+  .ai-prod .ai-prod-info { flex: 1 1 0; }
+  .ai-prod .ai-prod-name { -webkit-line-clamp: 2; font-size: 13px; }
+  .ai-prod-side { flex: 1 0 100%; }
+  .ai-add { width: 100%; height: 38px; font-size: 13.5px; border-radius: 10px; }
+  .ai-qty { width: 100%; height: 38px; border-radius: 10px; }
+  .ai-qty .qty-btn { width: 44px; height: 36px; font-size: 17px; }
+  .ai-qty .qty-val { font-size: 14px; }
   /* iOS не зумит при фокусе, если шрифт поля >= 16px */
   .form input, .form select, .form textarea,
   .search, .sc-search, .ai-input, .qty-input,
