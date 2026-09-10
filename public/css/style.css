@@ -3248,6 +3248,7 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
   .ai-fab { left: auto; right: 20px; }
   .ai-panel { left: auto; right: 20px; }
   body.has-cart .cart-fab { bottom: 94px; }
+  body.has-cart .cart-fab-clear { bottom: 140px; }
   body.has-cart .ai-panel { bottom: 164px; }
   body.has-cart.is-bottom .ai-panel { bottom: calc(164px + var(--fab-lift, 56px)); }
 }
