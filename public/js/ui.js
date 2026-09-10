@@ -429,8 +429,9 @@
   }
 
   // Разметка лупы для зоны .zoom-zone (каталог, модалка товара, чат).
-  // Клип и fisheye-фильтр применяются внутри SVG — там clip-path работает
+  // Клип и liquid-glass фильтр применяются внутри SVG — там clip-path работает
   // после фильтра, и увеличенное фото не вылезает квадратом за круг.
+  // Кольцо кромки — матовость края как в iOS; .zoom-glass — верхний спекулар (CSS).
   // .zoom-glass — чисто декоративный слой liquid glass поверх (стили в CSS),
   // на базовые фото и механику лупы не влияет.
   function lensHtml() {
@@ -438,6 +439,7 @@
       '<svg class="zoom-lens-svg" viewBox="0 0 100 100" preserveAspectRatio="none">' +
       '<circle cx="50" cy="50" r="50" fill="#fff"/>' +
       '<image filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none" image-rendering="optimizeQuality"/>' +
+      '<circle cx="50" cy="50" r="46.5" fill="none" stroke="url(#glLensRim)" stroke-width="5" opacity="0.55" filter="url(#glLensRimSoft)"/>' +
       '</svg><span class="zoom-glass" aria-hidden="true"></span></span>';
   }
 
@@ -600,6 +602,12 @@
     // 0.3 давит «пиксельноватость» апскейла на FHD, центр остаётся резким.
     // Базовые <img> товаров не затрагиваются.
     var LENS_SMOOTH = 0.3;
+    // Liquid glass: плоский центр + преломление у кромки (как в iOS).
+    // RIM_START — радиус плоского центра (внутри смещения нет, резкость макс.),
+    // RIM_POWER — крутизна загиба кромки, RIM_SCALE — сила (ед. viewBox).
+    var LENS_RIM_START = 0.62;
+    var LENS_RIM_POWER = 2.0;
+    var LENS_RIM_SCALE = 20;
 
     function buildWarpMap(size) {
       var c = document.createElement('canvas');
@@ -617,7 +625,10 @@
           var dx = (x - cx) / R;
           var dy = (y - cy) / R;
           var r = Math.sqrt(dx * dx + dy * dy);
-          var edge = Math.min(1, Math.pow(Math.max(0, r * 0.98), 2.4));
+          // Плоский центр (резко), загиб только у кромки: smoothstep-подъём
+          // от RIM_START к краю. Углы (r > 1) всё равно режутся круглым клипом.
+          var t = Math.min(1, Math.max(0, (r - LENS_RIM_START) / (1 - LENS_RIM_START)));
+          var edge = Math.pow(t, LENS_RIM_POWER);
           var ux = r > 0 ? dx / r : 0;
           var uy = r > 0 ? dy / r : 0;
           var i = (y * size + x) * 4;
@@ -676,7 +687,7 @@
         var disp = document.createElementNS(NS, 'feDisplacementMap');
         disp.setAttribute('in', 'SourceGraphic');
         disp.setAttribute('in2', 'map');
-        disp.setAttribute('scale', '20');
+        disp.setAttribute('scale', String(LENS_RIM_SCALE));
         disp.setAttribute('xChannelSelector', 'R');
         disp.setAttribute('yChannelSelector', 'G');
         disp.setAttribute('result', 'warped');
@@ -693,6 +704,41 @@
 
         defs.appendChild(clip);
         defs.appendChild(filter);
+        // Кромка liquid glass: градиент кольца (сверху светлое, снизу тёмное)
+        // и мягкий блюр только кольца — матовость края как в iOS. Статика.
+        var rimGrad = document.createElementNS(NS, 'linearGradient');
+        rimGrad.setAttribute('id', 'glLensRim');
+        rimGrad.setAttribute('x1', '0');
+        rimGrad.setAttribute('y1', '0');
+        rimGrad.setAttribute('x2', '0.7');
+        rimGrad.setAttribute('y2', '1');
+        var rimStop1 = document.createElementNS(NS, 'stop');
+        rimStop1.setAttribute('offset', '0');
+        rimStop1.setAttribute('stop-color', '#ffffff');
+        rimStop1.setAttribute('stop-opacity', '0.9');
+        var rimStop2 = document.createElementNS(NS, 'stop');
+        rimStop2.setAttribute('offset', '0.55');
+        rimStop2.setAttribute('stop-color', '#ffffff');
+        rimStop2.setAttribute('stop-opacity', '0.25');
+        var rimStop3 = document.createElementNS(NS, 'stop');
+        rimStop3.setAttribute('offset', '1');
+        rimStop3.setAttribute('stop-color', '#0a3520');
+        rimStop3.setAttribute('stop-opacity', '0.35');
+        rimGrad.appendChild(rimStop1);
+        rimGrad.appendChild(rimStop2);
+        rimGrad.appendChild(rimStop3);
+        defs.appendChild(rimGrad);
+        var rimFilter = document.createElementNS(NS, 'filter');
+        rimFilter.setAttribute('id', 'glLensRimSoft');
+        rimFilter.setAttribute('x', '-20%');
+        rimFilter.setAttribute('y', '-20%');
+        rimFilter.setAttribute('width', '140%');
+        rimFilter.setAttribute('height', '140%');
+        rimFilter.setAttribute('color-interpolation-filters', 'sRGB');
+        var rimBlur = document.createElementNS(NS, 'feGaussianBlur');
+        rimBlur.setAttribute('stdDeviation', '1.1');
+        rimFilter.appendChild(rimBlur);
+        defs.appendChild(rimFilter);
         svg.appendChild(defs);
         document.body.appendChild(svg);
       } catch (e) { /* без искажения, лупа всё равно работает */ }
