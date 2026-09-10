@@ -113,9 +113,10 @@
     return !!(o && Object.keys(o).length);
   }
 
-  // Единый контрол количества в строке: всегда степпер (0 = нет в корзине).
-  // + добавляет, − убавляет/убирает, ручной ввод задаёт абсолютное количество.
-  // Крестик рисуем всегда (задизейблен при 0), чтобы ширина колонки не прыгала.
+  // Единый контрол корзины в строке: пока товара нет в корзине — одна
+  // зелёная кнопка «В корзину»; после добавления она превращается в степпер
+  // «− N +» с крестиком. + добавляет, − убавляет/убирает, ручной ввод задаёт
+  // абсолютное количество. «Подробнее» — тихая текстовая кнопка.
   function rowCartControl(p, withDetail) {
     var item = Cart.get().find(function (i) { return i.id === p.id; });
     var cur = item ? (Number(item.qty) || 0) : 0;
@@ -129,13 +130,20 @@
       cur = cap;
       try { Cart.setQty(p.id, cap); } catch (e) { }
     }
-    return '<div class="qty-stepper' + (cur <= 0 ? ' is-empty' : '') + '" data-cart-row="' + Utils.esc(p.id) + '">' +
-      '<button class="qty-btn" data-cart-dec="' + Utils.esc(p.id) + '" aria-label="Уменьшить"' + (cur <= 0 ? ' disabled' : '') + '>−</button>' +
+    var detailBtn = withDetail === false ? '' : '<button class="btn btn-sm row-detail" data-open-detail="' + Utils.esc(p.id) + '">Подробнее</button>';
+    if (cur <= 0) {
+      if (effectiveStatus(p) === 'out') {
+        return '<button class="btn btn-primary btn-sm row-add is-disabled" type="button" disabled title="Товара нет в наличии">' + Utils.icon('cart', 15) + ' В корзину</button>' + detailBtn;
+      }
+      return '<button class="btn btn-primary btn-sm row-add" data-cart-add="' + Utils.esc(p.id) + '">' + Utils.icon('cart', 15) + ' В корзину</button>' + detailBtn;
+    }
+    return '<div class="qty-stepper" data-cart-row="' + Utils.esc(p.id) + '">' +
+      '<button class="qty-btn" data-cart-dec="' + Utils.esc(p.id) + '" aria-label="Уменьшить">−</button>' +
       '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(p.id) + '" min="0" max="' + cap + '" value="' + cur + '" aria-label="Количество">' +
       '<button class="qty-btn" data-cart-inc="' + Utils.esc(p.id) + '" aria-label="Увеличить">+</button>' +
       '</div>' +
-      '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины"' + (cur <= 0 ? ' disabled' : '') + '>' + Utils.iconX(12) + '</button>' +
-      (withDetail === false ? '' : '<button class="btn btn-outline btn-sm" data-open-detail="' + Utils.esc(p.id) + '">🔍 Подробнее</button>');
+      '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины">' + Utils.iconX(12) + '</button>' +
+      detailBtn;
   }
 
   // Для карточек полного каталога фото пока remote-миниатюры портала (-small, 60×60).

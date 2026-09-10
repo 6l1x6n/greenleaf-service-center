@@ -802,6 +802,7 @@ a:hover { text-decoration: none; }
 }
 .product-row.product-row-out .row-media img { filter: grayscale(0.8); }
 .product-row.product-row-out .btn { pointer-events: none; opacity: 0.5; }
+.product-row.product-row-out .row-detail { pointer-events: auto; opacity: 0.85; }
 .product-row.product-row-out .qty-stepper { pointer-events: none; opacity: 0.5; }
 .row-media { grid-area: media; position: relative; }
 .badge-hot {
@@ -847,6 +848,32 @@ a:hover { text-decoration: none; }
 .row-prices .card-prices { justify-content: flex-end; }
 .row-actions { grid-area: actions; display: flex; align-items: center; gap: 8px; }
 
+/* Кнопка «В корзину»: одна зелёная пилюля вместо степпера с нулём.
+   Мин. ширина — чтобы ряд не прыгал при превращении в степпер. */
+.row-add { min-width: 132px; }
+.row-add svg { flex: none; }
+.product-row-out .row-add {
+  background: var(--line) !important;
+  color: var(--muted) !important;
+  box-shadow: none !important;
+}
+
+/* Тихая кнопка «Подробнее»: без рамки, проявляется при наведении */
+.row-detail {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 8px 10px;
+  box-shadow: none;
+}
+.row-detail:hover { color: var(--green-dark); background: var(--green-soft); transform: none; }
+
+/* Плавное появление кнопки «В корзину» (степпер не анимируем,
+   чтобы быстрые клики «+/−» не дёргали ряд) */
+.row-actions > .row-add { animation: rowCtrlIn 0.18s ease both; }
+@keyframes rowCtrlIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+
 .qty-stepper {
   display: inline-flex;
   align-items: center;
@@ -886,7 +913,6 @@ a:hover { text-decoration: none; }
 .qty-input::-webkit-outer-spin-button,
 .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .qty-input:focus { background: rgba(10, 53, 32, 0.07); }
-.qty-stepper.is-empty .qty-input { color: var(--muted); }
 .qty-stepper .qty-btn:disabled { opacity: 0.35; cursor: default; }
 .qty-stepper .qty-btn:disabled:hover { background: transparent; }
 .row-remove {
@@ -921,6 +947,7 @@ a:hover { text-decoration: none; }
   .row-actions { flex-wrap: nowrap; justify-content: flex-end; min-width: 128px; }
   .row-actions [data-open-detail] { display: none; }
   .row-actions .btn { flex: none; padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+  .row-actions .row-add { min-width: 0; }
   .row-actions .qty-stepper { flex: none; }
 }
 
