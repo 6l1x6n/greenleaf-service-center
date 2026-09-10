@@ -464,7 +464,7 @@
     return '<div class="ai-prod" data-ai-detail="' + esc(p.id) + '" tabindex="0" role="button" title="Нажмите, чтобы открыть подробности">' +
       '<span class="ai-prod-media zoom-zone" data-zoom="2.8" data-lens="110">' +
       '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
-      '<span class="zoom-lens" aria-hidden="true"><span class="zoom-lens-img"></span></span>' +
+      (window.Utils && Utils.lensHtml ? Utils.lensHtml() : '') +
       '</span>' +
       '<div class="ai-prod-info">' +
       '<div class="ai-prod-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>' +

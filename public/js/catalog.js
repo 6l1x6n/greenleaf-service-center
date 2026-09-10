@@ -196,7 +196,7 @@
       '<div class="row-media zoom-zone" data-zoom="2.4" data-lens="150">' +
       priorityBadge(p) +
       '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
-      (st.meta === STATUS.out ? '' : '<span class="zoom-lens" aria-hidden="true"><span class="zoom-lens-img"></span></span>') +
+      (st.meta === STATUS.out ? '' : Utils.lensHtml()) +
       '</div>' +
       '<div class="row-body">' +
       '<span class="row-cat">' + Utils.esc(p.category) + '</span>' +
@@ -435,7 +435,7 @@
       '<div class="product-detail-grid">' +
       '<div class="product-detail-media zoom-zone" data-zoom="1.8" data-lens="180">' +
       '<img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
-      '<span class="zoom-lens" aria-hidden="true"><span class="zoom-lens-img"></span></span>' +
+      Utils.lensHtml() +
       '</div>' +
       '<div class="product-detail-body">' +
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +

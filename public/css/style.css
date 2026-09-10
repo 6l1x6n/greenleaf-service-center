@@ -893,9 +893,9 @@ a:hover { text-decoration: none; }
 }
 
 /* Лупа: круг следует за курсором; край искажается SVG-фильтром.
-   ВАЖНО: фильтр на элементе с border-radius браузер не обрезает —
-   результат рисуется прямоугольником. Поэтому круглый клип и ободок
-   живут на родителе (.zoom-lens), а фильтр — на дочернем слое. */
+   ВАЖНО: увеличенное фото и круглый клип живут внутри SVG (.zoom-lens-svg) —
+   в SVG clip-path применяется после фильтра, поэтому край чистый.
+   На HTML-элементе с filter CSS-клип в Chromium не работает (квадрат). */
 .zoom-zone { position: relative; }
 .zoom-lens {
   position: absolute;
@@ -917,16 +917,16 @@ a:hover { text-decoration: none; }
 .zoom-zone.is-lens .zoom-lens { opacity: 1; }
 .zoom-zone.is-lens,
 .zoom-zone.is-lens img { cursor: none; }
-.zoom-lens-img {
+.zoom-lens-svg {
   position: absolute;
   inset: 0;
-  background-color: #fff;
-  background-repeat: no-repeat;
-  filter: url(#glLensWarp);
+  width: 100%;
+  height: 100%;
+  display: block;
   transform: scale(0.82);
   transition: transform 0.16s ease;
 }
-.zoom-zone.is-lens .zoom-lens-img { transform: scale(1); }
+.zoom-zone.is-lens .zoom-lens-svg { transform: scale(1); }
 
 /* Плавное появление кнопки «В корзину» (степпер не анимируем,
    чтобы быстрые клики «+/−» не дёргали ряд) */

@@ -428,6 +428,17 @@
       '<circle cx="6.4" cy="17.4" r="1.7"/><circle cx="17.3" cy="17.4" r="1.7"/></svg>';
   }
 
+  // Разметка лупы для зоны .zoom-zone (каталог, модалка товара, чат).
+  // Клип и fisheye-фильтр применяются внутри SVG — там clip-path работает
+  // после фильтра, и увеличенное фото не вылезает квадратом за круг.
+  function lensHtml() {
+    return '<span class="zoom-lens" aria-hidden="true">' +
+      '<svg class="zoom-lens-svg" viewBox="0 0 100 100" preserveAspectRatio="none">' +
+      '<circle cx="50" cy="50" r="50" fill="#fff"/>' +
+      '<image filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none"/>' +
+      '</svg></span>';
+  }
+
   var WEEK_DAYS = [['mon', 'Пн'], ['tue', 'Вт'], ['wed', 'Ср'], ['thu', 'Чт'], ['fri', 'Пт'], ['sat', 'Сб'], ['sun', 'Вс']];
 
   function scheduleTimeOptions(selected) {
@@ -546,6 +557,7 @@
     iconX: iconX,
     iconTrash: iconTrash,
     iconTruck: iconTruck,
+    lensHtml: lensHtml,
     scheduleTimeOptions: scheduleTimeOptions,
     scheduleDefault: scheduleDefault,
     scheduleToText: scheduleToText,
@@ -559,9 +571,11 @@
 
   // ---------------- Лупа на фото (hover, только мышь) ----------------
   // Один контроллер для всех зон .zoom-zone: каталог, модалка товара, чат.
-  // Круг следует за курсором и показывает увеличенный фрагмент; край круга
-  // «выпуклый» — радиальная карта смещений в SVG feDisplacementMap (canvas,
-  // без чтения товарных фото — CORS ни при чём). Курсор на время скрываем.
+  // Лупа рендерится ВНУТРИ SVG: там clip-path применяется после фильтра,
+  // поэтому круглый край чистый (CSS-клип родителя SVG-фильтр не обрезает
+  // в Chromium — увеличенное фото вылезало квадратом). Край «выпуклый» —
+  // радиальная карта смещений в feDisplacementMap (canvas, без чтения
+  // товарных фото — CORS ни при чём). Курсор на время скрываем.
   (function initZoomLens() {
     var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -573,7 +587,9 @@
     var lastY = 0;
     var lensSize = 150;
     var zoom = 2.4;
-    var warpReady = false;
+    var imgW = 0;
+    var imgH = 0;
+    var defsReady = false;
 
     function buildWarpMap(size) {
       var c = document.createElement('canvas');
@@ -605,9 +621,11 @@
       return c.toDataURL('image/png');
     }
 
-    function ensureWarp() {
-      if (warpReady) return;
-      warpReady = true;
+    // Общие defs: круглый клип (после фильтра) и fisheye-фильтр.
+    // Координаты фильтра — 0..100 в системе viewBox лупы.
+    function ensureDefs() {
+      if (defsReady) return;
+      defsReady = true;
       try {
         var map = buildWarpMap(160);
         if (!map) return;
@@ -617,31 +635,46 @@
         svg.setAttribute('height', '0');
         svg.setAttribute('aria-hidden', 'true');
         svg.style.position = 'absolute';
+        var defs = document.createElementNS(NS, 'defs');
+
+        var clip = document.createElementNS(NS, 'clipPath');
+        clip.setAttribute('id', 'glLensClip');
+        clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+        var circle = document.createElementNS(NS, 'circle');
+        circle.setAttribute('cx', '50');
+        circle.setAttribute('cy', '50');
+        circle.setAttribute('r', '50');
+        clip.appendChild(circle);
+
         var filter = document.createElementNS(NS, 'filter');
         filter.setAttribute('id', 'glLensWarp');
-        filter.setAttribute('x', '-20%');
-        filter.setAttribute('y', '-20%');
-        filter.setAttribute('width', '140%');
-        filter.setAttribute('height', '140%');
+        filter.setAttribute('filterUnits', 'userSpaceOnUse');
+        filter.setAttribute('x', '0');
+        filter.setAttribute('y', '0');
+        filter.setAttribute('width', '100');
+        filter.setAttribute('height', '100');
         filter.setAttribute('color-interpolation-filters', 'sRGB');
         var feImg = document.createElementNS(NS, 'feImage');
         feImg.setAttribute('href', map);
         feImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', map);
         feImg.setAttribute('x', '0');
         feImg.setAttribute('y', '0');
-        feImg.setAttribute('width', '100%');
-        feImg.setAttribute('height', '100%');
+        feImg.setAttribute('width', '100');
+        feImg.setAttribute('height', '100');
         feImg.setAttribute('preserveAspectRatio', 'none');
         feImg.setAttribute('result', 'map');
         var disp = document.createElementNS(NS, 'feDisplacementMap');
         disp.setAttribute('in', 'SourceGraphic');
         disp.setAttribute('in2', 'map');
-        disp.setAttribute('scale', '30');
+        disp.setAttribute('scale', '20');
         disp.setAttribute('xChannelSelector', 'R');
         disp.setAttribute('yChannelSelector', 'G');
         filter.appendChild(feImg);
         filter.appendChild(disp);
-        svg.appendChild(filter);
+
+        defs.appendChild(clip);
+        defs.appendChild(filter);
+        svg.appendChild(defs);
         document.body.appendChild(svg);
       } catch (e) { /* без искажения, лупа всё равно работает */ }
     }
@@ -656,17 +689,19 @@
     function activate(zone) {
       var img = zone.querySelector('img');
       var lens = zone.querySelector('.zoom-lens');
-      var glass = zone.querySelector('.zoom-lens-img');
-      if (!img || !lens || !glass) return;
+      var layer = zone.querySelector('.zoom-lens-svg image');
+      if (!img || !lens || !layer) return;
       var src = img.currentSrc || img.src;
       if (!src) return;
-      ensureWarp();
+      ensureDefs();
       deactivate();
       lensSize = parseInt(zone.getAttribute('data-lens'), 10) || 150;
       zoom = parseFloat(zone.getAttribute('data-zoom')) || 2.4;
+      imgW = img.offsetWidth || 1;
+      imgH = img.offsetHeight || 1;
       lens.style.setProperty('--lens-size', lensSize + 'px');
-      glass.style.backgroundImage = 'url("' + src.replace(/"/g, '\\"') + '")';
-      glass.style.backgroundSize = (img.offsetWidth * zoom) + 'px ' + (img.offsetHeight * zoom) + 'px';
+      layer.setAttribute('href', src);
+      layer.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', src);
       zone.classList.add('is-lens');
       active = zone;
     }
@@ -675,15 +710,20 @@
       rafId = 0;
       if (!active) return;
       var lens = active.querySelector('.zoom-lens');
-      var glass = active.querySelector('.zoom-lens-img');
-      if (!lens || !glass) return;
+      var layer = active.querySelector('.zoom-lens-svg image');
+      if (!lens || !layer) return;
       var rect = active.getBoundingClientRect();
       var x = lastX - rect.left;
       var y = lastY - rect.top;
       lens.style.setProperty('--lens-x', (x - lensSize / 2) + 'px');
       lens.style.setProperty('--lens-y', (y - lensSize / 2) + 'px');
-      glass.style.backgroundPosition =
-        (lensSize / 2 - x * zoom) + 'px ' + (lensSize / 2 - y * zoom) + 'px';
+      // Координаты 0..100 (viewBox лупы): картинка кладётся так, чтобы
+      // точка под курсором оказалась в центре линзы.
+      var k = 100 / lensSize;
+      layer.setAttribute('x', (50 - x * zoom * k).toFixed(2));
+      layer.setAttribute('y', (50 - y * zoom * k).toFixed(2));
+      layer.setAttribute('width', (imgW * zoom * k).toFixed(2));
+      layer.setAttribute('height', (imgH * zoom * k).toFixed(2));
     }
 
     document.addEventListener('pointermove', function (e) {
