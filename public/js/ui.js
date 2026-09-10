@@ -557,6 +557,151 @@
   document.getElementById('year').textContent = new Date().getFullYear();
   loadStore();
 
+  // ---------------- Лупа на фото (hover, только мышь) ----------------
+  // Один контроллер для всех зон .zoom-zone: каталог, модалка товара, чат.
+  // Круг следует за курсором и показывает увеличенный фрагмент; край круга
+  // «выпуклый» — радиальная карта смещений в SVG feDisplacementMap (canvas,
+  // без чтения товарных фото — CORS ни при чём). Курсор на время скрываем.
+  (function initZoomLens() {
+    var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!canHover || reduced) return;
+
+    var active = null;
+    var rafId = 0;
+    var lastX = 0;
+    var lastY = 0;
+    var lensSize = 150;
+    var zoom = 2.4;
+    var warpReady = false;
+
+    function buildWarpMap(size) {
+      var c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      var ctx = c.getContext('2d');
+      if (!ctx) return '';
+      var imgData = ctx.createImageData(size, size);
+      var d = imgData.data;
+      var cx = size / 2;
+      var cy = size / 2;
+      var R = size / 2;
+      for (var y = 0; y < size; y++) {
+        for (var x = 0; x < size; x++) {
+          var dx = (x - cx) / R;
+          var dy = (y - cy) / R;
+          var r = Math.sqrt(dx * dx + dy * dy);
+          var edge = Math.min(1, Math.pow(Math.max(0, r * 0.98), 2.4));
+          var ux = r > 0 ? dx / r : 0;
+          var uy = r > 0 ? dy / r : 0;
+          var i = (y * size + x) * 4;
+          d[i] = 128 + ux * edge * 127.5;
+          d[i + 1] = 128 + uy * edge * 127.5;
+          d[i + 2] = 128;
+          d[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      return c.toDataURL('image/png');
+    }
+
+    function ensureWarp() {
+      if (warpReady) return;
+      warpReady = true;
+      try {
+        var map = buildWarpMap(160);
+        if (!map) return;
+        var NS = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(NS, 'svg');
+        svg.setAttribute('width', '0');
+        svg.setAttribute('height', '0');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.style.position = 'absolute';
+        var filter = document.createElementNS(NS, 'filter');
+        filter.setAttribute('id', 'glLensWarp');
+        filter.setAttribute('x', '-20%');
+        filter.setAttribute('y', '-20%');
+        filter.setAttribute('width', '140%');
+        filter.setAttribute('height', '140%');
+        filter.setAttribute('color-interpolation-filters', 'sRGB');
+        var feImg = document.createElementNS(NS, 'feImage');
+        feImg.setAttribute('href', map);
+        feImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', map);
+        feImg.setAttribute('x', '0');
+        feImg.setAttribute('y', '0');
+        feImg.setAttribute('width', '100%');
+        feImg.setAttribute('height', '100%');
+        feImg.setAttribute('preserveAspectRatio', 'none');
+        feImg.setAttribute('result', 'map');
+        var disp = document.createElementNS(NS, 'feDisplacementMap');
+        disp.setAttribute('in', 'SourceGraphic');
+        disp.setAttribute('in2', 'map');
+        disp.setAttribute('scale', '30');
+        disp.setAttribute('xChannelSelector', 'R');
+        disp.setAttribute('yChannelSelector', 'G');
+        filter.appendChild(feImg);
+        filter.appendChild(disp);
+        svg.appendChild(filter);
+        document.body.appendChild(svg);
+      } catch (e) { /* без искажения, лупа всё равно работает */ }
+    }
+
+    function deactivate() {
+      document.querySelectorAll('.zoom-zone.is-lens').forEach(function (z) {
+        z.classList.remove('is-lens');
+      });
+      active = null;
+    }
+
+    function activate(zone) {
+      var img = zone.querySelector('img');
+      var lens = zone.querySelector('.zoom-lens');
+      var glass = zone.querySelector('.zoom-lens-img');
+      if (!img || !lens || !glass) return;
+      var src = img.currentSrc || img.src;
+      if (!src) return;
+      ensureWarp();
+      deactivate();
+      lensSize = parseInt(zone.getAttribute('data-lens'), 10) || 150;
+      zoom = parseFloat(zone.getAttribute('data-zoom')) || 2.4;
+      lens.style.setProperty('--lens-size', lensSize + 'px');
+      glass.style.backgroundImage = 'url("' + src.replace(/"/g, '\\"') + '")';
+      glass.style.backgroundSize = (img.offsetWidth * zoom) + 'px ' + (img.offsetHeight * zoom) + 'px';
+      zone.classList.add('is-lens');
+      active = zone;
+    }
+
+    function apply() {
+      rafId = 0;
+      if (!active) return;
+      var lens = active.querySelector('.zoom-lens');
+      var glass = active.querySelector('.zoom-lens-img');
+      if (!lens || !glass) return;
+      var rect = active.getBoundingClientRect();
+      var x = lastX - rect.left;
+      var y = lastY - rect.top;
+      lens.style.setProperty('--lens-x', (x - lensSize / 2) + 'px');
+      lens.style.setProperty('--lens-y', (y - lensSize / 2) + 'px');
+      glass.style.backgroundPosition =
+        (lensSize / 2 - x * zoom) + 'px ' + (lensSize / 2 - y * zoom) + 'px';
+    }
+
+    document.addEventListener('pointermove', function (e) {
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      var zone = e.target && e.target.closest ? e.target.closest('.zoom-zone') : null;
+      if (zone && !zone.closest('.product-row-out')) {
+        if (zone !== active) activate(zone);
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (!rafId) rafId = requestAnimationFrame(apply);
+      } else if (active) {
+        deactivate();
+      }
+    }, { passive: true });
+    window.addEventListener('blur', deactivate);
+    document.addEventListener('mouseleave', deactivate);
+  })();
+
   // ---------------- Остатки по филиалам (store-stock.json + списания Worker) ----------------
 
   var baseStock = {};

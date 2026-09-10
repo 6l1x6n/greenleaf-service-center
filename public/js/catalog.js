@@ -193,7 +193,7 @@
 
     return '' +
       '<article class="product-row' + outCls + '" data-product-id="' + Utils.esc(p.id) + '" tabindex="0">' +
-      '<div class="row-media">' +
+      '<div class="row-media zoom-zone" data-zoom="2.4" data-lens="150">' +
       priorityBadge(p) +
       '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
       (st.meta === STATUS.out ? '' : '<span class="zoom-lens" aria-hidden="true"><span class="zoom-lens-img"></span></span>') +
@@ -433,8 +433,9 @@
     Utils.openModal(
       '<div class="modal-product-detail">' +
       '<div class="product-detail-grid">' +
-      '<div class="product-detail-media">' +
+      '<div class="product-detail-media zoom-zone" data-zoom="1.8" data-lens="180">' +
       '<img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+      '<span class="zoom-lens" aria-hidden="true"><span class="zoom-lens-img"></span></span>' +
       '</div>' +
       '<div class="product-detail-body">' +
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
@@ -762,145 +763,8 @@
     if (p) openProductDetailModal(p);
   });
 
-  // ---------------- Лупа на фото товара (hover, только мышь) ----------------
-  // Круг следует за курсором и показывает увеличенный фрагмент; край круга
-  // слегка «выпуклый» — радиальная карта смещений в SVG feDisplacementMap,
-  // сгенерированная один раз на canvas (товарные фото не читаются — CORS ни при чём).
-  (function initZoomLens() {
-    if (!grid) return;
-    var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!canHover || reduced) return;
-
-    var LENS_SIZE = 150;
-    var ZOOM = 2.4;
-    var active = null;
-    var rafId = 0;
-    var lastX = 0;
-    var lastY = 0;
-    var warpReady = false;
-
-    function buildWarpMap(size) {
-      var c = document.createElement('canvas');
-      c.width = size;
-      c.height = size;
-      var ctx = c.getContext('2d');
-      if (!ctx) return '';
-      var imgData = ctx.createImageData(size, size);
-      var d = imgData.data;
-      var cx = size / 2;
-      var cy = size / 2;
-      var R = size / 2;
-      for (var y = 0; y < size; y++) {
-        for (var x = 0; x < size; x++) {
-          var dx = (x - cx) / R;
-          var dy = (y - cy) / R;
-          var r = Math.sqrt(dx * dx + dy * dy);
-          var edge = Math.min(1, Math.pow(Math.max(0, r * 0.98), 2.4));
-          var ux = r > 0 ? dx / r : 0;
-          var uy = r > 0 ? dy / r : 0;
-          var i = (y * size + x) * 4;
-          d[i] = 128 + ux * edge * 127.5;
-          d[i + 1] = 128 + uy * edge * 127.5;
-          d[i + 2] = 128;
-          d[i + 3] = 255;
-        }
-      }
-      ctx.putImageData(imgData, 0, 0);
-      return c.toDataURL('image/png');
-    }
-
-    function ensureWarp() {
-      if (warpReady) return;
-      warpReady = true;
-      try {
-        var map = buildWarpMap(160);
-        if (!map) return;
-        var NS = 'http://www.w3.org/2000/svg';
-        var svg = document.createElementNS(NS, 'svg');
-        svg.setAttribute('width', '0');
-        svg.setAttribute('height', '0');
-        svg.setAttribute('aria-hidden', 'true');
-        svg.style.position = 'absolute';
-        var filter = document.createElementNS(NS, 'filter');
-        filter.setAttribute('id', 'glLensWarp');
-        filter.setAttribute('x', '-20%');
-        filter.setAttribute('y', '-20%');
-        filter.setAttribute('width', '140%');
-        filter.setAttribute('height', '140%');
-        filter.setAttribute('color-interpolation-filters', 'sRGB');
-        var feImg = document.createElementNS(NS, 'feImage');
-        feImg.setAttribute('href', map);
-        feImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', map);
-        feImg.setAttribute('x', '0');
-        feImg.setAttribute('y', '0');
-        feImg.setAttribute('width', '100%');
-        feImg.setAttribute('height', '100%');
-        feImg.setAttribute('preserveAspectRatio', 'none');
-        feImg.setAttribute('result', 'map');
-        var disp = document.createElementNS(NS, 'feDisplacementMap');
-        disp.setAttribute('in', 'SourceGraphic');
-        disp.setAttribute('in2', 'map');
-        disp.setAttribute('scale', '30');
-        disp.setAttribute('xChannelSelector', 'R');
-        disp.setAttribute('yChannelSelector', 'G');
-        filter.appendChild(feImg);
-        filter.appendChild(disp);
-        svg.appendChild(filter);
-        document.body.appendChild(svg);
-      } catch (e) { /* без искажения, лупа всё равно работает */ }
-    }
-
-    function activate(media) {
-      var img = media.querySelector('img');
-      var lens = media.querySelector('.zoom-lens');
-      var glass = media.querySelector('.zoom-lens-img');
-      if (!img || !lens || !glass) return;
-      var src = img.currentSrc || img.src;
-      if (!src) return;
-      ensureWarp();
-      glass.style.backgroundImage = 'url("' + src.replace(/"/g, '\\"') + '")';
-      glass.style.backgroundSize = (img.offsetWidth * ZOOM) + 'px ' + (img.offsetHeight * ZOOM) + 'px';
-      media.classList.add('is-lens');
-      active = media;
-    }
-
-    function deactivate() {
-      if (!active) return;
-      active.classList.remove('is-lens');
-      active = null;
-    }
-
-    function apply() {
-      rafId = 0;
-      if (!active) return;
-      var lens = active.querySelector('.zoom-lens');
-      var glass = active.querySelector('.zoom-lens-img');
-      var img = active.querySelector('img');
-      if (!lens || !glass || !img) return;
-      var rect = active.getBoundingClientRect();
-      var x = lastX - rect.left;
-      var y = lastY - rect.top;
-      lens.style.setProperty('--lens-x', (x - LENS_SIZE / 2) + 'px');
-      lens.style.setProperty('--lens-y', (y - LENS_SIZE / 2) + 'px');
-      glass.style.backgroundPosition =
-        (LENS_SIZE / 2 - x * ZOOM) + 'px ' + (LENS_SIZE / 2 - y * ZOOM) + 'px';
-    }
-
-    grid.addEventListener('pointermove', function (e) {
-      if (e.pointerType !== 'mouse') return;
-      var media = e.target.closest ? e.target.closest('.row-media') : null;
-      if (media && !media.closest('.product-row-out')) {
-        if (media !== active) activate(media);
-        lastX = e.clientX;
-        lastY = e.clientY;
-        if (!rafId) rafId = requestAnimationFrame(apply);
-      } else {
-        deactivate();
-      }
-    });
-    grid.addEventListener('pointerleave', deactivate);
-  })();
+  // Лупа на фото подключается из ui.js (класс .zoom-zone + data-zoom/data-lens):
+  // один общий контроллер для каталога, модалки товара и карточек чата.
 
   // Ручной ввод количества: 0 убирает из корзины, ввод при отсутствии
   // товара сразу кладёт его (с клампингом по остатку выбранного СЦ)

@@ -1929,6 +1929,7 @@ async function loadAiCatalog(env, url, storeId) {
       price: price,
       image: String(p.image || ''),
       status: String(o.status || p.status || ''),
+      priority: Number((o.priority != null ? o.priority : p.priority) || 0) || (p.hit ? 1 : 0),
       stock: stock
     });
   }
@@ -2141,6 +2142,28 @@ const AI_ORDER_KEYS = ['заказ', 'статус'];
 const AI_PAY_KEYS = ['оплат', 'каспи', 'kaspi', 'перевод', 'карт', 'наличн', 'рассрочк'];
 const AI_HOW_KEYS = ['оформ', 'заказать', 'купить', 'доставк', 'курьер', 'отправк', 'получить'];
 const AI_SUPPLY_KEYS = ['поставк', 'привоз', 'завоз', 'срок', 'ожида', 'доставк', 'когда будет', 'когда придет'];
+const AI_PICK_KEYS = ['подбер', 'посовет', 'порекоменд', 'помоги выбрать', 'не знаю что'];
+
+// Категорийные подборки для чипов «Помоги подобрать» (0 нейронов)
+const AI_CAT_PICKS = [
+  { phrases: ['для дома', 'для уборки', 'дом и уборк', 'бытов'], tokens: ['уборк', 'стирк', 'посуд'], cats: ['Бытовая химия'], label: 'для дома и уборки' },
+  { phrases: ['красота и уход', 'для красоты'], tokens: ['красот', 'космет'], cats: ['Уход за телом и косметика'], label: 'красоты и ухода' },
+  { phrases: [], tokens: ['витамин', 'бад'], cats: ['Напитки и БАДы'], label: 'витаминов и БАДов' },
+  { phrases: [], tokens: ['гигиен'], cats: ['Зубная гигиена', 'Женская и детская гигиена'], label: 'гигиены' }
+];
+
+function aiCategoryFor(qNorm, toks) {
+  for (let i = 0; i < AI_CAT_PICKS.length; i++) {
+    const c = AI_CAT_PICKS[i];
+    const byPhrase = c.phrases.some(function (ph) { return qNorm.indexOf(ph) !== -1; });
+    const byToken = aiTokensHit(toks, c.tokens);
+    if (byPhrase || byToken) return c;
+  }
+  if (qNorm.indexOf('детям') !== -1 || qNorm.indexOf('для детей') !== -1 || qNorm.indexOf('детск') !== -1) {
+    return { cats: [], kids: true, label: 'для детей' };
+  }
+  return null;
+}
 
 function aiTokensHit(toks, keys) {
   return toks.some(function (t) {
@@ -2165,7 +2188,7 @@ function aiFmtDay(iso) {
 
 // В пути / ждёт отгрузки: карта «артикул → ближайшая дата» и общая ближайшая поставка
 async function loadAiMoves(env, url) {
-  const out = { skuEta: {}, skuInTransit: {}, inTransit: 0, nearest: '' };
+  const out = { skuEta: {}, skuInTransit: {}, inTransit: 0, nearest: '', supplies: [] };
   try {
     const res = await env.ASSETS.fetch(new URL('/data/moves.json', url));
     if (!res.ok) return out;
@@ -2183,17 +2206,32 @@ async function loadAiMoves(env, url) {
       if (isNaN(start.getTime())) return;
       start.setDate(start.getDate() + (/Алматы/i.test(String(mv.source || '')) ? 2 : 1));
       const iso = start.toISOString().slice(0, 10);
+      const late = iso < todayIso;
+      out.supplies.push({
+        eta: iso,
+        late: late,
+        status: code === 4 ? 'transit' : 'expected',
+        route: /Алматы/i.test(String(mv.source || '')) ? 'Алматы' : 'Астана',
+        date: String(mv.date || ''),
+        items: mv.items.length,
+        number: String(mv.number || '')
+      });
       mv.items.forEach(function (it) {
         if (!it || !it.sku) return;
         const key = String(it.sku).toUpperCase();
         out.skuInTransit[key] = true;
         // Просроченные расчётные даты не обещаем (завоз задерживается)
-        if (iso < todayIso) return;
+        if (late) return;
         if (!out.skuEta[key] || iso < out.skuEta[key]) out.skuEta[key] = iso;
       });
       // Ближайшая дата — только из актуальных (не просроченных) поставок
-      if (iso >= todayIso && (!out.nearest || iso < out.nearest)) out.nearest = iso;
+      if (!late && (!out.nearest || iso < out.nearest)) out.nearest = iso;
     });
+    out.supplies.sort(function (a, b) {
+      if (a.late !== b.late) return a.late ? 1 : -1;
+      return a.eta < b.eta ? -1 : (a.eta > b.eta ? 1 : 0);
+    });
+    out.supplies = out.supplies.slice(0, 3);
   } catch (e) { /* без поставок */ }
   return out;
 }
@@ -2315,6 +2353,17 @@ function aiInstant(ctx) {
     };
   }
 
+  // 5б. «Помоги подобрать» — спрашиваем категорию и показываем хиты
+  if (aiTokensHit(toks, AI_PICK_KEYS)) {
+    const hits = ctx.categoryPick ? ctx.categoryPick({}, 3) : [];
+    return {
+      reply: 'С удовольствием помогу! Подскажите, что интересует: дом и уборка, красота и уход, витамины, гигиена или товары для детей?' +
+        (hits.length ? ' А пока — наши хиты:' : ''),
+      products: hits,
+      chips: ['🧴 Для дома и уборки', '💄 Красота и уход', '💊 Витамины и БАДы', '🦷 Гигиена', '👶 Детям']
+    };
+  }
+
   // 6. Поставки: по конкретному товару или ближайшая в СЦ
   if (aiTokensHit(toks, AI_SUPPLY_KEYS)) {
     const withEta = [];
@@ -2325,6 +2374,15 @@ function aiInstant(ctx) {
       if (eta) withEta.push({ p: p, eta: eta });
       else if (moves.skuInTransit[key]) onRoad.push(p);
     });
+    const supplyList = moves.supplies.map(function (s) {
+      return {
+        date: aiFmtDay(s.eta),
+        route: s.route,
+        late: !!s.late,
+        items: s.items,
+        status: s.status
+      };
+    });
     if (withEta.length) {
       const lines = withEta.map(function (x) {
         return '«' + x.p.name + '» — ожидается ≈ ' + aiFmtDay(x.eta);
@@ -2332,6 +2390,7 @@ function aiInstant(ctx) {
       return {
         reply: lines + '. Как только товар прибудет, его можно будет забрать в выбранном Сервис-Центре.',
         products: withEta.map(function (x) { return x.p; }),
+        supplies: supplyList,
         chips: AI_CHIPS_DEFAULT
       };
     }
@@ -2341,6 +2400,7 @@ function aiInstant(ctx) {
         reply: names + ' — уже в пути, точную дату прибытия подтвердим в WhatsApp (обычно это несколько дней).',
         products: onRoad,
         actions: waAct,
+        supplies: supplyList,
         chips: AI_CHIPS_DEFAULT
       };
     }
@@ -2350,21 +2410,29 @@ function aiInstant(ctx) {
         reply: names + ' нет в ближайшей поставке — точные сроки подскажем в WhatsApp.',
         products: products.slice(0, 2),
         actions: waAct,
+        supplies: supplyList,
         chips: AI_CHIPS_DEFAULT
       };
     }
-    if (moves.inTransit) {
+    if (moves.supplies.length) {
+      const lateList = moves.supplies.filter(function (s) { return s.late; });
+      const active = moves.supplies.filter(function (s) { return !s.late; });
+      let reply;
+      if (active.length) {
+        const n = active[0];
+        reply = 'Ближайшая поставка — ≈ ' + aiFmtDay(n.eta) + ' (' + n.route + ', ' +
+          (n.status === 'transit' ? 'в пути' : 'ожидается') + ').';
+        if (lateList.length) {
+          reply += ' ⚠️ Ещё ' + (lateList.length === 1 ? 'поставка' : lateList.length + ' поставки') +
+            ' задерживается: расчётно должна была прийти ' + aiFmtDay(lateList[0].eta) + '.';
+        }
+      } else {
+        reply = '⚠️ Поставки задерживаются: ближайшая расчётно должна была прийти ' +
+          aiFmtDay(lateList[0].eta) + ' (' + lateList[0].route + '), но ещё в пути.';
+      }
       return {
-        reply: 'Поставка в Сервис-Центр уже в пути — точную дату прибытия подтвердим в WhatsApp, обычно это вопрос нескольких дней.',
-        actions: waAct,
-        chips: AI_CHIPS_DEFAULT
-      };
-    }
-    if (moves.nearest) {
-      return {
-        reply: 'Ближайшая поставка в Сервис-Центр — ≈ ' + aiFmtDay(moves.nearest) +
-          '. Уточните в WhatsApp, войдут ли в неё нужные вам позиции.',
-        products: products.slice(0, 3),
+        reply: reply,
+        supplies: supplyList,
         actions: waAct,
         chips: AI_CHIPS_DEFAULT
       };
@@ -2376,8 +2444,22 @@ function aiInstant(ctx) {
     };
   }
 
-  // 7. Точный артикул/название или явный вопрос «есть ли / в наличии»: цена и наличие без ИИ
+  // 7. Категорийные чипы («Для дома», «Витамины»…) — подборка в наличии, 0 нейронов.
+  // Раньше точного товара: иначе «витамины»/«для дома» цепляют один случайный товар.
   const availQ = aiTokensHit(toks, ['наличи']) || qNorm.indexOf('есть ли') !== -1 || qNorm.indexOf('в наличии') !== -1;
+  const catPick = aiCategoryFor(qNorm, toks);
+  if (catPick && !availQ && ctx.categoryPick) {
+    const list = ctx.categoryPick(catPick, 4);
+    if (list.length) {
+      return {
+        reply: 'Вот лучшие варианты ' + catPick.label + ' — всё в наличии:',
+        products: list,
+        chips: AI_CHIPS_PRODUCT
+      };
+    }
+  }
+
+  // 7б. Точный артикул/название или явный вопрос «есть ли / в наличии»: цена и наличие без ИИ
   let exactProduct = null;
   if (ctx.foundExact && products.length) {
     exactProduct = products[0];
@@ -2519,7 +2601,7 @@ async function handleAiChat(request, env, url) {
   const shop = await loadAiShop(env, url, storeId);
   const moves = await loadAiMoves(env, url);
 
-  const products = found.products.map(function (p) {
+  function toPayload(p) {
     const av = aiAvail(p, storeId);
     const etaIso = moves.skuEta[String(p.sku || '').toUpperCase()] || '';
     return {
@@ -2528,15 +2610,29 @@ async function handleAiChat(request, env, url) {
       inStock: av.state === 'in', stockState: av.state, count: av.count,
       eta: etaIso, etaText: etaIso ? aiFmtDay(etaIso) : ''
     };
-  });
+  }
+  const products = found.products.map(toPayload);
+
+  // Подборка в наличии для «Помоги подобрать» и категорийных чипов (0 нейронов)
+  function categoryPick(cfg, limit) {
+    const res = [];
+    catalog.forEach(function (p) {
+      if (cfg && cfg.cats && cfg.cats.length && cfg.cats.indexOf(p.category) === -1) return;
+      if (cfg && cfg.kids && !aiHasKidsIntent(aiTokens(p.name))) return;
+      if (aiAvail(p, storeId).state !== 'in') return;
+      res.push(p);
+    });
+    res.sort(function (a, b) { return (b.priority || 0) - (a.priority || 0); });
+    return res.slice(0, limit || 4).map(toPayload);
+  }
 
   // Детерминированный ответ про подписку — с точными цифрами.
   // Используется в офлайне и как страховка, если модель поленилась назвать цены.
   function templateSubReply() {
-    return 'Подписка Greenleaf — 4 пакета: Бронза 50 000 ₸ (135 000 купонов), ' +
-      'Золото 138 000 ₸ (542 800 купонов), Платина 188 000 ₸ (678 500 купонов), ' +
-      'Бриллиант 564 000 ₸ (2 025 000 купонов). Покупая товар, 50% цены платишь деньгами, ' +
-      '50% — купонами. Подробности — на странице подписки.';
+    return 'Подписка Greenleaf — это −50% на весь каталог: половину цены платишь деньгами, ' +
+      'вторую половину — купонами. Чем выше пакет, тем больше купонов в подарок и выплат: ' +
+      'Бронза 50 000 ₸ (для себя), Золото 138 000 ₸, Платина 188 000 ₸ (самый популярный), ' +
+      'Бриллиант 564 000 ₸ (для магазинов). Подробности — на странице подписки.';
   }
 
   function templateReply() {
@@ -2563,7 +2659,7 @@ async function handleAiChat(request, env, url) {
   const instant = aiInstant({
     q: q, toks: aiTokens(q), subIntent: subIntent, shop: shop, moves: moves,
     catalog: catalog, products: products, foundExact: found.exact,
-    templateSubReply: templateSubReply
+    templateSubReply: templateSubReply, categoryPick: categoryPick
   });
   if (instant) {
     return jsonResponse({
@@ -2571,6 +2667,7 @@ async function handleAiChat(request, env, url) {
       reply: instant.reply,
       products: instant.products || [],
       actions: instant.actions || [],
+      supplies: instant.supplies || [],
       chips: instant.chips || AI_CHIPS_DEFAULT,
       instant: true
     });

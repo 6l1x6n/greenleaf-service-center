@@ -327,6 +327,24 @@
     scrollBottom();
   }
 
+  // Компактный список поставок: дата, маршрут, статус. Просрочка — акцентно.
+  function renderSupplies(box, supplies) {
+    if (!supplies || !supplies.length) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'ai-supplies';
+    wrap.innerHTML = supplies.map(function (s) {
+      var cls = s.late ? 'late' : (s.status === 'transit' ? 'transit' : 'expected');
+      var label = s.late ? '⚠️ Задерживается' : (s.status === 'transit' ? 'В пути' : 'Ожидается');
+      return '<div class="ai-supply ' + cls + '">' +
+        '<span class="ai-supply-date">' + esc(s.date || '') + '</span>' +
+        '<span class="ai-supply-info">' + esc(s.route || '') + (s.items ? ' · ' + s.items + ' поз.' : '') + '</span>' +
+        '<span class="ai-supply-status">' + label + '</span>' +
+        '</div>';
+    }).join('');
+    box.appendChild(wrap);
+    scrollBottom();
+  }
+
   // Оценка ответа: 👍/👎 уходит на сервер (в KV для разбора), повторно не спрашиваем
   function renderFeedback(box, q, reply) {
     var d = document.createElement('div');
@@ -404,23 +422,32 @@
     return 999;
   }
 
-  function stepperHtml(id) {
-    var q = aiQty(id);
-    return '<div class="ai-qty' + (q <= 0 ? ' is-empty' : '') + '" title="Количество">' +
-      '<button class="qty-btn" type="button" data-ai-dec="' + esc(id) + '" aria-label="Уменьшить"' + (q <= 0 ? ' disabled' : '') + '>−</button>' +
-      '<span class="qty-val" data-ai-qtyval="' + esc(id) + '">' + q + '</span>' +
-      '<button class="qty-btn" type="button" data-ai-inc="' + esc(id) + '" aria-label="Увеличить">+</button>' +
-      '</div>' +
-      (q > 0 ? '<span class="ai-incart">🛒 ' + q + '</span>' : '');
+  function cartIcon(size) {
+    try { if (window.Utils && Utils.icon) return Utils.icon('cart', size || 14); } catch (e) { }
+    return '';
   }
 
-  // Обновить все степперы в чате (после изменений корзины)
+  // Контрол корзины в чате: пусто — зелёная кнопка «В корзину»;
+  // после добавления — степпер − N +. Ширина обоих состояний одинаковая.
+  function cartControlHtml(id) {
+    var q = aiQty(id);
+    if (q <= 0) {
+      return '<button class="ai-add" type="button" data-ai-inc="' + esc(id) + '">' + cartIcon(14) + ' В корзину</button>';
+    }
+    return '<div class="ai-qty" title="Количество">' +
+      '<button class="qty-btn" type="button" data-ai-dec="' + esc(id) + '" aria-label="Уменьшить">−</button>' +
+      '<span class="qty-val" data-ai-qtyval="' + esc(id) + '">' + q + '</span>' +
+      '<button class="qty-btn" type="button" data-ai-inc="' + esc(id) + '" aria-label="Увеличить">+</button>' +
+      '</div>';
+  }
+
+  // Обновить все контролы корзины в чате (после изменений корзины)
   function refreshAiSteppers() {
     body.querySelectorAll('.ai-prod').forEach(function (card) {
       var id = card.getAttribute('data-ai-detail');
       if (!id) return;
       var side = card.querySelector('.ai-prod-side');
-      if (side) side.innerHTML = stepperHtml(id);
+      if (side) side.innerHTML = cartControlHtml(id);
     });
   }
 
@@ -435,12 +462,15 @@
           : '<span class="ai-prod-stock no">Нет в наличии</span>')
         : '<span class="ai-prod-stock na">Наличие уточняйте</span>';
     return '<div class="ai-prod" data-ai-detail="' + esc(p.id) + '" tabindex="0" role="button" title="Нажмите, чтобы открыть подробности">' +
+      '<span class="ai-prod-media zoom-zone" data-zoom="2.8" data-lens="110">' +
       '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
+      '<span class="zoom-lens" aria-hidden="true"><span class="zoom-lens-img"></span></span>' +
+      '</span>' +
       '<div class="ai-prod-info">' +
       '<div class="ai-prod-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>' +
       '<div class="ai-prod-meta"><span class="ai-prod-price">' + esc(price) + '</span>' + stock + '</div>' +
       '</div>' +
-      '<div class="ai-prod-side">' + stepperHtml(p.id) + '</div>' +
+      '<div class="ai-prod-side">' + cartControlHtml(p.id) + '</div>' +
       '</div>';
   }
 
@@ -564,6 +594,7 @@
         }
         setOffline(!!d.offline);
         var box = addBotHtml(html);
+        renderSupplies(box, d.supplies);
         renderProducts(box, d.products);
         var acts = Array.isArray(d.actions) ? d.actions : [];
         renderActions(box, acts);
