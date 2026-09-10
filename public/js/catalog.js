@@ -387,22 +387,30 @@
       waContacts.href = 'https://wa.me/' + s.whatsapp + '?text=' + encodeURIComponent('Здравствуйте! Интересует продукция Greenleaf.');
     }
 
+    // Карта и ссылки следуют за выбранным СЦ (Яндекс-виджет + кнопки 2ГИС/Яндекс)
+    var query = [s.address, s.city, s.name].filter(Boolean).join(', ');
+    var mapFrame = document.getElementById('map');
+    if (mapFrame && query && mapFrame.getAttribute('data-addr') !== query) {
+      mapFrame.setAttribute('data-addr', query);
+      mapFrame.classList.remove('is-loaded');
+      mapFrame.src = 'https://yandex.ru/map-widget/v1/?text=' + encodeURIComponent(query) + '&z=17';
+      mapFrame.title = 'Карта: ' + query;
+    }
+
     var mapLink = document.getElementById('mapLink');
-    if (mapLink) mapLink.href = 'https://go.2gis.com/MMuDb';
+    if (mapLink) {
+      mapLink.href = query
+        ? 'https://2gis.kz/search/' + encodeURIComponent(query)
+        : 'https://go.2gis.com/MMuDb';
+    }
+    var mapYa = document.getElementById('mapYa');
+    if (mapYa && query) {
+      mapYa.href = 'https://yandex.ru/maps/?text=' + encodeURIComponent(query);
+    }
   }
 
   window.CatalogRefreshContacts = renderContacts;
   window.CatalogSelectedStore = selectedStore;
-
-  // Страховка 2ГИС-виджета: если за 8с он не вставил iframe (лаги/block) —
-  // показываем Яндекс с точной меткой входа (src ставится только тут).
-  setTimeout(function () {
-    try {
-      var box = document.getElementById('dgMap');
-      if (!box || box.style.display === 'none') return;
-      if (!box.querySelector('iframe') && window.__mapFallback) window.__mapFallback();
-    } catch (e) { }
-  }, 8000);
 
   // ---------------- Товар: модалка, резерв ----------------
 
@@ -1373,8 +1381,8 @@ fetch('/api/event-bookings')
       var waHref = '#';
       try { waHref = (window.Utils && Utils.waLink) ? Utils.waLink('Здравствуйте! Хочу первым узнавать о презентациях Greenleaf.') : '#'; } catch (e) { }
       el.innerHTML = '<div class="events-empty"><div class="events-empty-ico">📅✨</div>' +
-        '<b>Пока тихо — готовим новое</b>' +
-        '<span>Скоро анонсируем презентации и обучения. Напишите в WhatsApp — пригласим первыми.</span>' +
+        '<div class="events-empty-text"><b>Пока тихо — готовим новое</b>' +
+        '<span>Скоро анонсируем презентации и обучения. Напишите в WhatsApp — пригласим первыми.</span></div>' +
         '<a class="btn btn-whatsapp btn-sm" href="' + waHref + '" target="_blank" rel="noopener">Написать в WhatsApp</a></div>';
       return;
     }

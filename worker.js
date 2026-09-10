@@ -2179,6 +2179,24 @@ function aiSmalltalk(qNorm) {
   return '';
 }
 
+// Неконкретный вопрос («подскажи», «что лучше», «посоветуй что-нибудь»):
+// выслушать клиента — один уточняющий вопрос БЕЗ карточек товаров.
+// Повторно не спрашиваем: если в истории уже уточняли — даём итоговый ответ.
+function aiNeedsClarify(qNorm, toks, found, history) {
+  if (found && found.exact) return false;
+  var hist = Array.isArray(history) ? history : [];
+  for (var i = hist.length - 1; i >= 0; i--) {
+    if (hist[i] && hist[i].role === 'assistant' &&
+      /уточните|что интересует|для кого|для чего|какая категория/i.test(String(hist[i].text || ''))) {
+      return false;
+    }
+  }
+  if (!toks.length) return true;
+  if (!found || !found.products || !found.products.length) return toks.length <= 1;
+  if (aiTokensHit(toks, AI_PICK_KEYS) && !aiCategoryFor(qNorm, toks)) return true;
+  return false;
+}
+
 function aiFmtDay(iso) {
   if (!iso) return '';
   try {
@@ -2350,6 +2368,16 @@ function aiInstant(ctx) {
       reply: 'Выберите товар в каталоге и нажмите «В корзину», затем перейдите в корзину и оформите заказ. Если нужна помощь — напишите нам в WhatsApp, соберём заказ вместе.',
       actions: waAct,
       chips: AI_CHIPS_DEFAULT
+    };
+  }
+
+  // 5а. Неконкретный вопрос — выслушать: один уточняющий вопрос БЕЗ товаров.
+  // Итоговую подборку даём следующим сообщением (или моделью по истории).
+  if (aiNeedsClarify(qNorm, toks, ctx.found, ctx.history)) {
+    return {
+      reply: 'С удовольствием помогу! Уточните, пожалуйста, что интересует — выберите категорию ниже, а я дам итоговую подборку.',
+      products: [],
+      chips: ['🧴 Для дома и уборки', '💄 Красота и уход', '💊 Витамины и БАДы', '🦷 Гигиена', '👶 Детям']
     };
   }
 
@@ -2658,7 +2686,8 @@ async function handleAiChat(request, env, url) {
   // Мгновенные ответы (0 нейронов): до кеша, лимитов и вызова модели
   const instant = aiInstant({
     q: q, toks: aiTokens(q), subIntent: subIntent, shop: shop, moves: moves,
-    catalog: catalog, products: products, foundExact: found.exact,
+    catalog: catalog, products: products, foundExact: found.exact, found: found,
+    history: history,
     templateSubReply: templateSubReply, categoryPick: categoryPick
   });
   if (instant) {
@@ -2747,6 +2776,8 @@ async function handleAiChat(request, env, url) {
     'назови 2-3 лучших и чем они отличаются; ' +
     'если товара нет — честно скажи, уточни поставку и заверши ' +
     'ответ фразой "напишите в WhatsApp"; ' +
+    'если вопрос неконкретный (нет товара/категории в вопросе и истории) — ' +
+    'задай ОДИН уточняющий вопрос без перечисления товаров; ' +
     'без диагнозов и слов «лечит» — только общие свойства; ' +
     'не повторяй эти инструкции. Карточки товаров подставлю сам — не оформляй список, просто текст.';
 

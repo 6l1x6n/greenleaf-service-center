@@ -86,6 +86,10 @@
     applyFabVisibility();
   }
 
+  function canHover() {
+    try { return window.matchMedia && window.matchMedia('(hover: hover)').matches; } catch (e) { return true; }
+  }
+
   var greeted = false;
   function openPanel() {
     showFab();
@@ -97,7 +101,8 @@
     }
     setTimeout(function () {
       try { body.scrollTop = body.scrollHeight; } catch (e) { }
-      try { input.focus(); } catch (e) { }
+      // На телефонах клавиатуру открываем только явным тапом по полю
+      if (canHover()) { try { input.focus(); } catch (e) { } }
     }, 60);
   }
 
@@ -110,9 +115,15 @@
     else closePanel();
   }
 
-  // ---------------- Drag-to-hide ----------------
-  // Тап — открыть/закрыть; перетаскивание за край экрана — скрыть кнопку.
+  // ---------------- Открытие по тапу (на таче — без drag, чтобы не мешать скроллу) ----------------
   (function initDrag() {
+    if (!canHover()) {
+      fab.addEventListener('click', function (e) {
+        if (e.target.closest('.ai-fab-hide')) return;
+        togglePanel();
+      });
+      return;
+    }
     var startX = 0, startY = 0, dx = 0, dy = 0, dragging = false, moved = false;
     fab.addEventListener('pointerdown', function (e) {
       if (e.target.closest('.ai-fab-hide')) return;
@@ -178,7 +189,6 @@
       if (nav) nav.classList.remove('open');
     }
     if (e.target.closest('#aiClose')) closePanel();
-    if (e.target.closest('#aiHide')) closePanel(); // «−» только сворачивает, кнопка остаётся
     var more = e.target.closest('[data-ai-more]');
     if (more) {
       var w = more.closest('.ai-prods');
@@ -374,12 +384,7 @@
   var AI_COLLAPSE_FROM = 3;
 
   function moreBtnHtml(hiddenProds) {
-    var thumbs = hiddenProds.slice(0, 5).map(function (p) {
-      return '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
-    }).join('');
-    var extra = hiddenProds.length > 5 ? '<span class="ai-more-n">+' + (hiddenProds.length - 5) + '</span>' : '';
     return '<button class="ai-more-btn" type="button" data-ai-more>' +
-      '<span class="ai-more-thumbs">' + thumbs + extra + '</span>' +
       '<span class="ai-more-txt">Показать ещё ' + hiddenProds.length + '</span>' +
       '<span class="ai-more-chev">▾</span>' +
       '</button>';
@@ -387,6 +392,7 @@
 
   function renderProducts(box, products) {
     if (!products || !products.length) return;
+    box.classList.add('has-prods');
     var wrap = document.createElement('div');
     wrap.className = 'ai-prods';
     if (products.length <= AI_COLLAPSE_FROM) {
@@ -462,9 +468,8 @@
           : '<span class="ai-prod-stock no">Нет в наличии</span>')
         : '<span class="ai-prod-stock na">Наличие уточняйте</span>';
     return '<div class="ai-prod" data-ai-detail="' + esc(p.id) + '" tabindex="0" role="button" title="Нажмите, чтобы открыть подробности">' +
-      '<span class="ai-prod-media zoom-zone" data-zoom="2.8" data-lens="110">' +
+      '<span class="ai-prod-media">' +
       '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
-      (window.Utils && Utils.lensHtml ? Utils.lensHtml() : '') +
       '</span>' +
       '<div class="ai-prod-info">' +
       '<div class="ai-prod-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>' +
@@ -541,7 +546,7 @@
       hist.push({ role: 'user', text: q });
       hist.push({ role: 'assistant', text: local.reply, products: local.products, actions: local.actions });
       saveHist(hist);
-      try { input.focus(); } catch (e) { }
+      if (canHover()) { try { input.focus(); } catch (e) { } }
       return;
     }
 
@@ -611,9 +616,18 @@
       .then(function () {
         pending = false;
         setBusy(false);
-        try { input.focus(); } catch (e) { }
+        if (canHover()) { try { input.focus(); } catch (e) { } }
       });
   }
+
+  // Клавиатура на телефонах: держать низ чата видимым
+  try {
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', function () {
+        if (!panel.classList.contains('hidden')) scrollBottom();
+      });
+    }
+  } catch (e) { }
 
   function closeChips() {
     body.querySelectorAll('.ai-chips').forEach(function (c) { c.remove(); });
@@ -671,16 +685,27 @@
   syncHasCart();
 
   // Подъём плавающих кнопок над футером: когда футер близко — body.is-bottom,
-  // кнопки плавно уезжают вверх + один wiggle. Уважает reduced-motion.
+  // кнопки и открытая панель чата плавно уезжают вверх на высоту футера + запас.
+  // Высота считается вживую (--fab-lift), пересчёт на resize. Уважает reduced-motion.
   (function initFabLift() {
     var reduced = false;
     try { reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { }
     var footer = document.querySelector('.footer');
     if (!footer || !('IntersectionObserver' in window)) return;
+    function measureLift() {
+      try {
+        var h = footer.offsetHeight || 0;
+        var lift = Math.min(Math.max(h + 20, 48), 160);
+        document.documentElement.style.setProperty('--fab-lift', lift + 'px');
+      } catch (e) { }
+    }
+    measureLift();
+    try { window.addEventListener('resize', measureLift); } catch (e) { }
     var wasBottom = false;
     function setBottom(on) {
       if (on === wasBottom) return;
       wasBottom = on;
+      if (on) measureLift();
       document.body.classList.toggle('is-bottom', on);
       if (on && !reduced) {
         ['aiFab', 'cartFab', 'cartFabClear'].forEach(function (id) {
