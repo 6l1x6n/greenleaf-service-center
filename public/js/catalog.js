@@ -394,6 +394,16 @@
   window.CatalogRefreshContacts = renderContacts;
   window.CatalogSelectedStore = selectedStore;
 
+  // Страховка 2ГИС-виджета: если за 8с он не вставил iframe (лаги/block) —
+  // показываем Яндекс с точной меткой входа (src ставится только тут).
+  setTimeout(function () {
+    try {
+      var box = document.getElementById('dgMap');
+      if (!box || box.style.display === 'none') return;
+      if (!box.querySelector('iframe') && window.__mapFallback) window.__mapFallback();
+    } catch (e) { }
+  }, 8000);
+
   // ---------------- Товар: модалка, резерв ----------------
 
   // ---------------- Товар: модалка, корзина ----------------
@@ -1170,7 +1180,7 @@
     }
     var rows = dsplitItems.map(function (l, i) {
       var media = l.p
-        ? '<span class="zoom-zone" data-zoom="2.4" data-lens="140" style="display:inline-flex;"><img class="delivery-item-img" src="' + Utils.esc(Utils.img(l.p.thumb || l.p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' + Utils.lensHtml() + '</span>'
+        ? '<img class="delivery-item-img" src="' + Utils.esc(Utils.img(l.p.thumb || l.p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
         : '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
       return '<div class="delivery-detail-item dsplit-row" data-dsplit-prod="' + i + '" style="cursor:pointer;" title="Показать детали товара">' +
         media +

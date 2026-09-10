@@ -23,7 +23,7 @@
   <meta property="og:image:alt" content="Greenleaf — Сервис-центр">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png">
-  <link rel="stylesheet" href="css/style.css?v=20260910f">
+  <link rel="stylesheet" href="css/style.css?v=20260910g">
 </head>
 
 <body>
@@ -66,10 +66,10 @@
         <div class="hero-cta">
           <a href="catalog.html" class="btn btn-accent">Открыть каталог →</a>
           <a href="#" class="btn btn-whatsapp" id="waHero" target="_blank" rel="noopener">Написать в WhatsApp</a>
-        </div>
-        <div class="hero-meta">
-          <span class="hero-meta-pill" id="heroStoresMeta">🏬 Загружаем филиалы…</span>
-          <div class="hero-cities" id="heroCities"></div>
+          <span class="hero-cta-meta">
+            <span class="hero-meta-pill" id="heroStoresMeta">🏬 Загружаем филиалы…</span>
+            <span class="hero-cities" id="heroCities"></span>
+          </span>
         </div>
       </div>
     </section>
@@ -171,9 +171,37 @@
             <a class="btn btn-outline btn-lg" id="phoneLink" href="tel:">Позвонить</a>
           </div>
         </div>
-        <div class="map-wrap">
-          <div class="map-google map-2gis">
-            <iframe id="map" src="https://widgets.2gis.com/widget?type=firmCard&id=70000001102239393" width="100%" height="100%" style="border:0;" loading="lazy" allowfullscreen title="Карта: Greenleaf, ул. Толе би 55 (Астана) — 2ГИС" onload="this.classList.add('is-loaded')"></iframe>
+        <div class="map-wrap map-2gis">
+          <div class="map-google" id="mapBox">
+            <div id="dgMap">
+              <script src="https://widgets.2gis.com/js/DGWidgetLoader.js"></script>
+              <script>
+                // 2ГИС-виджет филиала (Толе би 55). document.write лоадера работает
+                // только при синхронном парсинге — поэтому скрипты лежат прямо здесь.
+                // Не загрузилось (блок/лаги/мобила) — сразу показываем Яндекс.
+                window.__mapFallback = function () {
+                  var box = document.getElementById('dgMap');
+                  var fb = document.getElementById('map');
+                  if (!fb || fb.src) return;
+                  if (box) box.style.display = 'none';
+                  fb.src = fb.getAttribute('data-src');
+                  fb.classList.remove('hidden');
+                };
+                (function () {
+                  try {
+                    if (window.innerWidth >= 640 && window.DGWidgetLoader) {
+                      new DGWidgetLoader({
+                        width: 900, height: 400, borderColor: '#e3ebe3',
+                        pos: { lat: 51.125658, lon: 71.39452, zoom: 17 },
+                        opt: { city: 'astana' },
+                        org: [{ id: '70000001102239393' }]
+                      });
+                    } else { window.__mapFallback(); }
+                  } catch (e) { window.__mapFallback(); }
+                })();
+              </script>
+            </div>
+            <iframe id="map" class="hidden" data-src="https://yandex.ru/map-widget/v1/?ll=71.39452%2C51.125658&z=18&pt=71.39452,51.125658,pm2gnm" width="100%" height="100%" style="border:0;" loading="lazy" allowfullscreen title="Карта: Greenleaf, ул. Толе би 55 (Астана)" onload="this.classList.add('is-loaded')"></iframe>
             <div class="map-links">
               <a class="map-google-overlay" id="mapLink" href="https://go.2gis.com/MMuDb" target="_blank" rel="noopener" title="Открыть в 2ГИС">📍 Открыть в 2ГИС</a>
               <a class="map-google-overlay map-ya" href="https://yandex.ru/maps/?ll=71.39452%2C51.125658&z=18&pt=71.39452,51.125658,pm2gnm" target="_blank" rel="noopener" title="Открыть в Яндекс Картах">Яндекс Карты</a>
@@ -220,13 +248,13 @@
 
   <div class="toast hidden" id="toast"></div>
 
-  <script src="js/ui.js?v=20260910f"></script>
+  <script src="js/ui.js?v=20260910g"></script>
   <script src="js/cities.js"></script>
   <script src="js/auth.js?v=20260813c"></script>
-  <script src="js/cart.js?v=20260910f"></script>
-  <script src="js/catalog.js?v=20260910f"></script>
+  <script src="js/cart.js?v=20260910g"></script>
+  <script src="js/catalog.js?v=20260910g"></script>
   <script src="js/forms.js?v=20260813c"></script>
-  <script src="js/ai-chat.js?v=20260910f"></script>
+  <script src="js/ai-chat.js?v=20260910g"></script>
 </body>
 
 </html>

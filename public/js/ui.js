@@ -136,7 +136,8 @@
   // exactProduct — товар, уже найденный по артикулу (накладные): используется ТОЛЬКО он,
   // без повторного матчинга по названию. Всегда рисуется картинка (фото или плейсхолдер),
   // при ошибке загрузки фото подменяется плейсхолдером.
-  // Лупа: миниатюры — тоже .zoom-zone (меньше каталога, чтобы не перекрывать карточку).
+  // Без лупы: миниатюры 26px слишком малы — круг обрезался у краёв карточки.
+  // Лупа живёт только в окне поставки на большом фото (dsplit-media).
   function deliveryItemHtml(products, label, qty, exactProduct) {
     var txt = Utils.esc(String(label == null ? '' : label));
     var p = exactProduct || productByArticle(products, label);
@@ -145,9 +146,9 @@
     var inner;
     if (p) {
       var img = imgVersion(p.thumb || p.image || 'assets/images/products/placeholder.svg');
-      cls += ' has-prod zoom-zone';
-      dataAttr = ' data-del-open="' + Utils.esc(p.id) + '" data-zoom="2.4" data-lens="130"';
-      inner = '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' + lensHtml();
+      cls += ' has-prod';
+      dataAttr = ' data-del-open="' + Utils.esc(p.id) + '"';
+      inner = '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">';
     } else {
       // Товара ещё нет в каталоге — «часики»: фото появится после парсинга
       inner = '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
