@@ -893,8 +893,9 @@ a:hover { text-decoration: none; }
 }
 
 /* Лупа: круг следует за курсором; край искажается SVG-фильтром.
-   Один тонкий белый ободок и мягкая тень без смещения — ничего,
-   что читалось бы вторым кругом. */
+   ВАЖНО: фильтр на элементе с border-radius браузер не обрезает —
+   результат рисуется прямоугольником. Поэтому круглый клип и ободок
+   живут на родителе (.zoom-lens), а фильтр — на дочернем слое. */
 .zoom-zone { position: relative; }
 .zoom-lens {
   position: absolute;
@@ -902,12 +903,16 @@ a:hover { text-decoration: none; }
   left: 0;
   width: var(--lens-size, 150px);
   height: var(--lens-size, 150px);
+  border-radius: 50%;
+  overflow: hidden;
   pointer-events: none;
   opacity: 0;
   z-index: 6;
   transform: translate3d(var(--lens-x, -500px), var(--lens-y, -500px), 0);
   transition: opacity 0.15s ease;
   will-change: transform, opacity;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 6px 18px rgba(10, 53, 32, 0.22);
 }
 .zoom-zone.is-lens .zoom-lens { opacity: 1; }
 .zoom-zone.is-lens,
@@ -915,11 +920,8 @@ a:hover { text-decoration: none; }
 .zoom-lens-img {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
   background-color: #fff;
   background-repeat: no-repeat;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95),
-    0 6px 18px rgba(10, 53, 32, 0.22);
   filter: url(#glLensWarp);
   transform: scale(0.82);
   transition: transform 0.16s ease;
