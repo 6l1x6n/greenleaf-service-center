@@ -93,7 +93,7 @@
     if (!greeted && !hist.length) {
       greeted = true;
       addBotHtml('Здравствуйте! Я Иса, помогу подобрать товары Greenleaf. Напишите, что ищете — например, «что есть для мозга» или «какие витаминки есть».');
-      renderChips();
+      renderChips(['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы']);
     }
     setTimeout(function () {
       try { body.scrollTop = body.scrollHeight; } catch (e) { }
@@ -204,6 +204,13 @@
     if (chip) {
       openPanel();
       ask(chip.getAttribute('data-ai-chip') || '');
+      return;
+    }
+    var ordersBtn = e.target.closest('[data-ai-orders]');
+    if (ordersBtn) {
+      e.preventDefault();
+      try { if (window.Utils && Utils.openMyOrdersModal) Utils.openMyOrdersModal(); } catch (err) { }
+      return;
     }
     // Степпер идёт раньше деталей: клик по +/− не открывает карточку
     var inc = e.target.closest('[data-ai-inc]');
@@ -288,28 +295,58 @@
     return d;
   }
 
-  function renderChips() {
+  // Подсказки-кнопки: приветствие — стандартный набор, дальше — от сервера.
+  // box — пузырь ответа, под которым рисуем чипы (по умолчанию — внизу чата).
+  var DEFAULT_CHIPS = ['📍 Адрес и часы', '🚚 Когда поставка?', '📋 Подписка', '🔍 Помоги подобрать'];
+  function renderChips(items, box) {
+    var list = (Array.isArray(items) && items.length) ? items : DEFAULT_CHIPS;
     var d = document.createElement('div');
     d.className = 'ai-chips';
-    var items = ['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы'];
-    d.innerHTML = items.map(function (t) {
+    d.innerHTML = list.map(function (t) {
       return '<button class="ai-chip" type="button" data-ai-chip="' + esc(t) + '">' + esc(t) + '</button>';
     }).join('');
-    body.appendChild(d);
+    (box || body).appendChild(d);
     scrollBottom();
+    return d;
   }
 
-  // Кнопки под сообщением (решает сервер: подписка / WhatsApp)
+  // Кнопки под сообщением (решает сервер: подписка / WhatsApp / «Мои заказы»)
   function renderActions(box, actions) {
     if (!actions || !actions.length) return;
     var wrap = document.createElement('div');
     wrap.className = 'ai-actions';
     wrap.innerHTML = actions.map(function (a) {
+      if (a.type === 'orders') {
+        return '<button class="ai-act" type="button" data-ai-orders>' + esc(a.label || '📦 Мои заказы') + '</button>';
+      }
       var ext = /^https?:/i.test(a.url || '');
       return '<a class="ai-act' + (a.type === 'wa' ? ' ai-act-wa' : '') + '" href="' + esc(a.url || '#') + '"' +
         (ext ? ' target="_blank" rel="noopener"' : '') + '>' + esc(a.label || 'Подробнее') + '</a>';
     }).join('');
     box.appendChild(wrap);
+    scrollBottom();
+  }
+
+  // Оценка ответа: 👍/👎 уходит на сервер (в KV для разбора), повторно не спрашиваем
+  function renderFeedback(box, q, reply) {
+    var d = document.createElement('div');
+    d.className = 'ai-fb';
+    d.innerHTML = '<span class="ai-fb-q">Ответ полезен?</span>' +
+      '<button class="ai-fb-btn" type="button" data-ai-fb="up" aria-label="Полезно">👍</button>' +
+      '<button class="ai-fb-btn" type="button" data-ai-fb="down" aria-label="Не полезно">👎</button>';
+    box.appendChild(d);
+    d.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ai-fb]');
+      if (!b || d.classList.contains('voted')) return;
+      d.classList.add('voted');
+      var vote = b.getAttribute('data-ai-fb');
+      fetch('/api/ai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback: vote, q: q, reply: reply })
+      }).catch(function () { });
+      d.innerHTML = '<span class="ai-fb-thanks">Спасибо за оценку!</span>';
+    });
     scrollBottom();
   }
 
@@ -393,7 +430,9 @@
     var stock = st === 'in'
       ? '<span class="ai-prod-stock ok">В наличии</span>'
       : st === 'out'
-        ? '<span class="ai-prod-stock no">Нет в наличии</span>'
+        ? (p.etaText
+          ? '<span class="ai-prod-stock eta">Ожидается ≈ ' + esc(p.etaText) + '</span>'
+          : '<span class="ai-prod-stock no">Нет в наличии</span>')
         : '<span class="ai-prod-stock na">Наличие уточняйте</span>';
     return '<div class="ai-prod" data-ai-detail="' + esc(p.id) + '" tabindex="0" role="button" title="Нажмите, чтобы открыть подробности">' +
       '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
@@ -420,9 +459,62 @@
 
   var pending = false;
 
+  // «Что в корзине?» — отвечает сам сайт, без запроса к серверу и нейронов
+  function localCartAnswer(q) {
+    if (!/корзин/i.test(q)) return null;
+    var items = [];
+    try { if (window.Cart && Cart.get) items = Cart.get() || []; } catch (e) { }
+    if (!items.length) {
+      return {
+        reply: 'Ваша корзина пока пуста. Выберите товары в каталоге — помогу с выбором и оформлением.',
+        products: [],
+        actions: [{ type: 'link', label: '🔍 Открыть каталог', url: 'catalog.html' }],
+        chips: DEFAULT_CHIPS
+      };
+    }
+    var byId = {};
+    (window.CatalogProducts || []).forEach(function (p) { byId[String(p.id)] = p; });
+    var products = [];
+    var total = 0;
+    var lines = [];
+    items.forEach(function (it) {
+      var p = byId[String(it.id)];
+      var qty = Number(it.qty) || 0;
+      lines.push((p ? p.name : it.id) + ' × ' + qty);
+      if (!p) return;
+      total += (Number(p.price) || 0) * qty;
+      products.push({ id: p.id, name: p.name, price: p.price, image: p.thumb || p.image, stockState: 'in' });
+    });
+    if (!products.length) return null;
+    return {
+      reply: 'В корзине: ' + lines.join(', ') + '. Итого: ' + fmtPrice(total) + '. Можно перейти в корзину и оформить заказ.',
+      products: products,
+      actions: [{ type: 'link', label: '🛒 Открыть корзину', url: 'cart.html' }],
+      chips: DEFAULT_CHIPS
+    };
+  }
+
   function ask(text) {
     var q = String(text || '').trim();
     if (!q || pending) return;
+
+    // Корзина — мгновенный локальный ответ
+    var local = localCartAnswer(q);
+    if (local) {
+      closeChips();
+      addUser(q);
+      var lbox = addBotHtml(esc(local.reply).replace(/\n/g, '<br>'));
+      renderProducts(lbox, local.products);
+      renderActions(lbox, local.actions);
+      renderChips(local.chips, lbox);
+      renderFeedback(lbox, q, local.reply);
+      hist.push({ role: 'user', text: q });
+      hist.push({ role: 'assistant', text: local.reply, products: local.products, actions: local.actions });
+      saveHist(hist);
+      try { input.focus(); } catch (e) { }
+      return;
+    }
+
     pending = true;
     setBusy(true);
     closeChips();
@@ -475,6 +567,8 @@
         renderProducts(box, d.products);
         var acts = Array.isArray(d.actions) ? d.actions : [];
         renderActions(box, acts);
+        renderChips(d.chips, box);
+        renderFeedback(box, q, String(d.reply || ''));
         hist.push({ role: 'user', text: q });
         hist.push({ role: 'assistant', text: String(d.reply || '').slice(0, 500), products: Array.isArray(d.products) ? d.products : [], actions: acts });
         saveHist(hist);
@@ -491,8 +585,7 @@
   }
 
   function closeChips() {
-    var c = body.querySelector('.ai-chips');
-    if (c) c.remove();
+    body.querySelectorAll('.ai-chips').forEach(function (c) { c.remove(); });
   }
 
   sendBtn.addEventListener('click', function () {

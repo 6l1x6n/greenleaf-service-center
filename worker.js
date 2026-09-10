@@ -1802,6 +1802,9 @@ async function handleProductsJson(request, env, url) {
 const AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8-fast';
 const AI_MAX_HISTORY = 4;
 const AI_MAX_PRODUCTS = 8;
+const AI_TOP_FOR_PROMPT = 4; // в промпт — только лучшие карточки (в чате остаются все)
+const AI_MAX_TOKENS = 200; // короче ответ — меньше нейронов
+const AI_BUDGET_PER_DAY = 80; // реальных вызовов модели в сутки (страховка квоты)
 const AI_RATE_PER_HOUR = 60; // с одного устройства (по токену)
 const AI_RATE_PER_IP_HOUR = 300; // страховка с IP (от смены токенов скриптом)
 const AI_CACHE_TTL = 3600;
@@ -1912,13 +1915,18 @@ async function loadAiCatalog(env, url, storeId) {
     const o = overrides[p.id] || {};
     const hidden = o.hidden !== undefined ? !!o.hidden : !!p.hidden;
     if (hidden) continue;
+    // Цена как на витрине: скидочная/партнёрская, а не базовая
+    let price = o.price != null ? Number(o.price) : Number(p.price || 0);
+    const disc = o.discount_price != null ? Number(o.discount_price) : Number(p.discount_price || 0);
+    if (disc > 0 && disc < price) price = disc;
+    else if (price > 0) price = p.partner_price != null ? Number(p.partner_price) : Math.round(price / 2);
     out.push({
       id: String(p.id),
       sku: String(p.sku || p.id),
       name: String(p.name || ''),
       norm: aiNorm(String(p.name || '') + ' ' + (p.sku || p.id) + ' ' + (o.category || p.category || '')),
       category: String(o.category || p.category || ''),
-      price: o.price != null ? Number(o.price) : Number(p.price || 0),
+      price: price,
       image: String(p.image || ''),
       status: String(o.status || p.status || ''),
       stock: stock
@@ -2029,17 +2037,6 @@ function aiAliasFor(toks) {
   return null;
 }
 
-// Знания о подписке (источник — страница podpiska.html; цифры — из слов владельца).
-// Подмешиваются в system ТОЛЬКО при sub-интенте — обычные вопросы токены не тратят.
-const AI_SUB_KNOW = 'Подписка Greenleaf (партнёрство): купоны — электронная валюта; ' +
-  'покупая товар, 50% цены платишь деньгами, вторые 50% списываются купонами. ' +
-  'Пакеты: Бронза 50 000 ₸ → 135 000 купонов (для себя, скидка 50% без бизнеса); ' +
-  'Золото 138 000 ₸ → 542 800 купонов (быстрый старт, шире стартовый набор); ' +
-  'Платина 188 000 ₸ → 678 500 купонов (самый популярный, максимальные выплаты по маркетинг-плану); ' +
-  'Бриллиант 564 000 ₸ → 2 025 000 купонов (для магазинов и торговых точек). ' +
-  'Чем дороже пакет, тем больше купонов в подарок; Платина и Бриллиант открывают повышенные ' +
-  'бинарные и линейные бонусы, на Бронзе заработок сильно ограничен.';
-
 const AI_SUB_KEYS = ['подписк', 'партнер', 'партнёр', 'регистрац', 'купон', 'бронз', 'золот', 'платин', 'бриллиант', 'бизнес', 'франшиз', 'маркетинг'];
 
 function aiHasSubIntent(toks) {
@@ -2060,12 +2057,13 @@ function aiSearch(catalog, query, storeId, limit) {
   const useToks = alias ? alias.search : toks;
   const kids = !alias && aiHasKidsIntent(toks);
   const scored = [];
+  let exact = false;
   for (let i = 0; i < catalog.length; i++) {
     const p = catalog[i];
     let score = 0;
     let antiHit = false;
-    if (p.sku && p.sku.toLowerCase() === q) score += 100;
-    else if (!alias && p.norm && p.norm.indexOf(q) !== -1 && q.length >= 4) score += 40;
+    if (p.sku && p.sku.toLowerCase() === q) { score += 100; exact = true; }
+    else if (!alias && p.norm && p.norm.indexOf(q) !== -1 && q.length >= 4) { score += 40; exact = true; }
     for (let t = 0; t < useToks.length; t++) {
       const variants = aiStemVariants(useToks[t]);
       for (let v = 0; v < variants.length; v++) {
@@ -2127,8 +2125,308 @@ function aiSearch(catalog, query, storeId, limit) {
     });
     result = pinned.concat(result).slice(0, limit || AI_MAX_PRODUCTS);
   }
-  return { products: result, alias: alias };
+  return { products: result, alias: alias, exact: exact };
 }
+
+// ---------------- Мгновенные ответы без ИИ (0 нейронов) ----------------
+// Приветствия, адрес/часы, заказ, оплата, поставки, точный товар —
+// детерминированные ответы до вызова модели. Экономит суточную квоту.
+const AI_SMALLTALK = {
+  greet: ['привет', 'здравствуй', 'добрый день', 'добрый вечер', 'доброе утро', 'хай', 'салам', 'ассалам', 'доброго'],
+  thanks: ['спасибо', 'благодар', 'спс'],
+  bye: ['пока', 'до свидания', 'прощай', 'до встречи']
+};
+const AI_STORE_KEYS = ['адрес', 'часы', 'график', 'телефон', 'добраться', 'находит', 'самовывоз', 'где вы'];
+const AI_ORDER_KEYS = ['заказ', 'статус'];
+const AI_PAY_KEYS = ['оплат', 'каспи', 'kaspi', 'перевод', 'карт', 'наличн', 'рассрочк'];
+const AI_HOW_KEYS = ['оформ', 'заказать', 'купить', 'доставк', 'курьер', 'отправк', 'получить'];
+const AI_SUPPLY_KEYS = ['поставк', 'привоз', 'завоз', 'срок', 'ожида', 'доставк', 'когда будет', 'когда придет'];
+
+function aiTokensHit(toks, keys) {
+  return toks.some(function (t) {
+    return keys.some(function (k) { return t.indexOf(k) === 0 || k.indexOf(t) === 0; });
+  });
+}
+
+function aiSmalltalk(qNorm) {
+  if (!qNorm || qNorm.length > 40) return '';
+  if (AI_SMALLTALK.greet.some(function (k) { return qNorm.indexOf(k) === 0; })) return 'greet';
+  if (AI_SMALLTALK.thanks.some(function (k) { return qNorm.indexOf(k) === 0; })) return 'thanks';
+  if (AI_SMALLTALK.bye.some(function (k) { return qNorm.indexOf(k) === 0; })) return 'bye';
+  return '';
+}
+
+function aiFmtDay(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace(/\./g, '');
+  } catch (e) { return iso; }
+}
+
+// В пути / ждёт отгрузки: карта «артикул → ближайшая дата» и общая ближайшая поставка
+async function loadAiMoves(env, url) {
+  const out = { skuEta: {}, skuInTransit: {}, inTransit: 0, nearest: '' };
+  try {
+    const res = await env.ASSETS.fetch(new URL('/data/moves.json', url));
+    if (!res.ok) return out;
+    const d = await res.json();
+    const list = Array.isArray(d && d.moves) ? d.moves : [];
+    const valid = /(Астана поставщик|Алматы поставщик)/i;
+    const todayIso = new Date().toISOString().slice(0, 10);
+    list.forEach(function (mv) {
+      if (!mv || !valid.test(String(mv.source || ''))) return;
+      const code = mv.statusCode;
+      if (code !== 4 && code !== 0) return;
+      if (!Array.isArray(mv.items)) return;
+      out.inTransit++;
+      const start = code === 0 ? new Date() : new Date(String(mv.date || '') + 'T00:00:00');
+      if (isNaN(start.getTime())) return;
+      start.setDate(start.getDate() + (/Алматы/i.test(String(mv.source || '')) ? 2 : 1));
+      const iso = start.toISOString().slice(0, 10);
+      mv.items.forEach(function (it) {
+        if (!it || !it.sku) return;
+        const key = String(it.sku).toUpperCase();
+        out.skuInTransit[key] = true;
+        // Просроченные расчётные даты не обещаем (завоз задерживается)
+        if (iso < todayIso) return;
+        if (!out.skuEta[key] || iso < out.skuEta[key]) out.skuEta[key] = iso;
+      });
+      // Ближайшая дата — только из актуальных (не просроченных) поставок
+      if (iso >= todayIso && (!out.nearest || iso < out.nearest)) out.nearest = iso;
+    });
+  } catch (e) { /* без поставок */ }
+  return out;
+}
+
+// Данные магазина: выбранный СЦ (KV) → общий store.json
+async function loadAiShop(env, url, storeId) {
+  const shop = { name: '', addr: '', hours: '', phone: '', wa: '' };
+  try {
+    if (storeId) {
+      const stores = await kvGet(env, 'stores');
+      const s = stores && stores[storeId];
+      if (s) {
+        shop.name = String(s.name || '');
+        shop.addr = String(s.address || '');
+        shop.hours = Array.isArray(s.hours)
+          ? s.hours.map(function (h) { return h.days + ' ' + h.time; }).join(', ')
+          : String(s.hours || '');
+        shop.phone = String(s.phone || '');
+        shop.wa = String(s.whatsapp || '');
+        return shop;
+      }
+    }
+  } catch (e) { /* без KV — падаем на store.json */ }
+  try {
+    const sRes = await env.ASSETS.fetch(new URL('/data/store.json', url));
+    if (sRes.ok) {
+      const s = await sRes.json();
+      shop.addr = String(s.address || '');
+      shop.hours = Array.isArray(s.hours)
+        ? s.hours.map(function (h) { return h.days + ' ' + h.time; }).join(', ')
+        : String(s.hours || '');
+      shop.phone = String(s.phone || '');
+      shop.wa = String(s.whatsapp || '');
+    }
+  } catch (e) { /* без данных магазина */ }
+  return shop;
+}
+
+const AI_CHIPS_DEFAULT = ['📍 Адрес и часы', '🚚 Когда поставка?', '📋 Подписка', '🔍 Помоги подобрать'];
+const AI_CHIPS_PRODUCT = ['🚚 Когда поставка?', '📍 Адрес и часы', '📋 Подписка', '🔍 Помоги подобрать'];
+
+function aiMapUrl(addr) {
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr || 'Greenleaf');
+}
+
+// Мгновенный ответ: { reply, products, actions, chips } или null (тогда работает ИИ)
+function aiInstant(ctx) {
+  const q = ctx.q;
+  const qNorm = aiNorm(q);
+  const toks = ctx.toks;
+  const shop = ctx.shop;
+  const products = ctx.products; // payload с inStock/stockState/eta
+  const moves = ctx.moves;
+  const waAct = shop.wa ? [{ type: 'wa', label: '💬 Написать в WhatsApp', url: 'https://wa.me/' + shop.wa }] : [];
+  const addr = shop.addr || 'уточняется';
+
+  // 1. Приветствия/благодарности — только если вопрос не про товар
+  if (!products.length) {
+    const st = aiSmalltalk(qNorm);
+    if (st === 'greet') {
+      return {
+        reply: 'Здравствуйте! Я Иса, менеджер Greenleaf. Помогу подобрать товары, расскажу про наличие, поставки и подписку. Что вас интересует?',
+        chips: AI_CHIPS_DEFAULT
+      };
+    }
+    if (st === 'thanks') {
+      return { reply: 'Пожалуйста! Если появятся вопросы — спрашивайте, я рядом.', chips: AI_CHIPS_DEFAULT };
+    }
+    if (st === 'bye') {
+      return { reply: 'Всего доброго! Заходите ещё — помогу с выбором и подскажу по поставкам.', chips: [] };
+    }
+  }
+
+  // 2. Статус заказа
+  if (aiTokensHit(toks, ['заказ']) && (aiTokensHit(toks, ['статус']) || qNorm.indexOf('где мой') !== -1 || qNorm.indexOf('мои заказ') !== -1)) {
+    return {
+      reply: 'Статус заказа с этого устройства можно посмотреть в разделе «Мои заказы». Если заказ оформляли не вы или нужна помощь — напишите нам в WhatsApp.',
+      actions: [{ type: 'orders', label: '📦 Мои заказы' }].concat(waAct),
+      chips: AI_CHIPS_DEFAULT
+    };
+  }
+
+  // 3. Адрес / часы / телефон
+  if (aiTokensHit(toks, AI_STORE_KEYS)) {
+    const parts = [];
+    parts.push('📍 Адрес: ' + addr + '.');
+    if (shop.hours) parts.push('🕒 Часы работы: ' + shop.hours + '.');
+    if (shop.phone) parts.push('📞 Телефон: ' + shop.phone + '.');
+    parts.push('Будем рады видеть!');
+    return {
+      reply: parts.join(' '),
+      actions: [{ type: 'link', label: '🗺 Открыть на карте', url: aiMapUrl(shop.addr) }].concat(waAct),
+      chips: AI_CHIPS_PRODUCT
+    };
+  }
+
+  // 4. Подписка — готовый текст с точными цифрами
+  if (ctx.subIntent) {
+    return {
+      reply: ctx.templateSubReply(),
+      actions: [{ type: 'link', label: '📋 Подробнее о подписке', url: 'podpiska.html' }],
+      chips: AI_CHIPS_PRODUCT
+    };
+  }
+
+  // 5. Оплата и «как оформить заказ»
+  if (aiTokensHit(toks, AI_PAY_KEYS)) {
+    return {
+      reply: 'Оплатить можно через Kaspi QR, картой или наличными при получении в Сервис-Центре. Способы оплаты для вашего города подскажет менеджер.',
+      actions: waAct,
+      chips: AI_CHIPS_DEFAULT
+    };
+  }
+  if (aiTokensHit(toks, AI_HOW_KEYS) && qNorm.indexOf('когда') === -1) {
+    return {
+      reply: 'Выберите товар в каталоге и нажмите «В корзину», затем перейдите в корзину и оформите заказ. Если нужна помощь — напишите нам в WhatsApp, соберём заказ вместе.',
+      actions: waAct,
+      chips: AI_CHIPS_DEFAULT
+    };
+  }
+
+  // 6. Поставки: по конкретному товару или ближайшая в СЦ
+  if (aiTokensHit(toks, AI_SUPPLY_KEYS)) {
+    const withEta = [];
+    const onRoad = [];
+    products.slice(0, 2).forEach(function (p) {
+      const key = String(p.sku || '').toUpperCase();
+      const eta = moves.skuEta[key];
+      if (eta) withEta.push({ p: p, eta: eta });
+      else if (moves.skuInTransit[key]) onRoad.push(p);
+    });
+    if (withEta.length) {
+      const lines = withEta.map(function (x) {
+        return '«' + x.p.name + '» — ожидается ≈ ' + aiFmtDay(x.eta);
+      }).join('; ');
+      return {
+        reply: lines + '. Как только товар прибудет, его можно будет забрать в выбранном Сервис-Центре.',
+        products: withEta.map(function (x) { return x.p; }),
+        chips: AI_CHIPS_DEFAULT
+      };
+    }
+    if (onRoad.length) {
+      const names = onRoad.map(function (p) { return '«' + p.name + '»'; }).join(', ');
+      return {
+        reply: names + ' — уже в пути, точную дату прибытия подтвердим в WhatsApp (обычно это несколько дней).',
+        products: onRoad,
+        actions: waAct,
+        chips: AI_CHIPS_DEFAULT
+      };
+    }
+    if (products.length) {
+      const names = products.slice(0, 2).map(function (p) { return '«' + p.name + '»'; }).join(', ');
+      return {
+        reply: names + ' нет в ближайшей поставке — точные сроки подскажем в WhatsApp.',
+        products: products.slice(0, 2),
+        actions: waAct,
+        chips: AI_CHIPS_DEFAULT
+      };
+    }
+    if (moves.inTransit) {
+      return {
+        reply: 'Поставка в Сервис-Центр уже в пути — точную дату прибытия подтвердим в WhatsApp, обычно это вопрос нескольких дней.',
+        actions: waAct,
+        chips: AI_CHIPS_DEFAULT
+      };
+    }
+    if (moves.nearest) {
+      return {
+        reply: 'Ближайшая поставка в Сервис-Центр — ≈ ' + aiFmtDay(moves.nearest) +
+          '. Уточните в WhatsApp, войдут ли в неё нужные вам позиции.',
+        products: products.slice(0, 3),
+        actions: waAct,
+        chips: AI_CHIPS_DEFAULT
+      };
+    }
+    return {
+      reply: 'Поставок в пути сейчас нет — точные сроки подскажем в WhatsApp.',
+      actions: waAct,
+      chips: AI_CHIPS_DEFAULT
+    };
+  }
+
+  // 7. Точный артикул/название или явный вопрос «есть ли / в наличии»: цена и наличие без ИИ
+  const availQ = aiTokensHit(toks, ['наличи']) || qNorm.indexOf('есть ли') !== -1 || qNorm.indexOf('в наличии') !== -1;
+  let exactProduct = null;
+  if (ctx.foundExact && products.length) {
+    exactProduct = products[0];
+  } else {
+    const normSku = q.toUpperCase().replace(/\s+/g, '');
+    const hit = ctx.catalog.find(function (p) {
+      return String(p.sku || '').toUpperCase().replace(/\s+/g, '') === normSku;
+    });
+    if (hit) {
+      exactProduct = products.find(function (p) { return String(p.id) === String(hit.id); }) || null;
+    }
+  }
+  if (!exactProduct && availQ && products.length) exactProduct = products[0];
+  if (exactProduct) {
+    const priceTxt = exactProduct.price > 0 ? exactProduct.price + ' ₸' : 'цена по запросу';
+    const eta = moves.skuEta[String(exactProduct.sku || '').toUpperCase()];
+    let availTxt = 'наличие уточняйте в WhatsApp';
+    if (exactProduct.stockState === 'in') availTxt = 'в наличии';
+    else if (exactProduct.stockState === 'out') {
+      availTxt = 'сейчас нет в наличии' + (eta ? ', ожидается ≈ ' + aiFmtDay(eta) : '');
+    }
+    const needWa = exactProduct.stockState !== 'in';
+    return {
+      reply: '«' + exactProduct.name + '» — ' + priceTxt + ', ' + availTxt + '.',
+      products: [exactProduct].concat(products.slice(1, 3)),
+      actions: needWa ? waAct : [],
+      chips: AI_CHIPS_PRODUCT
+    };
+  }
+  if (availQ) {
+    return {
+      reply: 'Наличие всегда актуально в каталоге — там видно остатки по выбранному Сервис-Центру. Напишите название или артикул, и я подскажу по конкретному товару.',
+      actions: [{ type: 'link', label: '🔍 Открыть каталог', url: 'catalog.html' }].concat(waAct),
+      chips: AI_CHIPS_DEFAULT
+    };
+  }
+
+  // 8. Ничего не нашли — не тратим нейроны на пустой вопрос
+  if (!products.length) {
+    return {
+      reply: 'Не нашёл подходящего в каталоге. Напишите нам в WhatsApp — подскажем дату поставки и подберём аналог.',
+      actions: waAct.length ? waAct : [{ type: 'link', label: '🔍 Открыть каталог', url: 'catalog.html' }],
+      chips: ['🔍 Помоги подобрать', '🚚 Когда поставка?', '📍 Адрес и часы']
+    };
+  }
+
+  return null;
+}
+
 
 async function handleAiChat(request, env, url) {
   if (isBotRequest(request)) return jsonResponse({ ok: false, error: 'forbidden' }, 403);
@@ -2138,6 +2436,30 @@ async function handleAiChat(request, env, url) {
   } catch (e) {
     return jsonResponse({ ok: false, error: 'invalid json' }, 400);
   }
+  // Оценка ответа (👍/👎) — без ИИ, лимитов и кеша
+  if (body && body.feedback) {
+    const vote = body.feedback === 'up' ? 'up' : body.feedback === 'down' ? 'down' : '';
+    if (!vote) return jsonResponse({ ok: false, error: 'bad vote' }, 400);
+    try {
+      const day = new Date().toISOString().slice(0, 10);
+      const key = 'ai_fb:' + day;
+      const raw = await env.SC_STORES.get(key);
+      const d = raw ? JSON.parse(raw) : { up: 0, down: 0 };
+      d[vote] = (d[vote] || 0) + 1;
+      await env.SC_STORES.put(key, JSON.stringify(d), { expirationTtl: 7776000 });
+      const lastKey = 'ai_fb_last';
+      let last = [];
+      try { const lr = await env.SC_STORES.get(lastKey); last = lr ? JSON.parse(lr) : []; } catch (e) { }
+      last.unshift({
+        t: Date.now(), vote: vote,
+        q: String(body.q || '').slice(0, 120),
+        reply: String(body.reply || '').slice(0, 160)
+      });
+      await env.SC_STORES.put(lastKey, JSON.stringify(last.slice(0, 50)), { expirationTtl: 7776000 });
+    } catch (e) { /* оценки необязательны */ }
+    return jsonResponse({ ok: true });
+  }
+
   const q = String((body && body.q) || '').trim().slice(0, 300);
   if (q.length < 2) return jsonResponse({ ok: false, error: 'too short' }, 400);
   const storeId = String((body && body.storeId) || '').trim().slice(0, 64) || null;
@@ -2171,32 +2493,42 @@ async function handleAiChat(request, env, url) {
     return true;
   }
 
+  // Суточный бюджет реальных вызовов модели: страховка от исчерпания нейронов
+  async function aiBudgetLeft() {
+    const day = new Date().toISOString().slice(0, 10);
+    const key = 'ai_used:' + day;
+    try {
+      const raw = await env.SC_STORES.get(key);
+      const n = raw ? (JSON.parse(raw).n || 0) : 0;
+      return { key: key, left: Math.max(0, AI_BUDGET_PER_DAY - n) };
+    } catch (e) { return { key: '', left: AI_BUDGET_PER_DAY }; }
+  }
+  async function aiBudgetBump(key) {
+    if (!key) return;
+    try {
+      const raw = await env.SC_STORES.get(key);
+      const d = raw ? JSON.parse(raw) : { n: 0 };
+      d.n = (d.n || 0) + 1;
+      await env.SC_STORES.put(key, JSON.stringify(d), { expirationTtl: 172800 });
+    } catch (e) { /* счётчик необязателен */ }
+  }
+
   const catalog = await loadAiCatalog(env, url, storeId);
   const found = aiSearch(catalog, q, storeId, AI_MAX_PRODUCTS);
   const aliasNote = found.alias ? found.alias.note : '';
+  const shop = await loadAiShop(env, url, storeId);
+  const moves = await loadAiMoves(env, url);
+
   const products = found.products.map(function (p) {
     const av = aiAvail(p, storeId);
+    const etaIso = moves.skuEta[String(p.sku || '').toUpperCase()] || '';
     return {
       id: p.id, sku: p.sku, name: p.name, category: p.category,
       price: p.price, image: p.image, status: p.status,
-      inStock: av.state === 'in', stockState: av.state, count: av.count
+      inStock: av.state === 'in', stockState: av.state, count: av.count,
+      eta: etaIso, etaText: etaIso ? aiFmtDay(etaIso) : ''
     };
   });
-
-  // Данные магазина для ответов про адрес/часы/доставку (статика, 0 нейронов)
-  let shop = { addr: '', hours: '', phone: '', wa: '' };
-  try {
-    const sRes = await env.ASSETS.fetch(new URL('/data/store.json', url));
-    if (sRes.ok) {
-      const s = await sRes.json();
-      shop.addr = String(s.address || '');
-      shop.hours = Array.isArray(s.hours)
-        ? s.hours.map(function (h) { return h.days + ' ' + h.time; }).join(', ')
-        : String(s.hours || '');
-      shop.phone = String(s.phone || '');
-      shop.wa = String(s.whatsapp || '');
-    }
-  } catch (e) { /* без данных магазина */ }
 
   // Детерминированный ответ про подписку — с точными цифрами.
   // Используется в офлайне и как страховка, если модель поленилась назвать цены.
@@ -2208,7 +2540,6 @@ async function handleAiChat(request, env, url) {
   }
 
   function templateReply() {
-    if (subIntent) return templateSubReply();
     if (!products.length) {
       return 'Не нашёл подходящего в каталоге. Напишите в WhatsApp ' + (shop.wa || '') + ' — подскажем дату поставки и подберём аналог.';
     }
@@ -2217,20 +2548,38 @@ async function handleAiChat(request, env, url) {
   }
 
   // Кнопки под сообщением (решает сервер, 0 нейронов):
-  // подписка → страница подписки; упоминание WhatsApp → чат wa.me.
+  // «Мои заказы» → модалка заказов; упоминание WhatsApp → чат wa.me.
   function aiActions(replyText) {
+    const text = String(replyText || '');
     const acts = [];
-    if (subIntent) acts.push({ type: 'link', label: '📋 Подробнее о подписке', url: 'podpiska.html' });
-    if (/whatsapp/i.test(String(replyText || '')) && shop.wa) {
+    if (/мои заказы/i.test(text)) acts.push({ type: 'orders', label: '📦 Мои заказы' });
+    if (/whatsapp/i.test(text) && shop.wa) {
       acts.push({ type: 'wa', label: '💬 Написать в WhatsApp', url: 'https://wa.me/' + shop.wa });
     }
     return acts;
   }
 
-  // Кэш одинаковых вопросов (1 час): повторный вопрос = 0 нейронов
-  // и 0 единиц лимита — проверка кеша идёт ДО счётчика.
+  // Мгновенные ответы (0 нейронов): до кеша, лимитов и вызова модели
+  const instant = aiInstant({
+    q: q, toks: aiTokens(q), subIntent: subIntent, shop: shop, moves: moves,
+    catalog: catalog, products: products, foundExact: found.exact,
+    templateSubReply: templateSubReply
+  });
+  if (instant) {
+    return jsonResponse({
+      ok: true,
+      reply: instant.reply,
+      products: instant.products || [],
+      actions: instant.actions || [],
+      chips: instant.chips || AI_CHIPS_DEFAULT,
+      instant: true
+    });
+  }
+
+  // Кэш одинаковых вопросов (1 час): набор слов без учёта порядка + СЦ.
   // Версия в ключе: после правок промпта старые ответы не переиспользуем.
-  const cacheKey = 'ai_cache:v2:' + aiHash(aiNorm(q) + '|' + (storeId || 'all'));
+  const canon = aiTokens(q).sort().join(' ') || aiNorm(q);
+  const cacheKey = 'ai_cache:v3:' + aiHash(canon + '|' + (storeId || 'all'));
   try {
     const cachedRaw = await env.SC_STORES.get(cacheKey);
     if (cachedRaw) {
@@ -2238,7 +2587,7 @@ async function handleAiChat(request, env, url) {
       if (cached && typeof cached.reply === 'string') {
         const cProds = Array.isArray(cached.products) ? cached.products : products;
         const cActs = Array.isArray(cached.actions) ? cached.actions : aiActions(cached.reply);
-        return jsonResponse({ ok: true, reply: cached.reply, products: cProds, actions: cActs, cached: true });
+        return jsonResponse({ ok: true, reply: cached.reply, products: cProds, actions: cActs, chips: AI_CHIPS_DEFAULT, cached: true });
       }
     }
   } catch (e) { /* мимо кеша */ }
@@ -2246,7 +2595,14 @@ async function handleAiChat(request, env, url) {
   // Нет модели/биндинга — сразу шаблон (сайт работает и без AI, лимит не тратим)
   if (!hasAI) {
     const tReply = templateReply();
-    return jsonResponse({ ok: true, reply: tReply, products: products, actions: aiActions(tReply), offline: true });
+    return jsonResponse({ ok: true, reply: tReply, products: products, actions: aiActions(tReply), chips: AI_CHIPS_DEFAULT, offline: true });
+  }
+
+  // Суточный бюджет нейронов исчерпан — эко-режим до завтра
+  const budget = await aiBudgetLeft();
+  if (budget.left <= 0) {
+    const tReply = templateReply();
+    return jsonResponse({ ok: true, reply: tReply, products: products, actions: aiActions(tReply), chips: AI_CHIPS_DEFAULT, offline: true });
   }
 
   // Лимит тратит только реальный вызов ИИ
@@ -2264,11 +2620,13 @@ async function handleAiChat(request, env, url) {
     }
   } catch (e) { /* KV недоступен — пропускаем лимит */ }
 
-  const prodLines = products.map(function (p, idx) {
+  const promptProducts = products.slice(0, AI_TOP_FOR_PROMPT);
+  const prodLines = promptProducts.map(function (p, idx) {
     const avail = p.stockState === 'in' ? ' (в наличии)'
       : p.stockState === 'out' ? ' (нет в наличии)' : ' (наличие уточняйте)';
+    const eta = p.stockState === 'out' && p.etaText ? ', ожидается ≈ ' + p.etaText : '';
     return (idx + 1) + '. ' + p.name + ' [' + p.category + '] — ' +
-      (p.price > 0 ? p.price + ' ₸' : 'цена по запросу') + avail + ' {id:' + p.id + '}';
+      (p.price > 0 ? p.price + ' ₸' : 'цена по запросу') + avail + eta + ' {id:' + p.id + '}';
   }).join('\n');
 
   const histLines = history.map(function (m) {
@@ -2281,17 +2639,16 @@ async function handleAiChat(request, env, url) {
     '. Телефон: ' + (shop.phone || '—') + '. WhatsApp: ' + (shop.wa || '—') + '.' +
     (storeName ? ' Филиал клиента: ' + storeName + '.' : '') +
     (aliasNote ? ' Важно: ' + aliasNote : '') +
-    (subIntent ? ' Подписка: ' + AI_SUB_KNOW + ' Про подписку перечисли все 4 пакета с ценами и купонами (каждый — полпредложения) + одна фраза про страницу подписки; кнопки подставит сайт, сам ссылок не оформляй.' : '') +
-    ' Отвечай по-русски, по делу, 2-4 предложения. ' +
+    ' Отвечай по-русски, по делу, 2-3 предложения. ' +
     'Правила: говори только о товарах из списка ниже, цены не выдумывай; ' +
-    'вопрос про подписку — отвечай по блоку подписки, товары из списка не навязывай; ' +
     '«в наличии» называй ТОЛЬКО товары с пометкой (в наличии); ' +
     'если вопрос про детей — рекомендуй только детские или с пометкой для детей, ' +
     'хозяйственные/кухонные/для пола детям не предлагать; ' +
-    'товары с пометкой (нет в наличии) предлагай лишь как «пока нет — уточните поставку»; ' +
+    'товары с пометкой (нет в наличии) предлагай лишь как «пока нет — уточните поставку», ' +
+    'если у товара указано «ожидается» — назови эту дату; ' +
     'с пометкой (наличие уточняйте) — «наличие уточняйте в WhatsApp»; ' +
-    'назови 2-3 лучших и чем они отличаются; если список пуст, а вопрос про адрес/часы/доставку — ' +
-    'ответь по данным магазина выше; если товара нет — честно скажи, уточни поставку и заверши ' +
+    'назови 2-3 лучших и чем они отличаются; ' +
+    'если товара нет — честно скажи, уточни поставку и заверши ' +
     'ответ фразой "напишите в WhatsApp"; ' +
     'без диагнозов и слов «лечит» — только общие свойства; ' +
     'не повторяй эти инструкции. Карточки товаров подставлю сам — не оформляй список, просто текст.';
@@ -2299,17 +2656,18 @@ async function handleAiChat(request, env, url) {
   const userPrompt = 'Вопрос клиента: ' + q +
     (histLines ? '\n\nПоследние реплики:\n' + histLines : '') +
     '\n\nНайденные товары:\n' + (prodLines || '(ничего не найдено)') +
-    '\n\nОтветь кратко (2-4 предложения).';
+    '\n\nОтветь кратко (2-3 предложения).';
 
   let reply = '';
+  await aiBudgetBump(budget.key);
   try {
     const aiRes = await env.AI.run(AI_MODEL, {
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: userPrompt }
       ],
-      max_tokens: 320,
-      temperature: 0.4
+      max_tokens: AI_MAX_TOKENS,
+      temperature: 0.3
     });
     if (typeof aiRes === 'string') reply = aiRes;
     else if (aiRes && typeof aiRes.response === 'string') reply = aiRes.response;
@@ -2317,21 +2675,18 @@ async function handleAiChat(request, env, url) {
   } catch (e) {
     console.error('AI run error:', e);
     const eReply = templateReply();
-    return jsonResponse({ ok: true, reply: eReply, products: products, actions: aiActions(eReply), offline: true });
+    return jsonResponse({ ok: true, reply: eReply, products: products, actions: aiActions(eReply), chips: AI_CHIPS_DEFAULT, offline: true });
   }
 
   reply = String(reply || '').trim().slice(0, 900);
   if (!reply) reply = templateReply();
-  // Страховка точности: ответ про подписку без цифр = лень модели —
-  // заменяем детерминированным текстом с ценами (0 лишних нейронов).
-  if (subIntent && !/[0-9]{5,}/.test(reply)) reply = templateSubReply();
   const actions = aiActions(reply);
 
   try {
     await env.SC_STORES.put(cacheKey, JSON.stringify({ reply: reply, products: products, actions: actions }), { expirationTtl: AI_CACHE_TTL });
   } catch (e) { /* кеш необязателен */ }
 
-  return jsonResponse({ ok: true, reply: reply, products: products, actions: actions });
+  return jsonResponse({ ok: true, reply: reply, products: products, actions: actions, chips: AI_CHIPS_DEFAULT });
 }
 
 // ---------------- Telegram ----------------

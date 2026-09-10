@@ -116,8 +116,8 @@
   // Единый контрол корзины в строке: пока товара нет в корзине — одна
   // зелёная кнопка «В корзину»; после добавления она превращается в степпер
   // «− N +» с крестиком. + добавляет, − убавляет/убирает, ручной ввод задаёт
-  // абсолютное количество. «Подробнее» — тихая текстовая кнопка.
-  function rowCartControl(p, withDetail) {
+  // абсолютное количество.
+  function rowCartControl(p) {
     var item = Cart.get().find(function (i) { return i.id === p.id; });
     var cur = item ? (Number(item.qty) || 0) : 0;
     var rawMax = (state.selectedStoreId && state.selectedStoreId !== 'all')
@@ -130,20 +130,18 @@
       cur = cap;
       try { Cart.setQty(p.id, cap); } catch (e) { }
     }
-    var detailBtn = withDetail === false ? '' : '<button class="btn btn-sm row-detail" data-open-detail="' + Utils.esc(p.id) + '">Подробнее</button>';
     if (cur <= 0) {
       if (effectiveStatus(p) === 'out') {
-        return '<button class="btn btn-primary btn-sm row-add is-disabled" type="button" disabled title="Товара нет в наличии">' + Utils.icon('cart', 15) + ' В корзину</button>' + detailBtn;
+        return '<button class="btn btn-primary btn-sm row-add is-disabled" type="button" disabled title="Товара нет в наличии">' + Utils.icon('cart', 15) + ' В корзину</button>';
       }
-      return '<button class="btn btn-primary btn-sm row-add" data-cart-add="' + Utils.esc(p.id) + '">' + Utils.icon('cart', 15) + ' В корзину</button>' + detailBtn;
+      return '<button class="btn btn-primary btn-sm row-add" data-cart-add="' + Utils.esc(p.id) + '">' + Utils.icon('cart', 15) + ' В корзину</button>';
     }
     return '<div class="qty-stepper" data-cart-row="' + Utils.esc(p.id) + '">' +
       '<button class="qty-btn" data-cart-dec="' + Utils.esc(p.id) + '" aria-label="Уменьшить">−</button>' +
       '<input type="number" class="qty-input" data-cart-qty="' + Utils.esc(p.id) + '" min="0" max="' + cap + '" value="' + cur + '" aria-label="Количество">' +
       '<button class="qty-btn" data-cart-inc="' + Utils.esc(p.id) + '" aria-label="Увеличить">+</button>' +
       '</div>' +
-      '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины">' + Utils.iconX(12) + '</button>' +
-      detailBtn;
+      '<button class="btn btn-light-outline btn-sm row-remove" data-cart-remove="' + Utils.esc(p.id) + '" aria-label="Убрать из корзины">' + Utils.iconX(12) + '</button>';
   }
 
   // Для карточек полного каталога фото пока remote-миниатюры портала (-small, 60×60).
@@ -194,14 +192,15 @@
     }
 
     return '' +
-      '<article class="product-row' + outCls + '" data-product-id="' + Utils.esc(p.id) + '">' +
-      '<div class="row-media" data-open-detail="' + Utils.esc(p.id) + '">' +
+      '<article class="product-row' + outCls + '" data-product-id="' + Utils.esc(p.id) + '" tabindex="0">' +
+      '<div class="row-media">' +
       priorityBadge(p) +
       '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+      (st.meta === STATUS.out ? '' : '<span class="zoom-lens" aria-hidden="true"><span class="zoom-lens-img"></span></span>') +
       '</div>' +
       '<div class="row-body">' +
       '<span class="row-cat">' + Utils.esc(p.category) + '</span>' +
-      '<h3 class="row-title" style="cursor:pointer;" data-open-detail="' + Utils.esc(p.id) + '">' + Utils.esc(p.name) + '</h3>' +
+      '<h3 class="row-title">' + Utils.esc(p.name) + '</h3>' +
       '<div class="row-meta">' +
       '<span class="stock-pill ' + st.meta.pill + '">' + Utils.esc(st.meta.label) + '</span>' +
       stockInSelectedStore +
@@ -210,6 +209,7 @@
       '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
       '</div>' +
       '</div>' +
+      '<div class="row-foot">' +
       '<div class="row-prices">' +
       '<div class="card-prices">' +
       priceHtml +
@@ -218,6 +218,7 @@
       '</div>' +
       '<div class="row-actions">' +
       rowCartControl(p) +
+      '</div>' +
       '</div>' +
       '</article>';
   }
@@ -446,7 +447,7 @@
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
       '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center;">' +
-      '<div class="modal-cart-ctrl" data-modal-cart="' + Utils.esc(p.id) + '" style="display:flex; gap:10px; align-items:center;">' + rowCartControl(p, false) + '</div>' +
+      '<div class="modal-cart-ctrl" data-modal-cart="' + Utils.esc(p.id) + '" style="display:flex; gap:10px; align-items:center;">' + rowCartControl(p) + '</div>' +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -628,9 +629,10 @@
       return;
     }
 
-    var openDetailEl = e.target.closest('[data-open-detail]');
-    if (openDetailEl) {
-      var pId = openDetailEl.getAttribute('data-open-detail');
+    // Клик по карточке (кроме кнопок, степпера и ссылок) — детали товара
+    var rowEl = e.target.closest('.product-row');
+    if (rowEl && !e.target.closest('button,input,a,select,textarea,label,.qty-stepper')) {
+      var pId = rowEl.getAttribute('data-product-id');
       var p = products.find(function (x) { return x.id === pId && !x.hidden; });
       if (p) openProductDetailModal(p);
       return;
@@ -748,6 +750,157 @@
       return;
     }
   });
+
+  // Enter/Space по карточке (когда фокус на строке, а не на кнопке) — детали
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var row = e.target && e.target.closest ? e.target.closest('.product-row') : null;
+    if (!row || e.target.closest('button,input,a,select,textarea')) return;
+    e.preventDefault();
+    var pId = row.getAttribute('data-product-id');
+    var p = products.find(function (x) { return x.id === pId && !x.hidden; });
+    if (p) openProductDetailModal(p);
+  });
+
+  // ---------------- Лупа на фото товара (hover, только мышь) ----------------
+  // Круг следует за курсором и показывает увеличенный фрагмент; край круга
+  // слегка «выпуклый» — радиальная карта смещений в SVG feDisplacementMap,
+  // сгенерированная один раз на canvas (товарные фото не читаются — CORS ни при чём).
+  (function initZoomLens() {
+    if (!grid) return;
+    var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!canHover || reduced) return;
+
+    var LENS_SIZE = 150;
+    var ZOOM = 2.4;
+    var active = null;
+    var rafId = 0;
+    var lastX = 0;
+    var lastY = 0;
+    var warpReady = false;
+
+    function buildWarpMap(size) {
+      var c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      var ctx = c.getContext('2d');
+      if (!ctx) return '';
+      var imgData = ctx.createImageData(size, size);
+      var d = imgData.data;
+      var cx = size / 2;
+      var cy = size / 2;
+      var R = size / 2;
+      for (var y = 0; y < size; y++) {
+        for (var x = 0; x < size; x++) {
+          var dx = (x - cx) / R;
+          var dy = (y - cy) / R;
+          var r = Math.sqrt(dx * dx + dy * dy);
+          var edge = Math.min(1, Math.pow(Math.max(0, r * 0.98), 2.4));
+          var ux = r > 0 ? dx / r : 0;
+          var uy = r > 0 ? dy / r : 0;
+          var i = (y * size + x) * 4;
+          d[i] = 128 + ux * edge * 127.5;
+          d[i + 1] = 128 + uy * edge * 127.5;
+          d[i + 2] = 128;
+          d[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      return c.toDataURL('image/png');
+    }
+
+    function ensureWarp() {
+      if (warpReady) return;
+      warpReady = true;
+      try {
+        var map = buildWarpMap(160);
+        if (!map) return;
+        var NS = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(NS, 'svg');
+        svg.setAttribute('width', '0');
+        svg.setAttribute('height', '0');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.style.position = 'absolute';
+        var filter = document.createElementNS(NS, 'filter');
+        filter.setAttribute('id', 'glLensWarp');
+        filter.setAttribute('x', '-20%');
+        filter.setAttribute('y', '-20%');
+        filter.setAttribute('width', '140%');
+        filter.setAttribute('height', '140%');
+        filter.setAttribute('color-interpolation-filters', 'sRGB');
+        var feImg = document.createElementNS(NS, 'feImage');
+        feImg.setAttribute('href', map);
+        feImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', map);
+        feImg.setAttribute('x', '0');
+        feImg.setAttribute('y', '0');
+        feImg.setAttribute('width', '100%');
+        feImg.setAttribute('height', '100%');
+        feImg.setAttribute('preserveAspectRatio', 'none');
+        feImg.setAttribute('result', 'map');
+        var disp = document.createElementNS(NS, 'feDisplacementMap');
+        disp.setAttribute('in', 'SourceGraphic');
+        disp.setAttribute('in2', 'map');
+        disp.setAttribute('scale', '30');
+        disp.setAttribute('xChannelSelector', 'R');
+        disp.setAttribute('yChannelSelector', 'G');
+        filter.appendChild(feImg);
+        filter.appendChild(disp);
+        svg.appendChild(filter);
+        document.body.appendChild(svg);
+      } catch (e) { /* без искажения, лупа всё равно работает */ }
+    }
+
+    function activate(media) {
+      var img = media.querySelector('img');
+      var lens = media.querySelector('.zoom-lens');
+      var glass = media.querySelector('.zoom-lens-img');
+      if (!img || !lens || !glass) return;
+      var src = img.currentSrc || img.src;
+      if (!src) return;
+      ensureWarp();
+      glass.style.backgroundImage = 'url("' + src.replace(/"/g, '\\"') + '")';
+      glass.style.backgroundSize = (img.offsetWidth * ZOOM) + 'px ' + (img.offsetHeight * ZOOM) + 'px';
+      media.classList.add('is-lens');
+      active = media;
+    }
+
+    function deactivate() {
+      if (!active) return;
+      active.classList.remove('is-lens');
+      active = null;
+    }
+
+    function apply() {
+      rafId = 0;
+      if (!active) return;
+      var lens = active.querySelector('.zoom-lens');
+      var glass = active.querySelector('.zoom-lens-img');
+      var img = active.querySelector('img');
+      if (!lens || !glass || !img) return;
+      var rect = active.getBoundingClientRect();
+      var x = lastX - rect.left;
+      var y = lastY - rect.top;
+      lens.style.setProperty('--lens-x', (x - LENS_SIZE / 2) + 'px');
+      lens.style.setProperty('--lens-y', (y - LENS_SIZE / 2) + 'px');
+      glass.style.backgroundPosition =
+        (LENS_SIZE / 2 - x * ZOOM) + 'px ' + (LENS_SIZE / 2 - y * ZOOM) + 'px';
+    }
+
+    grid.addEventListener('pointermove', function (e) {
+      if (e.pointerType !== 'mouse') return;
+      var media = e.target.closest ? e.target.closest('.row-media') : null;
+      if (media && !media.closest('.product-row-out')) {
+        if (media !== active) activate(media);
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (!rafId) rafId = requestAnimationFrame(apply);
+      } else {
+        deactivate();
+      }
+    });
+    grid.addEventListener('pointerleave', deactivate);
+  })();
 
   // Ручной ввод количества: 0 убирает из корзины, ввод при отсутствии
   // товара сразу кладёт его (с клампингом по остатку выбранного СЦ)
@@ -877,7 +1030,7 @@
     // Степпер в открытой модалке товара — туда же
     document.querySelectorAll('[data-modal-cart]').forEach(function (box) {
       var mp = products.find(function (x) { return x.id === box.getAttribute('data-modal-cart'); });
-      if (mp) box.innerHTML = rowCartControl(mp, false);
+      if (mp) box.innerHTML = rowCartControl(mp);
     });
   });
 
