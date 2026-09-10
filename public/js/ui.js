@@ -435,7 +435,7 @@
     return '<span class="zoom-lens" aria-hidden="true">' +
       '<svg class="zoom-lens-svg" viewBox="0 0 100 100" preserveAspectRatio="none">' +
       '<circle cx="50" cy="50" r="50" fill="#fff"/>' +
-      '<image filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none"/>' +
+      '<image filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none" image-rendering="optimizeQuality"/>' +
       '</svg></span>';
   }
 
@@ -590,6 +590,14 @@
     var imgW = 0;
     var imgH = 0;
     var defsReady = false;
+    // Бусты увеличения по зонам (размер лупы не меняется).
+    // База из data-zoom разметки: 2.4 каталог, 1.8 детали, 2.8 Иса (чат).
+    // Итог: каталог 4.8 (x2.0), детали 2.7 (x1.5), Иса 7.0 (x2.5).
+    var LENS_BOOSTS = { catalog: 2.0, detail: 1.5, chat: 2.5 };
+    // Микро-сглаживание увеличенного слоя внутри лупы (единицы viewBox 0..100).
+    // 0.3 давит «пиксельноватость» апскейла на FHD, центр остаётся резким.
+    // Базовые <img> товаров не затрагиваются.
+    var LENS_SMOOTH = 0.3;
 
     function buildWarpMap(size) {
       var c = document.createElement('canvas');
@@ -627,7 +635,7 @@
       if (defsReady) return;
       defsReady = true;
       try {
-        var map = buildWarpMap(160);
+        var map = buildWarpMap(256);
         if (!map) return;
         var NS = 'http://www.w3.org/2000/svg';
         var svg = document.createElementNS(NS, 'svg');
@@ -669,8 +677,17 @@
         disp.setAttribute('scale', '20');
         disp.setAttribute('xChannelSelector', 'R');
         disp.setAttribute('yChannelSelector', 'G');
+        disp.setAttribute('result', 'warped');
         filter.appendChild(feImg);
         filter.appendChild(disp);
+        // Микро-AA только увеличенного слоя в лупе: давит aliasing
+        // апскейла/displacement на FHD, детали почти не трогает.
+        if (LENS_SMOOTH > 0) {
+          var soft = document.createElementNS(NS, 'feGaussianBlur');
+          soft.setAttribute('in', 'warped');
+          soft.setAttribute('stdDeviation', String(LENS_SMOOTH));
+          filter.appendChild(soft);
+        }
 
         defs.appendChild(clip);
         defs.appendChild(filter);
@@ -696,7 +713,10 @@
       ensureDefs();
       deactivate();
       lensSize = parseInt(zone.getAttribute('data-lens'), 10) || 150;
-      zoom = parseFloat(zone.getAttribute('data-zoom')) || 2.4;
+      var boost = LENS_BOOSTS.catalog;
+      if (zone.classList.contains('product-detail-media')) boost = LENS_BOOSTS.detail;
+      else if (zone.classList.contains('ai-prod-media')) boost = LENS_BOOSTS.chat;
+      zoom = (parseFloat(zone.getAttribute('data-zoom')) || 2.4) * boost;
       imgW = img.offsetWidth || 1;
       imgH = img.offsetHeight || 1;
       lens.style.setProperty('--lens-size', lensSize + 'px');

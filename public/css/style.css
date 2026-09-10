@@ -927,6 +927,13 @@ a:hover { text-decoration: none; }
   transition: transform 0.16s ease;
 }
 .zoom-zone.is-lens .zoom-lens-svg { transform: scale(1); }
+/* Качественный апскейл ТОЛЬКО увеличенного слоя в лупе.
+   Базовые img товаров не затрагиваются. На Windows FHD убирает
+   «пиксельноватость» быстрого ресемплинга внутри фильтрованного SVG. */
+.zoom-lens-svg image {
+  image-rendering: auto;
+  shape-rendering: geometricPrecision;
+}
 
 /* Плавное появление кнопки «В корзину» (степпер не анимируем,
    чтобы быстрые клики «+/−» не дёргали ряд) */
