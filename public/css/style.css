@@ -2823,10 +2823,11 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   text-decoration: none;
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, bottom 0.35s ease;
 }
-/* Крестик очистки корзины (только ПК): бейджем на правом верхнем углу фаба */
+/* Крестик очистки корзины (только ПК): бейджем на левом верхнем углу фаба,
+   чтобы не перекрывать счётчик товаров (тот — справа сверху) */
 .cart-fab-clear {
   position: fixed;
-  right: 8px;
+  right: 66px;
   bottom: 70px;
   z-index: 46;
   width: 24px;
