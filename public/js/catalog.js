@@ -388,7 +388,7 @@
     }
 
     var mapLink = document.getElementById('mapLink');
-    if (mapLink) mapLink.href = 'https://www.google.com/maps?q=51.126181,71.394568';
+    if (mapLink) mapLink.href = 'https://go.2gis.com/MMuDb';
   }
 
   window.CatalogRefreshContacts = renderContacts;
@@ -441,14 +441,14 @@
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 style="margin:2px 0 0;">' + Utils.esc(p.name) + '</h3>' +
       '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      '<div class="card-prices" style="margin-top:6px;">' +
-      priceHtml +
-      '</div>' +
       '<a class="partner-link" href="podpiska.html">Партнёрская цена для подписчиков · Как стать партнёром →</a>' +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
-      '<div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center;">' +
-      '<div class="modal-cart-ctrl" data-modal-cart="' + Utils.esc(p.id) + '" style="display:flex; gap:10px; align-items:center;">' + rowCartControl(p) + '</div>' +
+      '<div class="pdetail-buy">' +
+      '<div class="card-prices pdetail-price">' +
+      priceHtml +
+      '</div>' +
+      '<div class="modal-cart-ctrl" data-modal-cart="' + Utils.esc(p.id) + '">' + rowCartControl(p) + '</div>' +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -1170,7 +1170,7 @@
     }
     var rows = dsplitItems.map(function (l, i) {
       var media = l.p
-        ? '<img class="delivery-item-img" src="' + Utils.esc(Utils.img(l.p.thumb || l.p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
+        ? '<span class="zoom-zone" data-zoom="2.4" data-lens="140" style="display:inline-flex;"><img class="delivery-item-img" src="' + Utils.esc(Utils.img(l.p.thumb || l.p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' + Utils.lensHtml() + '</span>'
         : '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
       return '<div class="delivery-detail-item dsplit-row" data-dsplit-prod="' + i + '" style="cursor:pointer;" title="Показать детали товара">' +
         media +
@@ -1267,7 +1267,7 @@
         buyHtml = '<div class="dsplit-buy"><button class="btn btn-primary btn-sm is-disabled" style="flex:1;" data-dsplit-noavail="1" title="Товара нет в наличии">🛒 В корзину</button></div>';
       }
       body.innerHTML =
-        '<div class="dsplit-media"><img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'"></div>' +
+        '<div class="dsplit-media zoom-zone" data-zoom="1.8" data-lens="180"><img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' + Utils.lensHtml() + '</div>' +
         '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
         '<h4 class="dsplit-name">' + Utils.esc(p.name) + '</h4>' +
         '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
@@ -1360,7 +1360,12 @@ fetch('/api/event-bookings')
     list.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
 
     if (!list.length) {
-      el.innerHTML = '<p class="section-sub">Новых мероприятий пока нет — скоро анонсируем.</p>';
+      var waHref = '#';
+      try { waHref = (window.Utils && Utils.waLink) ? Utils.waLink('Здравствуйте! Хочу первым узнавать о презентациях Greenleaf.') : '#'; } catch (e) { }
+      el.innerHTML = '<div class="events-empty"><div class="events-empty-ico">📅✨</div>' +
+        '<b>Пока тихо — готовим новое</b>' +
+        '<span>Скоро анонсируем презентации и обучения. Напишите в WhatsApp — пригласим первыми.</span>' +
+        '<a class="btn btn-whatsapp btn-sm" href="' + waHref + '" target="_blank" rel="noopener">Написать в WhatsApp</a></div>';
       return;
     }
     el.innerHTML = list.map(function (ev) {

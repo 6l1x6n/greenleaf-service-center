@@ -670,5 +670,34 @@
   document.addEventListener('DOMContentLoaded', function () { setTimeout(syncHasCart, 50); });
   syncHasCart();
 
+  // Подъём плавающих кнопок над футером: когда футер близко — body.is-bottom,
+  // кнопки плавно уезжают вверх + один wiggle. Уважает reduced-motion.
+  (function initFabLift() {
+    var reduced = false;
+    try { reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { }
+    var footer = document.querySelector('.footer');
+    if (!footer || !('IntersectionObserver' in window)) return;
+    var wasBottom = false;
+    function setBottom(on) {
+      if (on === wasBottom) return;
+      wasBottom = on;
+      document.body.classList.toggle('is-bottom', on);
+      if (on && !reduced) {
+        ['aiFab', 'cartFab', 'cartFabClear'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.classList.remove('fab-wiggle');
+          void el.offsetWidth;
+          el.classList.add('fab-wiggle');
+        });
+      }
+    }
+    try {
+      new IntersectionObserver(function (entries) {
+        setBottom(!!(entries[0] && entries[0].isIntersecting));
+      }, { rootMargin: '0px 0px -40px 0px', threshold: 0 }).observe(footer);
+    } catch (e) { }
+  })();
+
   applyFabVisibility();
 })();

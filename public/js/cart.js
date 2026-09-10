@@ -113,6 +113,30 @@
         fabCount.style.display = n ? 'inline-flex' : 'none';
       }
     }
+    // Крестик очистки (только ПК, только когда есть товары)
+    var clearBtn = document.getElementById('cartFabClear');
+    if (clearBtn) {
+      var isDesktop = window.matchMedia && window.matchMedia('(min-width: 641px)').matches;
+      clearBtn.classList.toggle('hidden', !n || !isDesktop);
+    }
+  }
+
+  // Крестик на плавающей корзине: очистить всю корзину (ПК)
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#cartFabClear')) return;
+    e.preventDefault();
+    if (!count()) return;
+    if (!confirm('Очистить корзину?')) return;
+    clear();
+    updateBadge();
+    try { if (window.Utils && Utils.showToast) Utils.showToast('🗑 Корзина очищена'); } catch (err) { }
+  });
+  if (window.matchMedia) {
+    try {
+      window.matchMedia('(min-width: 641px)').addEventListener('change', updateBadge);
+    } catch (e) {
+      try { window.matchMedia('(min-width: 641px)').addListener(updateBadge); } catch (err) { }
+    }
   }
 
   document.addEventListener('change', function (e) {
