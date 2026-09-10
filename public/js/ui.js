@@ -439,7 +439,7 @@
       '<svg class="zoom-lens-svg" viewBox="0 0 100 100" preserveAspectRatio="none">' +
       '<circle cx="50" cy="50" r="50" fill="#fff"/>' +
       '<image filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none" image-rendering="optimizeQuality"/>' +
-      '<circle cx="50" cy="50" r="46.5" fill="none" stroke="url(#glLensRim)" stroke-width="5" opacity="0.55" filter="url(#glLensRimSoft)"/>' +
+      '<circle cx="50" cy="50" r="46.5" fill="none" stroke="url(#glLensRim)" stroke-width="5" opacity="0.3" filter="url(#glLensRimSoft)"/>' +
       '</svg><span class="zoom-glass" aria-hidden="true"></span></span>';
   }
 
@@ -715,15 +715,15 @@
         var rimStop1 = document.createElementNS(NS, 'stop');
         rimStop1.setAttribute('offset', '0');
         rimStop1.setAttribute('stop-color', '#ffffff');
-        rimStop1.setAttribute('stop-opacity', '0.9');
+        rimStop1.setAttribute('stop-opacity', '0.28');
         var rimStop2 = document.createElementNS(NS, 'stop');
         rimStop2.setAttribute('offset', '0.55');
         rimStop2.setAttribute('stop-color', '#ffffff');
-        rimStop2.setAttribute('stop-opacity', '0.25');
+        rimStop2.setAttribute('stop-opacity', '0.08');
         var rimStop3 = document.createElementNS(NS, 'stop');
         rimStop3.setAttribute('offset', '1');
         rimStop3.setAttribute('stop-color', '#0a3520');
-        rimStop3.setAttribute('stop-opacity', '0.35');
+        rimStop3.setAttribute('stop-opacity', '0.3');
         rimGrad.appendChild(rimStop1);
         rimGrad.appendChild(rimStop2);
         rimGrad.appendChild(rimStop3);
