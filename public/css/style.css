@@ -115,7 +115,7 @@ a:hover { text-decoration: none; }
 
 /* Inline-меню — базовые стили (>=1101px): при нехватке места ссылки ужимаются
    с многоточием (overflow-x больше не отрезает «Подписку» незаметно) */
-.nav { display: flex; align-items: center; gap: 2px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.nav { display: flex; align-items: center; justify-content: safe center; gap: 2px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .nav::-webkit-scrollbar { display: none; }
 .nav a {
   position: relative;
@@ -2851,6 +2851,7 @@ body.is-bottom .ai-fab:hover { transform: translateY(-58px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .cart-fab, .ai-fab, .cart-fab-clear { transition: none; }
+  .ai-fab { animation: none; box-shadow: 0 8px 24px rgba(10, 53, 32, 0.35); }
   .fab-wiggle { animation: none; }
 }
 .cart-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(10, 53, 32, 0.35); color: var(--green-dark); }
@@ -2991,15 +2992,21 @@ body.is-bottom .ai-fab:hover { transform: translateY(-58px); }
   border: none;
   cursor: grab;
   box-shadow: 0 8px 24px rgba(10, 53, 32, 0.35);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
+  transition: transform 0.15s ease, opacity 0.2s ease;
+  animation: fabGlow 2.6s ease-in-out infinite;
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
 }
-.ai-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(10, 53, 32, 0.45); }
+.ai-fab:hover { transform: translateY(-2px); }
+@keyframes fabGlow {
+  0%, 100% { box-shadow: 0 8px 24px rgba(10, 53, 32, 0.35), 0 0 0 0 rgba(37, 211, 102, 0.45); }
+  50% { box-shadow: 0 8px 24px rgba(10, 53, 32, 0.35), 0 0 20px 5px rgba(37, 211, 102, 0.55); }
+}
 .ai-fab:active { cursor: grabbing; }
-.ai-fab.dragging { transition: none; opacity: 0.92; transform: scale(1.04); }
+.ai-fab.dragging { transition: none; opacity: 0.92; transform: scale(1.04); animation: none; }
 .ai-fab-ico { font-size: 24px; line-height: 1; }
+/* Дот спокойный: светится сама кнопка, второго свечения не нужно */
 .ai-fab-dot {
   position: absolute;
   top: 8px;
@@ -3007,14 +3014,8 @@ body.is-bottom .ai-fab:hover { transform: translateY(-58px); }
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #2bff88;
+  background: #7ee2a0;
   border: 2px solid #fff;
-  box-shadow: 0 0 6px 2px rgba(43, 255, 136, 0.8), 0 0 14px 4px rgba(43, 255, 136, 0.35);
-  animation: ai-pulse 2s infinite;
-}
-@keyframes ai-pulse {
-  0%, 100% { box-shadow: 0 0 6px 2px rgba(43, 255, 136, 0.8), 0 0 0 0 rgba(43, 255, 136, 0.55); }
-  50% { box-shadow: 0 0 8px 3px rgba(43, 255, 136, 0.95), 0 0 0 7px rgba(43, 255, 136, 0); }
 }
 .ai-fab-hide {
   position: absolute;
@@ -3091,9 +3092,7 @@ body.is-bottom .ai-fab:hover { transform: translateY(-58px); }
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2bff88;
-  box-shadow: 0 0 6px 2px rgba(43, 255, 136, 0.8), 0 0 12px 4px rgba(43, 255, 136, 0.35);
-  animation: ai-pulse 2s infinite;
+  background: #7ee2a0;
 }
 .ai-status.off::before { background: #f5a623; }
 .ai-head-btn {

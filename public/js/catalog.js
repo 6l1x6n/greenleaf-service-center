@@ -451,7 +451,7 @@
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 style="margin:2px 0 0;">' + Utils.esc(p.name) + '</h3>' +
       '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      '<a class="partner-link" href="podpiska.html">Партнёрская цена для подписчиков · Как стать партнёром →</a>' +
+      '<a class="partner-link" href="podpiska.html">Партнёрам −50% · Подробнее →</a>' +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
       '<div class="pdetail-buy">' +
