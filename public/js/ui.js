@@ -601,13 +601,13 @@
     // Микро-сглаживание увеличенного слоя внутри лупы (единицы viewBox 0..100).
     // 0.3 давит «пиксельноватость» апскейла на FHD, центр остаётся резким.
     // Базовые <img> товаров не затрагиваются.
-    var LENS_SMOOTH = 0.3;
+    var LENS_SMOOTH = 0.35;
     // Liquid glass: плоский центр + преломление у кромки (как в iOS).
     // RIM_START — радиус плоского центра (внутри смещения нет, резкость макс.),
     // RIM_POWER — крутизна загиба кромки, RIM_SCALE — сила (ед. viewBox).
     var LENS_RIM_START = 0.62;
-    var LENS_RIM_POWER = 2.0;
-    var LENS_RIM_SCALE = 20;
+    var LENS_RIM_POWER = 2.4;
+    var LENS_RIM_SCALE = 26;
 
     function buildWarpMap(size) {
       var c = document.createElement('canvas');
@@ -715,7 +715,7 @@
         var rimStop1 = document.createElementNS(NS, 'stop');
         rimStop1.setAttribute('offset', '0');
         rimStop1.setAttribute('stop-color', '#ffffff');
-        rimStop1.setAttribute('stop-opacity', '0.28');
+        rimStop1.setAttribute('stop-opacity', '0.18');
         var rimStop2 = document.createElementNS(NS, 'stop');
         rimStop2.setAttribute('offset', '0.55');
         rimStop2.setAttribute('stop-color', '#ffffff');
