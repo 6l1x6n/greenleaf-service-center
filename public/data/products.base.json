@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-11T07:57:39+03:00",
+  "updated": "2026-09-11T13:27:34+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -1742,13 +1742,13 @@
       "category": "Женская и детская гигиена",
       "price": 1200,
       "partner_price": 600,
-      "quantity": 160,
+      "quantity": 660,
       "image": "assets/images/products/DAD180.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 160
+        "s240534": 660
       },
       "description": ""
     },
@@ -2320,13 +2320,13 @@
       "category": "Бытовая химия",
       "price": 4000,
       "partner_price": 2000,
-      "quantity": 97,
+      "quantity": 307,
       "image": "assets/images/products/KLA021.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 97
+        "s240534": 307
       },
       "description": ""
     },
@@ -2745,13 +2745,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 171,
+      "quantity": 0,
       "image": "assets/images/products/ASF056.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 171
+        "s240534": 0
       },
       "description": ""
     },
@@ -3272,13 +3272,13 @@
       "category": "Напитки и БАДы",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 138,
+      "quantity": 0,
       "image": "assets/images/products/NWA139.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 138
+        "s240534": 0
       },
       "description": ""
     },
@@ -3323,13 +3323,13 @@
       "category": "Напитки и БАДы",
       "price": 4000,
       "partner_price": 2000,
-      "quantity": 232,
+      "quantity": 0,
       "image": "assets/images/products/NWA111.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 232
+        "s240534": 0
       },
       "description": ""
     },
@@ -3340,13 +3340,13 @@
       "category": "Напитки и БАДы",
       "price": 12600,
       "partner_price": 6300,
-      "quantity": 40,
+      "quantity": 0,
       "image": "assets/images/products/NWA087.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 40
+        "s240534": 0
       },
       "description": ""
     },
@@ -3357,13 +3357,13 @@
       "category": "Медицинские изделия",
       "price": 7000,
       "partner_price": 3500,
-      "quantity": 25,
+      "quantity": 0,
       "image": "assets/images/products/KLA105.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 25
+        "s240534": 0
       },
       "description": ""
     },
@@ -3408,13 +3408,13 @@
       "category": "Напитки и БАДы",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 229,
+      "quantity": 0,
       "image": "assets/images/products/NWA062.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 229
+        "s240534": 0
       },
       "description": ""
     },
@@ -3476,13 +3476,13 @@
       "category": "Напитки и БАДы",
       "price": 11600,
       "partner_price": 5800,
-      "quantity": 20,
+      "quantity": 0,
       "image": "assets/images/products/NWA063.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 20
+        "s240534": 0
       },
       "description": ""
     },
@@ -3901,13 +3901,13 @@
       "category": "Уход за телом и косметика",
       "price": 11000,
       "partner_price": 5500,
-      "quantity": 19,
+      "quantity": 119,
       "image": "assets/images/products/LGW573.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 19
+        "s240534": 119
       },
       "description": ""
     },
@@ -4071,13 +4071,13 @@
       "category": "Уход за телом и косметика",
       "price": 5400,
       "partner_price": 2700,
-      "quantity": 331,
+      "quantity": 451,
       "image": "assets/images/products/CAA039.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 331
+        "s240534": 451
       },
       "description": ""
     },
@@ -5142,13 +5142,13 @@
       "category": "Бытовая химия",
       "price": 6800,
       "partner_price": 3400,
-      "quantity": 14,
+      "quantity": 54,
       "image": "assets/images/products/ASF062.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 14
+        "s240534": 54
       },
       "description": ""
     },
@@ -6057,14 +6057,14 @@
       "category": "Прочее",
       "price": 29800,
       "partner_price": 14900,
-      "quantity": 24,
+      "quantity": 0,
       "image": "assets/images/products/NWA123.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 24
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/202001/2602250707yn6cQJ8FvS.png"
@@ -6095,14 +6095,14 @@
       "category": "Напитки и БАДы",
       "price": 7400,
       "partner_price": 3700,
-      "quantity": 197,
+      "quantity": 0,
       "image": "assets/images/products/NWA175.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 197
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/685565/2607131006i34ydieEL4.png"
@@ -62265,17 +62265,18 @@
       "sku": "DAA039",
       "name": "iLiFE Гель для стирки против чесоточного зудня 1 кг",
       "category": "Бытовая химия",
-      "price": 0,
-      "partner_price": 0,
-      "quantity": 0,
+      "price": 4000,
+      "partner_price": 2000,
+      "quantity": 100,
       "image": "assets/images/products/DAA039.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "Откройте для себя глубокую чистоту и бережный уход за каждой вещью\nГель для стирки iLiFE эффективно удаляет загрязнения и пятна с различных видов тканей, обеспечивая чистоту, свежесть и бережный уход за одеждой. Современная формула не содержит фосфатов и флуоресцентных отбеливателей, благодаря чему подходит для регулярного использования и помогает сохранить качество тканей.\nСредство сочетает высокую моющую способность с деликатным воздействием на волокна, легко выполаскивается и оставляет приятный свежий аромат. Подходит как для ручной, так и для машинной стирки.\nСвойства:\nЭффективно удаляет загрязнения и пятна\nБережно очищает различные виды тканей\nНе содержит фосфатов и флуоресцентных отбеливателей\nПодходит для регулярного использования\nПомогает сохранить мягкость тканей\nЛегко выполаскивается\nПодходит для ручной и машинной стирки\nОставляет приятный свежий аромат\nКоличество:\n1 кг\nСостав (активные компоненты):\nКомплекс поверхностно-активных веществ, синергист моющих компонентов, ароматическая композиция.\nСпособ применения:\nРучная стирка: растворите 10–20 мл средства в 3–5 литрах воды, затем постирайте изделия обычным способом.\nСтиральная машина активаторного типа: используйте 30 мл средства на одну стирку.\nСтиральная машина барабанного типа: используйте 25 мл средства на одну стирку.\nПри сильных загрязнениях дозировку можно увеличить в зависимости от степени загрязнения и объёма белья.\nСпособ хранения:\nХранить при комнатной температуре, избегая попадания прямых солнечных лучей и воздействия высоких температур.\nСрок годности:\n3 года.",
-      "stock": {},
+      "stock": {
+        "s240534": 100
+      },
       "hidden": false,
-      "pending": true,
       "image_src": "/data/files/goods/9627/2401101700Ek3w93m2ye.jpg"
     },
     {
@@ -84299,6 +84300,22 @@
       "hidden": false,
       "pending": true,
       "image_src": "/data/files/goods/176983/2609100836F1UahtbO54.jpeg"
+    },
+    {
+      "id": "YZA026",
+      "sku": "YZA026",
+      "name": "(В коробке 5шт) Yue Zhonggui Подарочный набор средств по уходу за кожей с антивозрастным эффектом «Кордицепс»",
+      "category": "Прочее",
+      "price": 0,
+      "partner_price": 0,
+      "quantity": 0,
+      "image": "assets/images/products/YZA026.png",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
     }
   ]
 }
