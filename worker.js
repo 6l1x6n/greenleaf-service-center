@@ -2681,6 +2681,60 @@ async function handleAiChat(request, env, url) {
   }
   let products = found.products.map(toPayload);
 
+  // Автопроверка ответа (0 нейронов): ловим выдуманные/переписанные названия.
+  // Ищем в тексте окно из 6 значащих слов, которое ЦЕЛИКОМ входит в название
+  // товара каталога, которого НЕТ в показанной подборке («...из ног» против
+  // ASD014 «...из труб») — но только если это окно НЕ входит целиком и в
+  // показанный товар (near-дубли вроде «Жидкое 600 г» vs «Жидкое 500 г»
+  // легитимные цитаты не задевают). Короткие служебные фразы порогом длины
+  // не задеваются. Возвращает товар-нарушитель или null.
+  // Правило общее, без списков товаров.
+  function aiReplyLeak(replyText, listedProducts) {
+    const words = aiNorm(replyText).split(' ').filter(function (w) { return w.length >= 4 && !AI_STOP[w]; });
+    const WIN = 6;
+    if (words.length < WIN) return null;
+    // Коробочные дубли («(Кол-во ...) X» vs «X») — один товар: равняем по
+    // базовому имени той же нормализацией, что дедуп в aiSearch.
+    const baseName = function (n) { return aiNorm(String(n || '').replace(/^\([^)]*\)\s*/, '')); };
+    const listedBase = {};
+    const listedNorms = [];
+    (listedProducts || []).forEach(function (p) {
+      if (!p || !p.name) return;
+      listedBase[baseName(p.name)] = 1;
+      listedNorms.push(' ' + aiNorm(p.name) + ' ');
+    });
+    const inAny = function (norms, s) {
+      for (let n = 0; n < norms.length; n++) {
+        let ok = true;
+        for (let k = s; k < s + WIN; k++) {
+          if (norms[n].indexOf(' ' + words[k] + ' ') === -1) { ok = false; break; }
+        }
+        if (ok) return true;
+      }
+      return false;
+    };
+    const cands = [];
+    for (let i = 0; i < catalog.length; i++) {
+      const cp = catalog[i];
+      if (!cp.name || listedBase[baseName(cp.name)]) continue;
+      const cw = aiNorm(cp.name).split(' ').filter(function (w) { return w.length >= 4 && !AI_STOP[w]; });
+      if (cw.length < WIN) continue;
+      cands.push({ p: cp, norm: ' ' + aiNorm(cp.name) + ' ' });
+    }
+    const candNorms = cands.map(function (c) { return c.norm; });
+    for (let s = 0; s + WIN <= words.length; s++) {
+      if (inAny(listedNorms, s)) continue; // фраза из показанных товаров — ок
+      for (let c = 0; c < cands.length; c++) {
+        let ok = true;
+        for (let k = s; k < s + WIN; k++) {
+          if (cands[c].norm.indexOf(' ' + words[k] + ' ') === -1) { ok = false; break; }
+        }
+        if (ok) return cands[c].p;
+      }
+    }
+    return null;
+  }
+
   // Подборка в наличии для «Помоги подобрать» и категорийных чипов (0 нейронов)
   function categoryPick(cfg, limit) {
     const res = [];
@@ -2745,7 +2799,7 @@ async function handleAiChat(request, env, url) {
   // Кэш одинаковых вопросов (1 час): набор слов без учёта порядка + СЦ.
   // Версия в ключе: после правок промпта старые ответы не переиспользуем.
   const canon = aiTokens(q).sort().join(' ') || aiNorm(q);
-  const cacheKey = 'ai_cache:v5:' + aiHash(canon + '|' + (storeId || 'all'));
+  const cacheKey = 'ai_cache:v6:' + aiHash(canon + '|' + (storeId || 'all'));
   try {
     const cachedRaw = await env.SC_STORES.get(cacheKey);
     if (cachedRaw) {
@@ -2834,6 +2888,8 @@ async function handleAiChat(request, env, url) {
     (storeName ? ' Филиал клиента: ' + storeName + '.' : '') +
     (aliasNote ? ' Важно: ' + aliasNote : '') +
     noStoreHint +
+    ' История переписки ниже может содержать прошлые ошибки Исы — никогда не копируй ' +
+    'оттуда названия, цены и наличие, опирайся только на список найденных товаров ниже.' +
     ' Отвечай по-русски, по делу, 2-3 предложения. ' +
     'Правила: сначала проверь, подходит ли хоть один товар из списка по назначению ' +
     'целиком (название и категория целиком, а не одно слово — например запах для труб, ' +
@@ -2885,10 +2941,15 @@ async function handleAiChat(request, env, url) {
 
   reply = String(reply || '').trim().slice(0, 900);
   if (!reply) reply = templateReply();
-  // Честный отказ («подходящего нет») — без карточек: чужие по назначению
-  // товары не показываем вообще (решение владельца). Паттерн общий —
-  // по нашей же формулировке отказа, без списков товаров.
-  if (/подходящего нет|подходящих нет|не наш[её]л подходящего|не нашла подходящего/i.test(reply)) {
+  // Детектор вранья: название не из подборки — ответ в эфир не выходит,
+  // заменяем строгим честным отказом без карточек (решение владельца).
+  if (aiReplyLeak(reply, products)) {
+    reply = 'Подходящего товара в каталоге нет. Напишите в WhatsApp — подскажем и подберём аналог.';
+    products = [];
+  } else if (/подходящего нет|подходящих нет|не наш[её]л подходящего|не нашла подходящего/i.test(reply)) {
+    // Честный отказ («подходящего нет») — без карточек: чужие по назначению
+    // товары не показываем вообще (решение владельца). Паттерн общий —
+    // по нашей же формулировке отказа, без списков товаров.
     products = [];
   }
   const actions = aiActions(reply);

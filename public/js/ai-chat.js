@@ -2,7 +2,7 @@
   'use strict';
 
   var FAB_KEY = 'greenleaf_ai_fab_hidden_v1';
-  var HIST_KEY = 'greenleaf_ai_hist_v1';
+  var HIST_KEY = 'greenleaf_ai_hist_v2';
   var MAX_HIST = 10;
 
   var fab = document.getElementById('aiFab');
@@ -178,6 +178,21 @@
   });
 
   // Возврат через меню: любой .ai-chat-link открывает чат
+  // «Новый диалог»: чистим историю (в т.ч. старые ошибки Исы) и экран
+  var aiNew = document.getElementById('aiNew');
+  if (aiNew) aiNew.addEventListener('click', function () {
+    hist = [];
+    saveHist(hist);
+    body.innerHTML = '';
+    greeted = false;
+    if (panel.classList.contains('hidden')) openPanel();
+    else {
+      greeted = true;
+      addBotHtml('Новый диалог. Спросите про товары — например, «что есть для мозга» или «какие витаминки есть».');
+      renderChips(['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы']);
+    }
+  });
+
   document.addEventListener('click', function (e) {
     var link = e.target.closest('.ai-chat-link');
     if (link) {
