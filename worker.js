@@ -1820,8 +1820,9 @@ function aiTokens(s) {
 }
 
 // Лёгкий стемминг для русского: «витаминки» → «витамин»,
-// «шампуни» → «шампунь». Варианты короче 4 букв отбрасываем,
-// чтобы «маска» не тянула «масло» наверх (у стем-совпадений вес ниже).
+// «шампуни» → «шампунь». Короткие токены (3 буквы: «ног», «чай», «пот»)
+// оставляем как есть — их точность держит aiTokHit (граница слова),
+// а выбрасывать их нельзя: иначе «запах ног» ищется только по «запах».
 function aiStemVariants(tok) {
   var out = [tok];
   if (tok.length > 5) out.push(tok.slice(0, -1));
@@ -1829,7 +1830,7 @@ function aiStemVariants(tok) {
     var v2 = tok.slice(0, -2);
     if (v2.length >= 4) out.push(v2);
   }
-  return out.filter(function (v, i) { return v.length >= 4 && out.indexOf(v) === i; });
+  return out.filter(function (v, i) { return v.length >= 3 && out.indexOf(v) === i; });
 }
 
 // Синонимы для «аптечных» вопросов: в каталоге нет слова «мозг»,
@@ -2057,19 +2058,54 @@ function aiSearch(catalog, query, storeId, limit) {
   const syns = alias ? [] : aiSynonyms(toks);
   const useToks = alias ? alias.search : toks;
   const kids = !alias && aiHasKidsIntent(toks);
+  // Общий порог релевантности (без списков товаров): токен, бьющий по 3+
+  // категориям («запах» — трубы/рот/воздух, «гель» — стирка/душ), сам по себе
+  // назначение не определяет. Если в запросе 2+ осмысленных токена (шум вроде
+  // «плохого», которого нет ни в одном названии, не считаем), а товар совпал
+  // ТОЛЬКО с расплывчатыми — отбрасываем: иначе «запах ног» тянет трубы,
+  // а «гель для стирки» — гель для душа. Алиасы уже точные — их не трогаем.
+  let gateInfo = null; // [0=расплывчатый, 1=конкретный, -1=игнор] по useToks
+  if (!alias && useToks.length >= 2) {
+    const eff = [], amb = [];
+    for (let t = 0; t < useToks.length; t++) {
+      const variants = aiStemVariants(useToks[t]);
+      let hits = 0;
+      const cats = {};
+      for (let i = 0; i < catalog.length; i++) {
+        const cp = catalog[i];
+        let hit = false;
+        for (let v = 0; v < variants.length; v++) {
+          if (aiTokHit(cp.norm, variants[v])) { hit = true; break; }
+        }
+        if (hit) { hits++; if (cp.category) cats[cp.category] = 1; }
+      }
+      if (!hits) continue;
+      eff.push(t);
+      amb.push(Object.keys(cats).length >= 3);
+    }
+    if (eff.length >= 2) {
+      gateInfo = [];
+      for (let t = 0; t < useToks.length; t++) {
+        const ei = eff.indexOf(t);
+        gateInfo.push(ei === -1 ? -1 : (amb[ei] ? 0 : 1));
+      }
+    }
+  }
   const scored = [];
   let exact = false;
   for (let i = 0; i < catalog.length; i++) {
     const p = catalog[i];
     let score = 0;
     let antiHit = false;
-    if (p.sku && p.sku.toLowerCase() === q) { score += 100; exact = true; }
-    else if (!alias && p.norm && p.norm.indexOf(q) !== -1 && q.length >= 4) { score += 40; exact = true; }
+    let gateN = 0, gateSpec = false, gateExact = false;
+    if (p.sku && p.sku.toLowerCase() === q) { score += 100; exact = true; gateExact = true; }
+    else if (!alias && p.norm && p.norm.indexOf(q) !== -1 && q.length >= 4) { score += 40; exact = true; gateExact = true; }
     for (let t = 0; t < useToks.length; t++) {
       const variants = aiStemVariants(useToks[t]);
       for (let v = 0; v < variants.length; v++) {
         if (aiTokHit(p.norm, variants[v])) {
           score += v === 0 ? (variants[v].length >= 6 ? 6 : 3) : 2;
+          if (gateInfo && gateInfo[t] >= 0) { gateN++; if (gateInfo[t] === 1) gateSpec = true; }
           break;
         }
       }
@@ -2082,6 +2118,10 @@ function aiSearch(catalog, query, storeId, limit) {
       if (AI_INTENT_KIDS_ANTI.some(function (a) { return aiTokHit(p.norm, a); })) { score -= 10; antiHit = true; }
     }
     if (score <= 0) continue;
+    // Порог релевантности: совпал только с расплывчатыми токенами
+    // при 2+ осмысленных в запросе — чужое назначение, пропускаем.
+    // Точное совпадение (артикул/фраза) гейт не режет.
+    if (gateInfo && !gateExact && !(gateN >= 2 || gateSpec)) continue;
     const av = aiAvail(p, storeId);
     // Нет в наличии — вниз, но не выкидываем (кроме задемпленного мусора).
     // Пол для детской кухни и т.п. при детском вопросе должен исчезнуть вовсе.
@@ -2639,7 +2679,7 @@ async function handleAiChat(request, env, url) {
       eta: etaIso, etaText: etaIso ? aiFmtDay(etaIso) : ''
     };
   }
-  const products = found.products.map(toPayload);
+  let products = found.products.map(toPayload);
 
   // Подборка в наличии для «Помоги подобрать» и категорийных чипов (0 нейронов)
   function categoryPick(cfg, limit) {
@@ -2705,16 +2745,21 @@ async function handleAiChat(request, env, url) {
   // Кэш одинаковых вопросов (1 час): набор слов без учёта порядка + СЦ.
   // Версия в ключе: после правок промпта старые ответы не переиспользуем.
   const canon = aiTokens(q).sort().join(' ') || aiNorm(q);
-  const cacheKey = 'ai_cache:v4:' + aiHash(canon + '|' + (storeId || 'all'));
+  const cacheKey = 'ai_cache:v5:' + aiHash(canon + '|' + (storeId || 'all'));
   try {
     const cachedRaw = await env.SC_STORES.get(cacheKey);
     if (cachedRaw) {
       const cached = JSON.parse(cachedRaw);
       if (cached && typeof cached.reply === 'string') {
-        // Честный кеш: наличие меняется за минуты (холды/заказы/парсер),
-        // а текст лежит час. Свежие products уже посчитаны выше — если
-        // состояние наличия у карточек разъехалось, кеш не отдаём.
+        // Честный отказ («подходящего нет») кешируется без карточек —
+        // чужие товары при переотдаче не подмешиваем.
         const cProds = Array.isArray(cached.products) ? cached.products : products;
+        if (!cProds.length) {
+          const cActs = Array.isArray(cached.actions) ? cached.actions : aiActions(cached.reply);
+          return jsonResponse({ ok: true, reply: cached.reply, products: [], actions: cActs, chips: AI_CHIPS_DEFAULT, cached: true });
+        }
+        // Честный кеш: наличие меняется за минуты, а текст лежит час —
+        // если состояние наличия разъехалось со свежим, кеш не отдаём.
         let stale = false;
         try {
           const freshById = {};
@@ -2790,9 +2835,13 @@ async function handleAiChat(request, env, url) {
     (aliasNote ? ' Важно: ' + aliasNote : '') +
     noStoreHint +
     ' Отвечай по-русски, по делу, 2-3 предложения. ' +
-    'Правила: рекомендуй товар только если его назначение целиком совпадает с вопросом ' +
-    '(смотри название и категорию целиком, а не одно слово — например запах для труб, ' +
+    'Правила: сначала проверь, подходит ли хоть один товар из списка по назначению ' +
+    'целиком (название и категория целиком, а не одно слово — например запах для труб, ' +
     'для рта и для тела путать нельзя); ' +
+    'если ни один не подходит по назначению — честно напиши что подходящего нет и заверши ' +
+    'фразой "напишите в WhatsApp", никакие товары не называй и не описывай; ' +
+    'названия и артикулы из списка не переписывай и не пересказывай — запрещено менять ' +
+    'даже одно слово, лучше вообще не пиши названий в тексте (карточки подставит сайт); ' +
     'говори только о товарах из списка ниже, цены, свойства и наличие не выдумывай; ' +
     '«в наличии» называй ТОЛЬКО товары с пометкой (в наличии); ' +
     'если вопрос про детей — рекомендуй только детские или с пометкой для детей, ' +
@@ -2800,10 +2849,10 @@ async function handleAiChat(request, env, url) {
     'товары с пометкой (нет в наличии) предлагай лишь как «пока нет — уточните поставку», ' +
     'если у товара указано «ожидается» — назови эту дату; ' +
     'с пометкой (наличие уточняйте) — «наличие уточняйте в WhatsApp»; ' +
-    'назови 2-3 лучших и чем они отличаются; ' +
-    'если ни один товар из списка не подходит по назначению или все с пометкой ' +
-    '(нет в наличии)/(наличие уточняйте) — честно скажи что подходящего нет и заверши ' +
-    'ответ фразой "напишите в WhatsApp", не приписывай товару чужое назначение; ' +
+    'если есть подходящие — назови 2-3 лучших и чем они отличаются; ' +
+    'если все подходящие с пометкой (нет в наличии)/(наличие уточняйте) — скажи ' +
+    '«пока нет — уточните поставку» или «наличие уточняйте в WhatsApp» и заверши ' +
+    'ответ фразой "напишите в WhatsApp"; ' +
     'если вопрос неконкретный (нет товара/категории в вопросе и истории) — ' +
     'задай ОДИН уточняющий вопрос без перечисления товаров; ' +
     'без диагнозов и слов «лечит» — только общие свойства; ' +
@@ -2823,7 +2872,7 @@ async function handleAiChat(request, env, url) {
         { role: 'user', content: userPrompt }
       ],
       max_tokens: AI_MAX_TOKENS,
-      temperature: 0.3
+      temperature: 0.2
     });
     if (typeof aiRes === 'string') reply = aiRes;
     else if (aiRes && typeof aiRes.response === 'string') reply = aiRes.response;
@@ -2836,6 +2885,12 @@ async function handleAiChat(request, env, url) {
 
   reply = String(reply || '').trim().slice(0, 900);
   if (!reply) reply = templateReply();
+  // Честный отказ («подходящего нет») — без карточек: чужие по назначению
+  // товары не показываем вообще (решение владельца). Паттерн общий —
+  // по нашей же формулировке отказа, без списков товаров.
+  if (/подходящего нет|подходящих нет|не наш[её]л подходящего|не нашла подходящего/i.test(reply)) {
+    products = [];
+  }
   const actions = aiActions(reply);
 
   try {
