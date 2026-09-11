@@ -1823,12 +1823,20 @@ function aiTokens(s) {
 // «шампуни» → «шампунь». Короткие токены (3 буквы: «ног», «чай», «пот»)
 // оставляем как есть — их точность держит aiTokHit (граница слова),
 // а выбрасывать их нельзя: иначе «запах ног» ищется только по «запах».
+// Плюс снимаем стандартные падежные окончания («ногах/ногами/ноги» → «ног»,
+// «поту» → «пот», «лица» → «лиц»): без этого словоформы в косвенных падежах
+// вообще не ищутся и отрубают порог релевантности. Без списков слов, чистая
+// морфология; короткие варианты ищутся только по границе слова, мусор не тянут.
 function aiStemVariants(tok) {
   var out = [tok];
   if (tok.length > 5) out.push(tok.slice(0, -1));
   if (tok.length > 6) {
     var v2 = tok.slice(0, -2);
     if (v2.length >= 4) out.push(v2);
+  }
+  if (tok.length >= 4 && tok.length <= 9) {
+    var stem = tok.replace(/(ами|ями|ах|ях|ам|ям|ом|ем|ой|ей|ою|ею|у|ю|а|я|и|ы|о|е|ь)$/, '');
+    if (stem.length >= 3) out.push(stem);
   }
   return out.filter(function (v, i) { return v.length >= 3 && out.indexOf(v) === i; });
 }
@@ -2682,13 +2690,10 @@ async function handleAiChat(request, env, url) {
   let products = found.products.map(toPayload);
 
   // Автопроверка ответа (0 нейронов): ловим выдуманные/переписанные названия.
-  // Ищем в тексте окно из 6 значащих слов, которое ЦЕЛИКОМ входит в название
-  // товара каталога, которого НЕТ в показанной подборке («...из ног» против
-  // ASD014 «...из труб») — но только если это окно НЕ входит целиком и в
-  // показанный товар (near-дубли вроде «Жидкое 600 г» vs «Жидкое 500 г»
-  // легитимные цитаты не задевают). Короткие служебные фразы порогом длины
-  // не задеваются. Возвращает товар-нарушитель или null.
-  // Правило общее, без списков товаров.
+  // Два общих правила без списков товаров:
+  // 1) окно из 6 значащих слов целиком входит в товар НЕ из подборки;
+  // 2) ≥6 значащих слов ответа принадлежат показанному товару, но его полного
+  // названия в ответе нет дословно (переименование «...из труб» → «...из ног»).
   function aiReplyLeak(replyText, listedProducts) {
     const words = aiNorm(replyText).split(' ').filter(function (w) { return w.length >= 4 && !AI_STOP[w]; });
     const WIN = 6;
@@ -2731,6 +2736,26 @@ async function handleAiChat(request, env, url) {
         }
         if (ok) return cands[c].p;
       }
+    }
+    // Правило точной цитаты: если ≥6 значащих слов ответа принадлежат ОДНОМУ
+    // показанному товару, а его полное название в ответе дословно отсутствует —
+    // это пересказ-переименование («...из ног» вместо «...из труб»).
+    // Короткие пересказы порога не набирают (слова <4 букв не считаются).
+    const replyNorm = ' ' + aiNorm(replyText) + ' ';
+    const rset = {};
+    words.forEach(function (w) { rset[w] = 1; });
+    const listed = listedProducts || [];
+    for (let l = 0; l < listed.length; l++) {
+      const lp = listed[l];
+      if (!lp || !lp.name) continue;
+      const lw = aiNorm(lp.name).split(' ').filter(function (w) { return w.length >= 4 && !AI_STOP[w]; });
+      if (lw.length < 6) continue;
+      let common = 0;
+      const seen2 = {};
+      for (let w = 0; w < lw.length; w++) {
+        if (rset[lw[w]] && !seen2[lw[w]]) { seen2[lw[w]] = 1; common++; }
+      }
+      if (common >= 6 && replyNorm.indexOf(' ' + aiNorm(lp.name) + ' ') === -1) return lp;
     }
     return null;
   }
@@ -2799,7 +2824,7 @@ async function handleAiChat(request, env, url) {
   // Кэш одинаковых вопросов (1 час): набор слов без учёта порядка + СЦ.
   // Версия в ключе: после правок промпта старые ответы не переиспользуем.
   const canon = aiTokens(q).sort().join(' ') || aiNorm(q);
-  const cacheKey = 'ai_cache:v6:' + aiHash(canon + '|' + (storeId || 'all'));
+  const cacheKey = 'ai_cache:v7:' + aiHash(canon + '|' + (storeId || 'all'));
   try {
     const cachedRaw = await env.SC_STORES.get(cacheKey);
     if (cachedRaw) {
