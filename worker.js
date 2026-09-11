@@ -2705,15 +2705,35 @@ async function handleAiChat(request, env, url) {
   // Кэш одинаковых вопросов (1 час): набор слов без учёта порядка + СЦ.
   // Версия в ключе: после правок промпта старые ответы не переиспользуем.
   const canon = aiTokens(q).sort().join(' ') || aiNorm(q);
-  const cacheKey = 'ai_cache:v3:' + aiHash(canon + '|' + (storeId || 'all'));
+  const cacheKey = 'ai_cache:v4:' + aiHash(canon + '|' + (storeId || 'all'));
   try {
     const cachedRaw = await env.SC_STORES.get(cacheKey);
     if (cachedRaw) {
       const cached = JSON.parse(cachedRaw);
       if (cached && typeof cached.reply === 'string') {
+        // Честный кеш: наличие меняется за минуты (холды/заказы/парсер),
+        // а текст лежит час. Свежие products уже посчитаны выше — если
+        // состояние наличия у карточек разъехалось, кеш не отдаём.
         const cProds = Array.isArray(cached.products) ? cached.products : products;
-        const cActs = Array.isArray(cached.actions) ? cached.actions : aiActions(cached.reply);
-        return jsonResponse({ ok: true, reply: cached.reply, products: cProds, actions: cActs, chips: AI_CHIPS_DEFAULT, cached: true });
+        let stale = false;
+        try {
+          const freshById = {};
+          products.forEach(function (p) { freshById[String(p.id)] = p.stockState; });
+          cProds.slice(0, AI_TOP_FOR_PROMPT).forEach(function (p) {
+            const fresh = freshById[String(p && p.id)];
+            if (fresh && String(p.stockState || '') !== String(fresh)) stale = true;
+          });
+          // Текст говорил «в наличии», а свежих в наличии уже нет — не врём.
+          if (!stale && /в наличии/i.test(cached.reply)) {
+            const anyIn = products.slice(0, AI_TOP_FOR_PROMPT).some(function (p) { return p.stockState === 'in'; });
+            if (!anyIn) stale = true;
+          }
+        } catch (e) { stale = true; }
+        if (!stale) {
+          const cActs = Array.isArray(cached.actions) ? cached.actions : aiActions(cached.reply);
+          // Карточки — свежие (актуальные бейджи), текст — из кеша.
+          return jsonResponse({ ok: true, reply: cached.reply, products: products, actions: cActs, chips: AI_CHIPS_DEFAULT, cached: true });
+        }
       }
     }
   } catch (e) { /* мимо кеша */ }
@@ -2759,14 +2779,21 @@ async function handleAiChat(request, env, url) {
     return (m.role === 'user' ? 'Клиент: ' : 'Иса: ') + m.text;
   }).join('\n');
 
+  const noStoreHint = (!storeId || !storeName)
+    ? ' Филиал не выбран: не пиши «у вас/в вашем филиале в наличии», только «есть в сети» или «наличие уточняйте в WhatsApp».'
+    : '';
   const system = 'Ты — Иса, менеджер магазина эко-товаров Greenleaf (бытовая химия iLife, ' +
     'косметика SEALUXE, гигиена CARICH и др.). ' +
     'Магазин: ' + (shop.addr || 'адрес уточняйте') + '. Часы: ' + (shop.hours || 'уточняйте') +
     '. Телефон: ' + (shop.phone || '—') + '. WhatsApp: ' + (shop.wa || '—') + '.' +
     (storeName ? ' Филиал клиента: ' + storeName + '.' : '') +
     (aliasNote ? ' Важно: ' + aliasNote : '') +
+    noStoreHint +
     ' Отвечай по-русски, по делу, 2-3 предложения. ' +
-    'Правила: говори только о товарах из списка ниже, цены не выдумывай; ' +
+    'Правила: рекомендуй товар только если его назначение целиком совпадает с вопросом ' +
+    '(смотри название и категорию целиком, а не одно слово — например запах для труб, ' +
+    'для рта и для тела путать нельзя); ' +
+    'говори только о товарах из списка ниже, цены, свойства и наличие не выдумывай; ' +
     '«в наличии» называй ТОЛЬКО товары с пометкой (в наличии); ' +
     'если вопрос про детей — рекомендуй только детские или с пометкой для детей, ' +
     'хозяйственные/кухонные/для пола детям не предлагать; ' +
@@ -2774,8 +2801,9 @@ async function handleAiChat(request, env, url) {
     'если у товара указано «ожидается» — назови эту дату; ' +
     'с пометкой (наличие уточняйте) — «наличие уточняйте в WhatsApp»; ' +
     'назови 2-3 лучших и чем они отличаются; ' +
-    'если товара нет — честно скажи, уточни поставку и заверши ' +
-    'ответ фразой "напишите в WhatsApp"; ' +
+    'если ни один товар из списка не подходит по назначению или все с пометкой ' +
+    '(нет в наличии)/(наличие уточняйте) — честно скажи что подходящего нет и заверши ' +
+    'ответ фразой "напишите в WhatsApp", не приписывай товару чужое назначение; ' +
     'если вопрос неконкретный (нет товара/категории в вопросе и истории) — ' +
     'задай ОДИН уточняющий вопрос без перечисления товаров; ' +
     'без диагнозов и слов «лечит» — только общие свойства; ' +
