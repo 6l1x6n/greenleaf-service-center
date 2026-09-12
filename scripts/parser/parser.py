@@ -231,15 +231,87 @@ def dump_form_state(page, label):
         print(f"Не удалось сохранить форму {label}: {e}")
 
 
+def is_maintenance_page(page):
+    """Страница техработ вместо формы входа (даёт обходной вход для СЦ).
+
+    Разметка от пользователя (12.09.2026): заголовок «Уважаемые партнёры!»,
+    текст «по техническим причинам ... не будет работать до 18:00 (МСК)»
+    и ссылка «Вы Сервис-центр? Вам сюда» -> /do.control/login.
+    Дата внутри собирается через document.write, поэтому ищем устойчивые маркеры.
+    """
+    try:
+        html = (page.content() or "").lower()
+    except Exception:
+        html = ""
+    if not html:
+        try:
+            html = (page.inner_text("body") or "").lower()
+        except Exception:
+            return False
+    markers = 0
+    if "уважаемые партн" in html:
+        markers += 1
+    if "по техническим причинам" in html:
+        markers += 1
+    if "не будет работать до" in html:
+        markers += 1
+    if "вы сервис-центр" in html or "вы сервис центр" in html:
+        markers += 1
+    has_bypass = "do.control/login" in html
+    return has_bypass and markers >= 2
+
+
 def wait_login_or_form(page, timeout=60):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if "#admin" in page.url:
             return "already_logged_in"
-        if page.query_selector('input[name="login"]') is not None:
-            return "form"
+        try:
+            if page.query_selector('input[name="login"]') is not None:
+                return "form"
+        except Exception:
+            pass
+        try:
+            if is_maintenance_page(page):
+                return "maintenance"
+        except Exception:
+            pass
         time.sleep(1)
+    # Финальная проверка перед выходом: техработы могли подгрузиться поздно
+    try:
+        if is_maintenance_page(page):
+            return "maintenance"
+    except Exception:
+        pass
     return "none"
+
+
+def submit_do_control_login(page, login_, password):
+    """Заполнить и отправить форму обходного входа /do.control/login.
+
+    Разметка от пользователя: <input type="text" name="login">,
+    <input type="password" name="passwd">, кнопка
+    <div class="submit"><input type="submit" value="Enter"></div>.
+    Креды те же, что и для /office/login, капчи/SMS нет.
+    """
+    page.wait_for_selector('input[name="login"]', timeout=25000)
+    page.fill('input[name="login"]', login_)
+    page.fill('input[name="passwd"]', password)
+    clicked = False
+    for sel in (
+        'div.submit input[type="submit"]',
+        'input[type="submit"][value="Enter"]',
+        'input[type="submit"]',
+    ):
+        try:
+            if page.query_selector(sel) is not None:
+                page.click(sel, timeout=10000)
+                clicked = True
+                break
+        except Exception:
+            continue
+    if not clicked:
+        page.keyboard.press("Enter")
 
 
 def login(page, config):
@@ -260,6 +332,7 @@ def login(page, config):
 
     max_retries = 6
     for retry in range(max_retries):
+        login_url = url
         try:
             page.goto(url, timeout=60000)
             for _ in range(3):
@@ -270,14 +343,42 @@ def login(page, config):
                     return
                 if state == "form":
                     break
+                if state == "maintenance":
+                    print("Портал на техработах — вход через do.control/login")
+                    dump_diag(page, "maintenance_detected")
+                    # Обходной вход открываем напрямую в том же контексте:
+                    # клик по target="_blank" увёл бы в новую вкладку без сессии.
+                    login_url = config["portal_url"] + "/do.control/login"
+                    page.goto(login_url, timeout=60000)
+                    mstate = wait_login_or_form(page, timeout=25)
+                    if mstate == "already_logged_in":
+                        print("Сессия уже активна (do.control)")
+                        time.sleep(2)
+                        return
+                    if mstate == "maintenance":
+                        dump_diag(page, "do_control_maintenance")
+                        raise RuntimeError(
+                            "портал на техработах, обходной вход do.control/login недоступен"
+                        )
+                    if mstate != "form":
+                        raise TimeoutError("форма обходного входа do.control не появилась")
+                    break
                 print("Форма входа не загрузилась, перезагрузка страницы...")
                 page.reload(timeout=30000)
                 time.sleep(3)
             else:
                 raise TimeoutError("форма входа не появилась")
-            page.fill('input[name="login"]', login_)
-            page.fill('input[name="passwd"]', password)
-            page.keyboard.press("Enter")
+            if login_url.endswith("/do.control/login"):
+                try:
+                    submit_do_control_login(page, login_, password)
+                except RuntimeError:
+                    raise
+                except Exception as e:
+                    raise TimeoutError(f"форма обходного входа do.control не отправилась: {e}")
+            else:
+                page.fill('input[name="login"]', login_)
+                page.fill('input[name="passwd"]', password)
+                page.keyboard.press("Enter")
             deadline = time.time() + 150
             while time.time() < deadline:
                 if "#admin" in page.url:
@@ -288,11 +389,26 @@ def login(page, config):
             else:
                 raise TimeoutError("остались на странице входа")
             time.sleep(3)
-            print("Вход выполнен")
+            if login_url.endswith("/do.control/login"):
+                print("Вход выполнен через do.control (техработы)")
+            else:
+                print("Вход выполнен")
             return
         except Exception as e:
+            # Техработы с закрытым обходом — отдельная понятная причина,
+            # не маскируем её под generic «форма не появилась».
+            if "обходной вход do.control/login недоступен" in str(e):
+                print(f"Ошибка входа (попытка {retry + 1}/{max_retries}): {e}")
+                dump_diag(page, "do_control_maintenance")
+                if retry < max_retries - 1:
+                    time.sleep(30)
+                continue
             print(f"Ошибка входа (попытка {retry + 1}/{max_retries}): {e}")
-            dump_diag(page, f"login_failed_{retry + 1}")
+            try:
+                label = "do_control_login_failed" if login_url.endswith("/do.control/login") else "login_failed"
+                dump_diag(page, f"{label}_{retry + 1}")
+            except Exception:
+                dump_diag(page, f"login_failed_{retry + 1}")
             if retry < max_retries - 1:
                 time.sleep(30)
     raise RuntimeError("Вход не удался после всех попыток")
