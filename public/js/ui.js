@@ -433,15 +433,16 @@
   // Разметка лупы для зоны .zoom-zone (каталог, модалка товара, чат).
   // Клип и liquid-glass фильтр применяются внутри SVG — там clip-path работает
   // после фильтра, и увеличенное фото не вылезает квадратом за круг.
-  // Подложка прозрачная (никаких белых щелей у кромки), блика-«солнца» нет —
-  // внутри круга только увеличенное фото. Кольцо кромки — едва видимый контур.
+  // Кольцо кромки — матовость края как в iOS; .zoom-glass — верхний спекулар (CSS).
+  // .zoom-glass — чисто декоративный слой liquid glass поверх (стили в CSS),
+  // на базовые фото и механику лупы не влияет.
   function lensHtml() {
     return '<span class="zoom-lens" aria-hidden="true">' +
       '<svg class="zoom-lens-svg" viewBox="0 0 100 100" preserveAspectRatio="none">' +
-      '<circle cx="50" cy="50" r="50" fill="none"/>' +
+      '<circle cx="50" cy="50" r="50" fill="#fff"/>' +
       '<image filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none" image-rendering="optimizeQuality"/>' +
-      '<circle cx="50" cy="50" r="46.5" fill="none" stroke="url(#glLensRim)" stroke-width="5" opacity="0.12" filter="url(#glLensRimSoft)"/>' +
-      '</svg></span>';
+      '<circle cx="50" cy="50" r="46.5" fill="none" stroke="url(#glLensRim)" stroke-width="5" opacity="0.3" filter="url(#glLensRimSoft)"/>' +
+      '</svg><span class="zoom-glass" aria-hidden="true"></span></span>';
   }
 
   var WEEK_DAYS = [['mon', 'Пн'], ['tue', 'Вт'], ['wed', 'Ср'], ['thu', 'Чт'], ['fri', 'Пт'], ['sat', 'Сб'], ['sun', 'Вс']];
@@ -609,6 +610,12 @@
     var LENS_RIM_START = 0.62;
     var LENS_RIM_POWER = 2.4;
     var LENS_RIM_SCALE = 26;
+    // Запас покрытия слоя (ед. viewBox, с каждой стороны): outward-загиб кромки
+    // сдвигает пиксели наружу до ~13 ед. (0.5 * RIM_SCALE), и без запаса у края
+    // круга обнажается подложка — белые рамки. Слой кладётся шире на 2*BLEED
+    // симметрично, поэтому центровка (точка под курсором — в центре линзы)
+    // и сила фишая не меняются.
+    var LENS_BLEED = 16;
 
     function buildWarpMap(size) {
       var c = document.createElement('canvas');
@@ -633,11 +640,8 @@
           var ux = r > 0 ? dx / r : 0;
           var uy = r > 0 ? dy / r : 0;
           var i = (y * size + x) * 4;
-          // Смещение ВНУТРЬ (знак минус): кромка слегка сжимается к центру,
-          // фото всегда полностью покрывает круг — белых щелей у края нет.
-          // (Со знаком плюс кромка разъезжалась наружу и обнажала подложку.)
-          d[i] = 128 - ux * edge * 127.5;
-          d[i + 1] = 128 - uy * edge * 127.5;
+          d[i] = 128 + ux * edge * 127.5;
+          d[i + 1] = 128 + uy * edge * 127.5;
           d[i + 2] = 128;
           d[i + 3] = 255;
         }
@@ -647,8 +651,8 @@
     }
 
     // Общие defs: круглый клип (после фильтра) и fisheye-фильтр.
-    // Координаты фильтра — в системе viewBox лупы (0..100) с запасом −20..120,
-    // чтобы вытесненное/блюренное содержимое не обрезалось по краю круга.
+    // Регион фильтра — с запасом −20..120: outward-загиб кромки вытесняет
+    // пиксели за пределы 0..100, без запаса они обрезались бы (белые рамки).
     function ensureDefs() {
       if (defsReady) return;
       defsReady = true;
@@ -709,8 +713,8 @@
 
         defs.appendChild(clip);
         defs.appendChild(filter);
-        // Кромка: едва видимый тёмный контур в тон тени (без белых стопов —
-        // белый градиент давал молочную плёнку по ободу). Статика.
+        // Кромка liquid glass: градиент кольца (сверху светлое, снизу тёмное)
+        // и мягкий блюр только кольца — матовость края как в iOS. Статика.
         var rimGrad = document.createElementNS(NS, 'linearGradient');
         rimGrad.setAttribute('id', 'glLensRim');
         rimGrad.setAttribute('x1', '0');
@@ -719,12 +723,12 @@
         rimGrad.setAttribute('y2', '1');
         var rimStop1 = document.createElementNS(NS, 'stop');
         rimStop1.setAttribute('offset', '0');
-        rimStop1.setAttribute('stop-color', '#0a3520');
-        rimStop1.setAttribute('stop-opacity', '0.10');
+        rimStop1.setAttribute('stop-color', '#ffffff');
+        rimStop1.setAttribute('stop-opacity', '0.18');
         var rimStop2 = document.createElementNS(NS, 'stop');
         rimStop2.setAttribute('offset', '0.55');
-        rimStop2.setAttribute('stop-color', '#0a3520');
-        rimStop2.setAttribute('stop-opacity', '0.06');
+        rimStop2.setAttribute('stop-color', '#ffffff');
+        rimStop2.setAttribute('stop-opacity', '0.08');
         var rimStop3 = document.createElementNS(NS, 'stop');
         rimStop3.setAttribute('offset', '1');
         rimStop3.setAttribute('stop-color', '#0a3520');
@@ -791,12 +795,13 @@
       lens.style.setProperty('--lens-x', (x - lensSize / 2) + 'px');
       lens.style.setProperty('--lens-y', (y - lensSize / 2) + 'px');
       // Координаты 0..100 (viewBox лупы): картинка кладётся так, чтобы
-      // точка под курсором оказалась в центре линзы.
+      // точка под курсором оказалась в центре линзы. Слой шире круга
+      // на 2*LENS_BLEED симметрично — запас под outward-загиб кромки.
       var k = 100 / lensSize;
-      layer.setAttribute('x', (50 - x * zoom * k).toFixed(2));
-      layer.setAttribute('y', (50 - y * zoom * k).toFixed(2));
-      layer.setAttribute('width', (imgW * zoom * k).toFixed(2));
-      layer.setAttribute('height', (imgH * zoom * k).toFixed(2));
+      layer.setAttribute('x', (50 - x * zoom * k - LENS_BLEED).toFixed(2));
+      layer.setAttribute('y', (50 - y * zoom * k - LENS_BLEED).toFixed(2));
+      layer.setAttribute('width', (imgW * zoom * k + 2 * LENS_BLEED).toFixed(2));
+      layer.setAttribute('height', (imgH * zoom * k + 2 * LENS_BLEED).toFixed(2));
     }
 
     document.addEventListener('pointermove', function (e) {
