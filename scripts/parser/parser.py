@@ -1530,6 +1530,7 @@ def ensure_full_catalog(base_products, goods, config):
             "category": category,
             "price": 0,
             "partner_price": 0,
+            "pv": 0,
             "quantity": 0,
             "image": image or image_for_category(category, categories),
             "status": "out",
@@ -1571,6 +1572,7 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
         p.setdefault("eta", None)
         p.setdefault("incoming", None)
         p.setdefault("description", "")
+        p.setdefault("pv", 0)
 
     by_code = base_index(base_products)
     created = 0
@@ -1582,6 +1584,10 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
         category = classify_category(it["name"], categories)
         price = round(it["sale_price"] * multiplier)
         partner_price = round(it["sale_price"])
+        try:
+            pv = float(it.get("pv") or 0)
+        except (TypeError, ValueError):
+            pv = 0
         img = images.get(code)
         card = by_code.get(code)
         if card is None:
@@ -1592,6 +1598,7 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
                 "category": category,
                 "price": price,
                 "partner_price": partner_price,
+                "pv": pv,
                 "quantity": 0,
                 "image": img or image_for_category(category, categories),
                 "status": "out",
@@ -1606,11 +1613,17 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
             # Инкрементальный режим: существующие карточки трогаем только по количеству.
             # Исключение — заглушка из накладной (pending): достраиваем её полными
             # данными один раз, как только артикул появился в каталоге продажи.
+            # PV при этом обновляем всегда: это дешёвое поле из той же строки
+            # каталога, без доп. запросов к порталу.
+            if pv:
+                card["pv"] = pv
             if full or card.get("pending"):
                 card["name"] = it["name"]
                 card["category"] = category
                 card["price"] = price
                 card["partner_price"] = partner_price
+                if pv:
+                    card["pv"] = pv
                 if img:
                     card["image"] = img
                 if card.get("pending"):
@@ -1872,6 +1885,7 @@ def ensure_cards_from_moves(page, base_products, moves, config):
             "category": category,
             "price": 0,
             "partner_price": 0,
+            "pv": 0,
             "quantity": 0,
             "image": img_rel or image_for_category(category, categories),
             "status": "out",

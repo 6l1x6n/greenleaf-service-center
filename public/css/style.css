@@ -1047,6 +1047,11 @@ a:hover { text-decoration: none; }
 @media (max-width: 420px) {
   .row-foot { flex-wrap: wrap; }
   .row-prices { width: 100%; }
+  /* Компактная цена в одну строку: 11 500 ₸ + −50% влезают без переноса */
+  .row-prices .card-prices, .pdetail-price { gap: 6px; }
+  .row-prices .price-partner, .pdetail-price .price-partner { font-size: 18px; }
+  .row-prices .price-old, .pdetail-price .price-old { font-size: 12px; }
+  .row-prices .badge-sale, .pdetail-price .badge-sale { font-size: 11px; padding: 2px 7px; }
   .row-actions { width: 100%; min-width: 0; }
   .row-actions .row-add { flex: 1; width: auto; }
   .row-actions .qty-stepper { flex: 1; justify-content: space-between; }
@@ -1099,12 +1104,16 @@ a:hover { text-decoration: none; }
 .card-sku { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .card-price { font-size: 22px; font-weight: 800; color: var(--green-dark); }
 .card-prices { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.price-old { font-size: 14px; color: var(--muted); text-decoration: line-through; font-weight: 600; }
-.price-partner { font-size: 22px; font-weight: 800; color: var(--green-dark); }
+/* Цена + скидка + бейдж всегда в одну строку: при 5-значных суммах
+   (11 500 ₸) бейдж −50% раньше падал на вторую строку на телефонах */
+.row-prices .card-prices, .pdetail-price { flex-wrap: nowrap; white-space: nowrap; }
+.price-old { font-size: 14px; color: var(--muted); text-decoration: line-through; font-weight: 600; white-space: nowrap; }
+.price-partner { font-size: 22px; font-weight: 800; color: var(--green-dark); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .price-ask { font-size: 15px; font-weight: 700; color: var(--muted); }
 .badge-sale {
   display: inline-flex;
   align-items: center;
+  flex: none;
   padding: 3px 9px;
   border-radius: 999px;
   font-size: 12px;
@@ -1112,6 +1121,22 @@ a:hover { text-decoration: none; }
   background: var(--green);
   color: #fff;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+/* PV-баллы: компактный серо-зелёный бейдж рядом с артикулом/ценой, в одну строку */
+.pv-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #eef4ff;
+  color: #2f6bb3;
+  border: 1px solid #d6e4f8;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 .partner-link {
   font-size: 12.5px;
@@ -3039,6 +3064,23 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
   border-radius: 50%;
   background: #7ee2a0;
   border: 2px solid #fff;
+}
+/* Проактив Исы: красная точка «новое сообщение» + настойчивая пульсация */
+.ai-fab.has-nudge .ai-fab-dot {
+  background: #ff5a5a;
+  width: 14px;
+  height: 14px;
+  top: 4px;
+  left: 8px;
+  border-width: 2px;
+}
+.ai-fab.has-nudge { animation: fabNudge 1.1s ease-in-out infinite; }
+@keyframes fabNudge {
+  0%, 100% { box-shadow: 0 8px 24px rgba(10, 53, 32, 0.35), 0 0 0 0 rgba(255, 90, 90, 0.55); }
+  50% { box-shadow: 0 8px 24px rgba(10, 53, 32, 0.35), 0 0 22px 6px rgba(255, 90, 90, 0.65); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-fab.has-nudge { animation: none; }
 }
 .ai-fab-hide {
   position: absolute;

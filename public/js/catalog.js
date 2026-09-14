@@ -207,6 +207,7 @@
       (moveSkuMap[p.id] ? '<span class="meta-note">🚚 В пути · ' + Utils.fmtDate(moveSkuMap[p.id].eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>' : '') +
       (st.note ? '<span class="meta-note">' + Utils.esc(st.note) + '</span>' : '') +
       '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
+      pvBadge(p) +
       '</div>' +
       '</div>' +
       '<div class="row-foot">' +
@@ -227,6 +228,14 @@
     var v = p.partner_price;
     if (typeof v !== 'number' || isNaN(v)) v = Math.round(p.price / 2);
     return v;
+  }
+
+  // PV-баллы товара (партнёрская выгода из базы парсера). 0/пусто — не показываем.
+  function pvBadge(p) {
+    var v = p && p.pv != null ? Number(p.pv) : 0;
+    if (!isFinite(v) || v <= 0) return '';
+    var txt = (Math.round(v * 100) / 100).toString();
+    return '<span class="pv-badge" title="PV-баллы: начисляются партнёру за покупку">PV ' + Utils.esc(txt) + '</span>';
   }
 
   function selectedStore() {
@@ -459,6 +468,7 @@
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 style="margin:2px 0 0;">' + Utils.esc(p.name) + '</h3>' +
       '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
+      pvBadge(p) +
       '<a class="partner-link" href="podpiska.html">Партнёрам −50% · Подробнее →</a>' +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +

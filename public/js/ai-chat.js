@@ -96,8 +96,9 @@
     panel.classList.remove('hidden');
     if (!greeted && !hist.length) {
       greeted = true;
-      addBotHtml('Здравствуйте! Я Иса, помогу подобрать товары Greenleaf. Напишите, что ищете — например, «что есть для мозга» или «какие витаминки есть».');
-      renderChips(['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы']);
+      sayBotHtml('Здравствуйте! Я Иса, помогу подобрать товары Greenleaf. Напишите, что ищете — например, «что есть для мозга» или «какие витаминки есть».', function (box) {
+        renderChips(['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы'], box);
+      });
     }
     setTimeout(function () {
       try { body.scrollTop = body.scrollHeight; } catch (e) { }
@@ -188,8 +189,9 @@
     if (panel.classList.contains('hidden')) openPanel();
     else {
       greeted = true;
-      addBotHtml('Новый диалог. Спросите про товары — например, «что есть для мозга» или «какие витаминки есть».');
-      renderChips(['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы']);
+      sayBotHtml('Новый диалог. Спросите про товары — например, «что есть для мозга» или «какие витаминки есть».', function (box) {
+        renderChips(['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы'], box);
+      });
     }
   });
 
@@ -318,6 +320,32 @@
     body.appendChild(d);
     scrollBottom();
     return d;
+  }
+
+  // «Человеческая» подача мгновенных ответов: сначала пузырь «печатает…»
+  // с задержкой по длине текста (как живой менеджер), затем текст и карточки.
+  // HTML не печатаем посимвольно (ломает разметку) — эффект даёт пауза + точки.
+  function reducedMotion() {
+    try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+
+  function humanDelay(text) {
+    if (reducedMotion()) return 120;
+    var n = String(text || '').length;
+    return Math.min(1300, 450 + n * 5);
+  }
+
+  // sayBotHtml(html, after): показать «печатает…», затем сообщение.
+  // after(box) — дорисовка карточек/кнопок/чипов после появления текста.
+  function sayBotHtml(html, after) {
+    var typing = addTyping();
+    var delay = humanDelay(html.replace(/<[^>]+>/g, ' '));
+    setTimeout(function () {
+      try { typing.remove(); } catch (e) { }
+      if (panel.classList.contains('hidden')) return;
+      var box = addBotHtml(html);
+      if (after) { try { after(box); } catch (e) { } }
+    }, delay);
   }
 
   // Подсказки-кнопки: приветствие — стандартный набор, дальше — от сервера.
@@ -474,6 +502,7 @@
 
   function prodCard(p) {
     var price = Number(p.price) > 0 ? fmtPrice(p.price) : 'Цена по запросу';
+    var pv = Number(p.pv) > 0 ? '<span class="pv-badge">PV ' + esc(Math.round(Number(p.pv) * 100) / 100) + '</span>' : '';
     var st = p.stockState || (p.inStock ? 'in' : 'out');
     var stock = st === 'in'
       ? '<span class="ai-prod-stock ok">В наличии</span>'
@@ -488,7 +517,7 @@
       '</span>' +
       '<div class="ai-prod-info">' +
       '<div class="ai-prod-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>' +
-      '<div class="ai-prod-meta"><span class="ai-prod-price">' + esc(price) + '</span>' + stock + '</div>' +
+      '<div class="ai-prod-meta"><span class="ai-prod-price">' + esc(price) + '</span>' + stock + pv + '</div>' +
       '</div>' +
       '<div class="ai-prod-side">' + cartControlHtml(p.id) + '</div>' +
       '</div>';
@@ -548,19 +577,20 @@
     var q = String(text || '').trim();
     if (!q || pending) return;
 
-    // Корзина — мгновенный локальный ответ
+    // Корзина — мгновенный локальный ответ (с «человеческой» паузой)
     var local = localCartAnswer(q);
     if (local) {
       closeChips();
       addUser(q);
-      var lbox = addBotHtml(esc(local.reply).replace(/\n/g, '<br>'));
-      renderProducts(lbox, local.products);
-      renderActions(lbox, local.actions);
-      renderChips(local.chips, lbox);
-      renderFeedback(lbox, q, local.reply);
       hist.push({ role: 'user', text: q });
       hist.push({ role: 'assistant', text: local.reply, products: local.products, actions: local.actions });
       saveHist(hist);
+      sayBotHtml(esc(local.reply).replace(/\n/g, '<br>'), function (lbox) {
+        renderProducts(lbox, local.products);
+        renderActions(lbox, local.actions);
+        renderChips(local.chips, lbox);
+        renderFeedback(lbox, q, local.reply);
+      });
       if (canHover()) { try { input.focus(); } catch (e) { } }
       return;
     }
@@ -738,6 +768,106 @@
       }, { rootMargin: '0px 0px -40px 0px', threshold: 0 }).observe(footer);
     } catch (e) { }
   })();
+
+  // ---------------- Проактив: «долго выбирает» ----------------
+  // Клиент idle N секунд — Иса ненавязчиво предлагает помощь (1 раз в сутки).
+  // Панель открыта → сообщение в чат; закрыта → красный бейдж на кнопке
+  // (панель силой не открываем). Кнопка скрыта пользователем — не тревожим вовсе.
+  var NUDGE_DELAY = 45000;
+  var NUDGE_KEY = 'greenleaf_ai_nudge_v1';
+  var NUDGE_TEXT = 'Привет! Я Иса 👋 Вижу, вы выбираете — помочь с товарами, адресом или поставкой?';
+  var NUDGE_CHIPS = ['🔍 Помоги подобрать', '📍 Адрес и часы', '🚚 Когда поставка?'];
+  var nudgeTimer = null;
+  var nudgePending = false;
+
+  function nudgeDoneToday() {
+    try {
+      return localStorage.getItem(NUDGE_KEY) === new Date().toISOString().slice(0, 10);
+    } catch (e) { return false; }
+  }
+
+  function nudgeMarkDone() {
+    try { localStorage.setItem(NUDGE_KEY, new Date().toISOString().slice(0, 10)); } catch (e) { }
+  }
+
+  // Короткий «динь» нового сообщения без аудиофайла (WebAudio, тихо).
+  // Без жеста пользователя браузер может заблокировать звук — тогда только бейдж.
+  function playNudgeSound() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      var ctx = playNudgeSound.ctx || (playNudgeSound.ctx = new AC());
+      if (ctx.state === 'suspended') { ctx.resume().catch(function () { }); return; }
+      var t = ctx.currentTime;
+      [660, 880].forEach(function (f, i) {
+        var o = ctx.createOscillator();
+        var g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t + i * 0.13);
+        g.gain.exponentialRampToValueAtTime(0.12, t + i * 0.13 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.13 + 0.12);
+        o.connect(g).connect(ctx.destination);
+        o.start(t + i * 0.13);
+        o.stop(t + i * 0.13 + 0.14);
+      });
+    } catch (e) { /* без звука — не страшно */ }
+    try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) { }
+  }
+
+  function fireNudge() {
+    nudgeTimer = null;
+    if (nudgeDoneToday() || isHidden()) return;
+    nudgeMarkDone();
+    playNudgeSound();
+    if (!panel.classList.contains('hidden')) {
+      sayBotHtml(esc(NUDGE_TEXT), function (box) { renderChips(NUDGE_CHIPS, box); });
+    } else {
+      nudgePending = true;
+      fab.classList.add('has-nudge');
+    }
+  }
+
+  function resetNudgeTimer() {
+    if (nudgeTimer) clearTimeout(nudgeTimer);
+    if (nudgeDoneToday()) return;
+    nudgeTimer = setTimeout(fireNudge, NUDGE_DELAY);
+  }
+
+  var _lastAct = 0;
+  function activityTick() {
+    var now = Date.now();
+    if (now - _lastAct < 2000) return;
+    _lastAct = now;
+    resetNudgeTimer();
+  }
+  try {
+    document.addEventListener('pointerdown', activityTick, { passive: true });
+    document.addEventListener('keydown', activityTick);
+    document.addEventListener('scroll', activityTick, { passive: true });
+    document.addEventListener('cart:change', activityTick);
+  } catch (e) { }
+  resetNudgeTimer();
+
+  var _openPanel = openPanel;
+  openPanel = function () {
+    _openPanel();
+    if (nudgePending) {
+      nudgePending = false;
+      fab.classList.remove('has-nudge');
+      // Приветствие уже показано — нудж следующим сообщением
+      sayBotHtml(esc(NUDGE_TEXT), function (box) { renderChips(NUDGE_CHIPS, box); });
+    } else {
+      fab.classList.remove('has-nudge');
+    }
+  };
+
+  var _hideFab = hideFab;
+  hideFab = function () {
+    nudgePending = false;
+    try { fab.classList.remove('has-nudge'); } catch (e) { }
+    _hideFab();
+  };
 
   applyFabVisibility();
 })();

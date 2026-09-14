@@ -343,13 +343,20 @@
     if (el) el.value = value;
   }
 
+  function pvText(p) {
+    var v = p && p.pv != null ? Number(p.pv) : 0;
+    if (!isFinite(v) || v <= 0) return '';
+    return 'PV ' + (Math.round(v * 100) / 100).toString();
+  }
+
   function itemHtml(l, unavailable) {
+    var pv = pvText(l.p);
     return '<div class="cart-item' + (unavailable ? ' cart-item-unavailable' : '') + '">' +
       '<button class="cart-item-x" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Удалить из корзины">' + Utils.iconX(13) + '</button>' +
       '<div class="cart-item-media"><img src="' + Utils.esc(Utils.img(l.p.image || 'assets/images/products/placeholder.svg')) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
       '<div class="cart-item-body">' +
       '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
-      '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + '</div>' +
+      '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + (pv ? ' · <span class="pv-badge">' + Utils.esc(pv) + '</span>' : '') + '</div>' +
       '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + '</div>' +
       (unavailable ? '<div class="cart-item-unavailable-note">Нет в выбранном филиале — не войдёт в заказ</div>' : '') +
       '</div>' +

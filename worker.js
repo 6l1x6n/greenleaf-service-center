@@ -1532,7 +1532,7 @@ async function handleAdminProducts(request, env) {
       const u = updates[pid];
       if (!u || typeof u !== 'object') return;
       const clean = {};
-      ['price', 'description', 'category', 'status', 'discount_price', 'eta', 'incoming', 'priority'].forEach(function (f) {
+      ['price', 'description', 'category', 'status', 'discount_price', 'eta', 'incoming', 'priority', 'pv'].forEach(function (f) {
         if (u[f] === undefined || u[f] === null) return;
         // Пустое значение = вернуть значение по умолчанию (снять оверрайд поля)
         if (u[f] === '') {
@@ -1542,7 +1542,7 @@ async function handleAdminProducts(request, env) {
           }
           return;
         }
-        clean[f] = (f === 'price' || f === 'discount_price' || f === 'priority') ? Number(u[f]) : u[f];
+        clean[f] = (f === 'price' || f === 'discount_price' || f === 'priority' || f === 'pv') ? Number(u[f]) : u[f];
       });
       if (typeof u.hidden === 'boolean') clean.hidden = u.hidden;
       if (typeof u.hit === 'boolean') clean.hit = u.hit;
@@ -1594,6 +1594,7 @@ async function handleAdminProducts(request, env) {
       category: String(p.category || '').trim() || 'Прочее',
       price: price,
       discount_price: (p.discount_price !== undefined && p.discount_price !== '' && !isNaN(Number(p.discount_price))) ? Number(p.discount_price) : null,
+      pv: (p.pv !== undefined && p.pv !== '' && !isNaN(Number(p.pv))) ? Number(p.pv) : 0,
       description: String(p.description || '').trim(),
       priority: (p.priority !== undefined && p.priority !== '' && p.priority !== null) ? Number(p.priority) : null,
       showDiscount: p.showDiscount !== false,
@@ -1739,6 +1740,7 @@ async function handleProductsJson(request, env, url) {
     if (!o) return;
     if (o.price !== undefined && o.price !== '' && o.price !== null) p.price = Number(o.price);
     if (o.discount_price !== undefined && o.discount_price !== '' && o.discount_price !== null) p.discount_price = Number(o.discount_price);
+    if (o.pv !== undefined && o.pv !== '' && o.pv !== null) p.pv = Number(o.pv);
     if (o.description) p.description = o.description;
     if (o.category) p.category = o.category;
     if (o.status) p.status = o.status;
@@ -1762,6 +1764,7 @@ async function handleProductsJson(request, env, url) {
       category: c.category || 'Прочее',
       price: o.price != null ? Number(o.price) : Number(c.price || 0),
       discount_price: o.discount_price != null ? Number(o.discount_price) : (c.discount_price != null ? Number(c.discount_price) : null),
+      pv: o.pv != null ? Number(o.pv) : Number(c.pv || 0),
       description: o.description || c.description || '',
       status: o.status || c.status || 'in_stock',
       eta: c.eta || '',
@@ -1936,6 +1939,7 @@ async function loadAiCatalog(env, url, storeId) {
       norm: aiNorm(String(p.name || '') + ' ' + (p.sku || p.id) + ' ' + (o.category || p.category || '')),
       category: String(o.category || p.category || ''),
       price: price,
+      pv: Number(o.pv != null ? o.pv : (p.pv || 0)) || 0,
       image: String(p.image || ''),
       status: String(o.status || p.status || ''),
       priority: Number((o.priority != null ? o.priority : p.priority) || 0) || (p.hit ? 1 : 0),
@@ -2029,6 +2033,25 @@ const AI_ALIAS = [
     search: ['хозяйствен', 'мыло', 'сода', 'энзим'],
     pin: ['ASF068', 'ASF036'],
     note: '"зелёное мыло" у клиентов = Хозяйственное мыло с содой и энзимами (ASF068).'
+  },
+  {
+    keys: ['дезодорант', 'дезик', 'антиперспирант', 'антиперспир'],
+    search: ['дезодорант', 'антиперспирант'],
+    pin: ['CBE037', 'CBA053'],
+    anti: ['дезодоратор', 'дезодорирующ', 'труб', 'холодильник', 'одежд'],
+    note: '"дезодорант / антиперспирант / шариковый" = только средства для тела (CBE037, CBA053). "Дезодоратор для труб/холодильника" и "дезодорирующее средство для одежды" — совсем другие товары, их НЕ предлагай и не называй.'
+  },
+  {
+    keys: ['morereal'],
+    search: ['morereal', 'древес', 'полотенце'],
+    pin: ['MSA001'],
+    note: '"MOREREAL кухонное полотенце из древесного волокна" по факту — это тряпки/салфетки из древесного волокна 25*25 см для кухни, а не банное махровое полотенце. Так и объясни клиенту.'
+  },
+  {
+    keys: ['древес'], need: ['полотенце', 'тряпк', 'салфетк', 'кухон'],
+    search: ['morereal', 'древес', 'полотенце'],
+    pin: ['MSA001'],
+    note: '"Кухонное полотенце из древесного волокна" (MOREREAL) по факту — это тряпки/салфетки из древесного волокна 25*25 см для кухни, а не банное махровое полотенце. Так и объясни клиенту.'
   }
 ];
 
@@ -2124,6 +2147,13 @@ function aiSearch(catalog, query, storeId, limit) {
     if (kids) {
       if (AI_INTENT_KIDS_HIT.some(function (h) { return aiTokHit(p.norm, h); })) score += 8;
       if (AI_INTENT_KIDS_ANTI.some(function (a) { return aiTokHit(p.norm, a); })) { score -= 10; antiHit = true; }
+    }
+    // Алиас с anti-списком (напр. «дезодорант» ≠ «дезодоратор»):
+    // чужое назначение уводим глубоко вниз, чтобы пины были первыми,
+    // а чужое не попадало даже в «плюс 2» хвоста.
+    if (alias && alias.anti && alias.anti.some(function (a) { return aiTokHit(p.norm, a); })) {
+      score -= 30;
+      antiHit = true;
     }
     if (score <= 0) continue;
     // Порог релевантности: совпал только с расплывчатыми токенами
@@ -2682,7 +2712,7 @@ async function handleAiChat(request, env, url) {
     const etaIso = moves.skuEta[String(p.sku || '').toUpperCase()] || '';
     return {
       id: p.id, sku: p.sku, name: p.name, category: p.category,
-      price: p.price, image: p.image, status: p.status,
+      price: p.price, pv: Number(p.pv || 0) || 0, image: p.image, status: p.status,
       inStock: av.state === 'in', stockState: av.state, count: av.count,
       eta: etaIso, etaText: etaIso ? aiFmtDay(etaIso) : ''
     };
