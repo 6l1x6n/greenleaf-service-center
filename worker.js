@@ -2565,10 +2565,22 @@ function aiInstant(ctx) {
     }
   }
 
-  // 7б. Точный артикул/название или явный вопрос «есть ли / в наличии»: цена и наличие без ИИ
+  // 7б. Точный артикул/название или явный вопрос «есть ли / в наличии»: цена и наличие без ИИ.
+  // Точный товар ищем по артикулу среди найденных, а НЕ products[0]: при сортировке
+  // «в наличии → неизвестно → нет» точный товар без остатка уходит в хвост,
+  // а products[0] — чужой товар в наличии (был баг: «CBE037» отвечал про крем CBE035).
   let exactProduct = null;
   if (ctx.foundExact && products.length) {
-    exactProduct = products[0];
+    const qSku = q.toUpperCase().replace(/\s+/g, '');
+    exactProduct = products.find(function (p) {
+      return String(p.sku || '').toUpperCase().replace(/\s+/g, '') === qSku;
+    }) || null;
+    if (!exactProduct) {
+      const qNorm = aiNorm(q);
+      exactProduct = products.find(function (p) {
+        return qNorm.length >= 4 && p.name && aiNorm(p.name).indexOf(qNorm) !== -1;
+      }) || products[0];
+    }
   } else {
     const normSku = q.toUpperCase().replace(/\s+/g, '');
     const hit = ctx.catalog.find(function (p) {
@@ -2588,9 +2600,10 @@ function aiInstant(ctx) {
       availTxt = 'сейчас нет в наличии' + (eta ? ', ожидается ≈ ' + aiFmtDay(eta) : '');
     }
     const needWa = exactProduct.stockState !== 'in';
+    const rest = products.filter(function (p) { return String(p.id) !== String(exactProduct.id); }).slice(0, 2);
     return {
       reply: '«' + exactProduct.name + '» — ' + priceTxt + ', ' + availTxt + '.',
-      products: [exactProduct].concat(products.slice(1, 3)),
+      products: [exactProduct].concat(rest),
       actions: needWa ? waAct : [],
       chips: AI_CHIPS_PRODUCT
     };
