@@ -356,8 +356,8 @@
       '<div class="cart-item-media"><img src="' + Utils.esc(Utils.img(l.p.image || 'assets/images/products/placeholder.svg')) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
       '<div class="cart-item-body">' +
       '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
-      '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + (pv ? ' · <span class="pv-badge">' + Utils.esc(pv) + '</span>' : '') + '</div>' +
-      '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + '</div>' +
+      '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + '</div>' +
+      '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + (pv ? ' <span class="pv-badge">' + Utils.esc(pv) + '</span>' : '') + '</div>' +
       (unavailable ? '<div class="cart-item-unavailable-note">Нет в выбранном филиале — не войдёт в заказ</div>' : '') +
       '</div>' +
       '<div class="cart-item-ctrl">' +

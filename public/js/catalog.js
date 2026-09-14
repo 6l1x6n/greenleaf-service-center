@@ -189,6 +189,8 @@
           '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
           '<span class="badge-sale">-50%</span>';
       }
+      // PV-баллы — справа от цен, в том же ряду (без цены не показываем)
+      if (prices.price > 0) priceHtml += pvBadge(p);
     }
 
     return '' +
@@ -207,7 +209,6 @@
       (moveSkuMap[p.id] ? '<span class="meta-note">🚚 В пути · ' + Utils.fmtDate(moveSkuMap[p.id].eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>' : '') +
       (st.note ? '<span class="meta-note">' + Utils.esc(st.note) + '</span>' : '') +
       '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      pvBadge(p) +
       '</div>' +
       '</div>' +
       '<div class="row-foot">' +
@@ -441,6 +442,8 @@
         '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
         '<span class="badge-sale">-50%</span>';
     }
+    // PV-баллы — справа от цен, в том же ряду
+    if (prices.price > 0) priceHtml += pvBadge(p);
     var sel = selectedStore();
     var stockRows = '';
     var storeStockLines = [];
@@ -468,7 +471,6 @@
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 style="margin:2px 0 0;">' + Utils.esc(p.name) + '</h3>' +
       '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      pvBadge(p) +
       '<a class="partner-link" href="podpiska.html">Партнёрам −50% · Подробнее →</a>' +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +

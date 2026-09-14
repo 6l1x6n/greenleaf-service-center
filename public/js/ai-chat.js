@@ -95,9 +95,13 @@
     showFab();
     panel.classList.remove('hidden');
     if (!greeted && !hist.length) {
-      greeted = true;
+      // Флаг — в момент показа, а не постановки в очередь: иначе быстрое
+      // «открыл-закрыл-открыл» даст два приветствия подряд.
       sayBotHtml('Здравствуйте! Я Иса, помогу подобрать товары Greenleaf. Напишите, что ищете — например, «что есть для мозга» или «какие витаминки есть».', function (box) {
-        renderChips(['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы'], box);
+        if (greeted) return;
+        greeted = true;
+        // Висящий нудж вливаем сюда же чипами — второго сообщения не будет
+        renderChips(nudgePending ? NUDGE_CHIPS : ['🧠 Что есть для мозга?', '💊 Какие витаминки есть?', '🧴 Что для дома?', '📍 Адрес и часы'], box);
       });
     }
     setTimeout(function () {
@@ -182,6 +186,7 @@
   // «Новый диалог»: чистим историю (в т.ч. старые ошибки Исы) и экран
   var aiNew = document.getElementById('aiNew');
   if (aiNew) aiNew.addEventListener('click', function () {
+    if (saying) return; // печать идёт — повторный ↺ не дублирует сообщение
     hist = [];
     saveHist(hist);
     body.innerHTML = '';
@@ -337,14 +342,31 @@
 
   // sayBotHtml(html, after): показать «печатает…», затем сообщение.
   // after(box) — дорисовка карточек/кнопок/чипов после появления текста.
+  // Очередь: одновременно только один пузырёк «печатает…» — никаких
+  // двойных индикаторов и сообщений друг за другом.
+  var sayQueue = [];
+  var saying = false;
+
   function sayBotHtml(html, after) {
+    sayQueue.push({ html: html, after: after });
+    pumpSay();
+  }
+
+  function pumpSay() {
+    if (saying) return;
+    var job = sayQueue.shift();
+    if (!job) return;
+    saying = true;
     var typing = addTyping();
-    var delay = humanDelay(html.replace(/<[^>]+>/g, ' '));
+    var delay = humanDelay(String(job.html).replace(/<[^>]+>/g, ' '));
     setTimeout(function () {
       try { typing.remove(); } catch (e) { }
-      if (panel.classList.contains('hidden')) return;
-      var box = addBotHtml(html);
-      if (after) { try { after(box); } catch (e) { } }
+      saying = false;
+      if (!panel.classList.contains('hidden')) {
+        var box = addBotHtml(job.html);
+        if (job.after) { try { job.after(box); } catch (e) { } }
+      }
+      pumpSay();
     }, delay);
   }
 
@@ -770,9 +792,10 @@
   })();
 
   // ---------------- Проактив: «долго выбирает» ----------------
-  // Клиент idle N секунд — Иса ненавязчиво предлагает помощь (1 раз в сутки).
-  // Панель открыта → сообщение в чат; закрыта → красный бейдж на кнопке
-  // (панель силой не открываем). Кнопка скрыта пользователем — не тревожим вовсе.
+  // Клиент idle N секунд — Иса предлагает помощь (1 раз в сутки).
+  // Панель открыта → сообщение в чат; закрыта → на ПК сами открываем чат,
+  // на телефоне только синий бейдж (панель не дёргаем).
+  // Кнопка скрыта пользователем — не тревожим вовсе.
   var NUDGE_DELAY = 45000;
   var NUDGE_KEY = 'greenleaf_ai_nudge_v1';
   var NUDGE_TEXT = 'Привет! Я Иса 👋 Вижу, вы выбираете — помочь с товарами, адресом или поставкой?';
@@ -818,12 +841,26 @@
   function fireNudge() {
     nudgeTimer = null;
     if (nudgeDoneToday() || isHidden()) return;
+    // Не перебиваем живой диалог: ждём ответ сервера или идёт печать —
+    // переносим нудж, а не дублируем пузыри
+    if (pending || saying || body.querySelector('.ai-typing-msg')) {
+      nudgeTimer = setTimeout(fireNudge, 20000);
+      return;
+    }
     nudgeMarkDone();
     playNudgeSound();
     if (!panel.classList.contains('hidden')) {
       sayBotHtml(esc(NUDGE_TEXT), function (box) { renderChips(NUDGE_CHIPS, box); });
+      return;
+    }
+    // Панель закрыта: запоминаем нудж, дальше решает устройство.
+    // ПК (есть hover) — сами открываем чат: обёртка openPanel покажет
+    // ОДНО сообщение (приветствие с чипами нуджа либо сам нудж).
+    // Телефон — только синий бейдж, панель не трогаем.
+    nudgePending = true;
+    if (canHover()) {
+      try { openPanel(); } catch (e) { fab.classList.add('has-nudge'); }
     } else {
-      nudgePending = true;
       fab.classList.add('has-nudge');
     }
   }
@@ -851,12 +888,16 @@
 
   var _openPanel = openPanel;
   openPanel = function () {
+    // Свежая история: приветствие уже в очереди (с чипами нуджа, если он висит) —
+    // отдельным сообщением нудж не дублируем. Иначе — показываем сам нудж.
+    var fresh = !greeted && !hist.length;
     _openPanel();
     if (nudgePending) {
       nudgePending = false;
       fab.classList.remove('has-nudge');
-      // Приветствие уже показано — нудж следующим сообщением
-      sayBotHtml(esc(NUDGE_TEXT), function (box) { renderChips(NUDGE_CHIPS, box); });
+      if (!fresh) {
+        sayBotHtml(esc(NUDGE_TEXT), function (box) { renderChips(NUDGE_CHIPS, box); });
+      }
     } else {
       fab.classList.remove('has-nudge');
     }
