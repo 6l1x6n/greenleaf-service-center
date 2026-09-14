@@ -9,6 +9,58 @@
 
   var store = null;
 
+  // ---------------- Блок скролла фона при открытой модалке ----------------
+  // Один оверлей на всех страницах: повторный openModal (перерендер поставки,
+  // dsplit) не должен дублировать лок, а closeModal — снимать его раньше времени.
+  var modalLockCount = 0;
+  var modalSavedY = 0;
+
+  function lockScroll() {
+    if (modalLockCount > 0) return;
+    modalLockCount = 1;
+    try {
+      modalSavedY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    } catch (e) { modalSavedY = 0; }
+    try {
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      // position:fixed убирает прыжок и лочит фон даже на iOS Safari,
+      // где одного overflow:hidden на body недостаточно
+      document.body.style.position = 'fixed';
+      document.body.style.top = (-modalSavedY) + 'px';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+    } catch (e) { /* старый браузер — остаётся overflow:hidden */ }
+  }
+
+  function unlockScroll() {
+    if (modalLockCount <= 0) return;
+    modalLockCount = 0;
+    try {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      window.scrollTo(0, modalSavedY);
+    } catch (e) { /* ignore */ }
+  }
+
+  function isModalOpen() {
+    return !!overlay && !overlay.classList.contains('hidden');
+  }
+
+  // Тач за пределами .modal при открытой модалке — гасим (фон зафиксирован,
+  // но iOS тянет жестом и модалку, и фон; колесо мыши лочится самим fixed).
+  document.addEventListener('touchmove', function (e) {
+    if (!isModalOpen()) return;
+    if (e.target && e.target.closest && e.target.closest('.modal')) return;
+    e.preventDefault();
+  }, { passive: false });
+
   function openModal(html, wide, extraCls) {
     modalBody.innerHTML = html;
     var modalEl = overlay.querySelector('.modal');
@@ -22,14 +74,24 @@
       if (extraCls) modalEl.classList.add(extraCls);
     }
     overlay.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
+    lockScroll();
+    // Скролл модалки — всегда сверху при новом контенте (поставка и пр.)
+    try {
+      var m = overlay.querySelector('.modal');
+      if (m) m.scrollTop = 0;
+    } catch (e) { /* ignore */ }
     var first = modalBody.querySelector('input');
-    if (first) first.focus();
+    if (first) {
+      try { first.focus({ preventScroll: true }); }
+      catch (e) { try { first.focus(); } catch (e2) { /* ignore */ } }
+    }
   }
 
   function closeModal() {
+    if (!overlay) return;
+    var wasOpen = !overlay.classList.contains('hidden');
     overlay.classList.add('hidden');
-    document.body.style.overflow = '';
+    if (wasOpen) unlockScroll();
   }
 
   function showToast(text) {
@@ -576,23 +638,28 @@
   loadStore();
 
   // ---------------- Лупа на фото (hover, только мышь) ----------------
-  // Один контроллер для всех зон .zoom-zone: каталог, модалка товара, чат.
+  // Один контроллер для всех зон .zoom-zone: каталог, модалка товара, чат,
+  // поставка (dsplit-media).
   // Лупа рендерится ВНУТРИ SVG: там clip-path применяется после фильтра,
   // поэтому круглый край чистый (CSS-клип родителя SVG-фильтр не обрезает
   // в Chromium — увеличенное фото вылезало квадратом). Край «выпуклый» —
   // радиальная карта смещений в feDisplacementMap (canvas, без чтения
   // товарных фото — CORS ни при чём). Курсор на время скрываем.
+  // Зум колесом: плавно (rAF-lerp к target), 1.5–8×. Настройки (размер, зум,
+  // лок) — в ПКМ-меню, доступном ВЕЗДЕ на сайте, персист в localStorage.
+  // Лок ВКЛ: колесо скроллит страницу/модалку, зум только слайдером.
+  // Лок ВЫКЛ: колесо над фото (пока видна лупа) только зумит.
   (function initZoomLens() {
     var canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!canHover || reduced) return;
 
     var active = null;
     var rafId = 0;
     var lastX = 0;
     var lastY = 0;
     var lensSize = 150;
-    var zoom = 2.4;
+    var zoomCur = 2.4;
+    var zoomTarget = 2.4;
     var imgW = 0;
     var imgH = 0;
     var defsReady = false;
@@ -600,6 +667,12 @@
     // База из data-zoom разметки: 2.4 каталог, 1.8 детали, 2.8 Иса (чат).
     // Итог: каталог 4.8 (x2.0), детали 2.7 (x1.5), Иса 7.0 (x2.5).
     var LENS_BOOSTS = { catalog: 2.0, detail: 1.5, chat: 2.5 };
+    var LENS_MIN = 1.5;
+    var LENS_MAX = 8;
+    var LENS_SIZE_MIN = 80;
+    var LENS_SIZE_MAX = 300;
+    // Скорость дотяжки зума к цели (меньше — плавнее). При reduced — снап.
+    var LENS_EASE = reduced ? 1 : 0.22;
     // Микро-сглаживание увеличенного слоя внутри лупы (единицы viewBox 0..100).
     // 0.3 давит «пиксельноватость» апскейла на FHD, центр остаётся резким.
     // Базовые <img> товаров не затрагиваются.
@@ -616,6 +689,30 @@
     // симметрично, поэтому центровка (точка под курсором — в центре линзы)
     // и сила фишая не меняются.
     var LENS_BLEED = 16;
+    var LENS_STORE_KEY = 'greenleaf_lens_v1';
+
+    // Пользовательские настройки: size/zoom null = зональные дефолты.
+    var lensSettings = { size: null, zoom: null, locked: false };
+    try {
+      var rawSet = localStorage.getItem(LENS_STORE_KEY);
+      if (rawSet) {
+        var parsed = JSON.parse(rawSet);
+        if (parsed && typeof parsed === 'object') {
+          if (isFinite(Number(parsed.size))) {
+            lensSettings.size = Math.min(LENS_SIZE_MAX, Math.max(LENS_SIZE_MIN, Number(parsed.size)));
+          }
+          if (isFinite(Number(parsed.zoom))) {
+            lensSettings.zoom = Math.min(LENS_MAX, Math.max(LENS_MIN, Number(parsed.zoom)));
+          }
+          lensSettings.locked = !!parsed.locked;
+        }
+      }
+    } catch (e) { /* localStorage недоступен — работаем без персиста */ }
+
+    function saveLensSettings() {
+      try { localStorage.setItem(LENS_STORE_KEY, JSON.stringify(lensSettings)); }
+      catch (e) { /* ignore */ }
+    }
 
     function buildWarpMap(size) {
       var c = document.createElement('canvas');
@@ -753,11 +850,32 @@
       } catch (e) { /* без искажения, лупа всё равно работает */ }
     }
 
+    function zoneBoost(zone) {
+      if (zone.classList.contains('product-detail-media')) return LENS_BOOSTS.detail;
+      if (zone.classList.contains('ai-prod-media')) return LENS_BOOSTS.chat;
+      return LENS_BOOSTS.catalog;
+    }
+
+    // Зональные дефолты (до пользовательских оверрайдов): размер из data-lens,
+    // увеличение — data-zoom × буст зоны.
+    function zoneBase(zone) {
+      return {
+        size: parseInt(zone.getAttribute('data-lens'), 10) || 150,
+        zoom: (parseFloat(zone.getAttribute('data-zoom')) || 2.4) * zoneBoost(zone)
+      };
+    }
+
+    function scheduleApply() {
+      if (!rafId) rafId = requestAnimationFrame(tick);
+    }
+
     function deactivate() {
+      if (rafId) { try { cancelAnimationFrame(rafId); } catch (e) { /* ignore */ } rafId = 0; }
       document.querySelectorAll('.zoom-zone.is-lens').forEach(function (z) {
         z.classList.remove('is-lens');
       });
       active = null;
+      hideZoomBadge();
     }
 
     function activate(zone) {
@@ -769,11 +887,10 @@
       if (!src) return;
       ensureDefs();
       deactivate();
-      lensSize = parseInt(zone.getAttribute('data-lens'), 10) || 150;
-      var boost = LENS_BOOSTS.catalog;
-      if (zone.classList.contains('product-detail-media')) boost = LENS_BOOSTS.detail;
-      else if (zone.classList.contains('ai-prod-media')) boost = LENS_BOOSTS.chat;
-      zoom = (parseFloat(zone.getAttribute('data-zoom')) || 2.4) * boost;
+      var base = zoneBase(zone);
+      lensSize = lensSettings.size || base.size;
+      zoomCur = lensSettings.zoom || base.zoom;
+      zoomTarget = zoomCur;
       imgW = img.offsetWidth || 1;
       imgH = img.offsetHeight || 1;
       lens.style.setProperty('--lens-size', lensSize + 'px');
@@ -781,10 +898,12 @@
       layer.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', src);
       zone.classList.add('is-lens');
       active = zone;
+      tickNow();
     }
 
-    function apply() {
-      rafId = 0;
+    // Один кадр: дотяжка зума к цели + позиция линзы. Зум едет плавно,
+    // позиция — за курсором без задержек.
+    function tickNow() {
       if (!active) return;
       var lens = active.querySelector('.zoom-lens');
       var layer = active.querySelector('.zoom-lens-svg image');
@@ -798,26 +917,251 @@
       // точка под курсором оказалась в центре линзы. Слой шире круга
       // на 2*LENS_BLEED симметрично — запас под outward-загиб кромки.
       var k = 100 / lensSize;
-      layer.setAttribute('x', (50 - x * zoom * k - LENS_BLEED).toFixed(2));
-      layer.setAttribute('y', (50 - y * zoom * k - LENS_BLEED).toFixed(2));
-      layer.setAttribute('width', (imgW * zoom * k + 2 * LENS_BLEED).toFixed(2));
-      layer.setAttribute('height', (imgH * zoom * k + 2 * LENS_BLEED).toFixed(2));
+      var z = zoomCur;
+      layer.setAttribute('x', (50 - x * z * k - LENS_BLEED).toFixed(2));
+      layer.setAttribute('y', (50 - y * z * k - LENS_BLEED).toFixed(2));
+      layer.setAttribute('width', (imgW * z * k + 2 * LENS_BLEED).toFixed(2));
+      layer.setAttribute('height', (imgH * z * k + 2 * LENS_BLEED).toFixed(2));
     }
 
-    document.addEventListener('pointermove', function (e) {
-      if (e.pointerType && e.pointerType !== 'mouse') return;
-      var zone = e.target && e.target.closest ? e.target.closest('.zoom-zone') : null;
-      if (zone && !zone.closest('.product-row-out')) {
-        if (zone !== active) activate(zone);
-        lastX = e.clientX;
-        lastY = e.clientY;
-        if (!rafId) rafId = requestAnimationFrame(apply);
-      } else if (active) {
-        deactivate();
+    function tick() {
+      rafId = 0;
+      if (!active) return;
+      var diff = zoomTarget - zoomCur;
+      if (Math.abs(diff) > 0.0005) {
+        zoomCur += diff * LENS_EASE;
+        if (Math.abs(zoomTarget - zoomCur) <= 0.005) zoomCur = zoomTarget;
+        else scheduleApply();
       }
-    }, { passive: true });
-    window.addEventListener('blur', deactivate);
-    document.addEventListener('mouseleave', deactivate);
+      tickNow();
+    }
+
+    function apply() { tick(); }
+
+    // Бейдж текущего увеличения у курсора (пока крутят колесо).
+    var zoomBadge = null;
+    var zoomBadgeTimer = 0;
+    function ensureZoomBadge() {
+      if (zoomBadge) return zoomBadge;
+      zoomBadge = document.createElement('div');
+      zoomBadge.className = 'lens-zoom-badge hidden';
+      zoomBadge.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(zoomBadge);
+      return zoomBadge;
+    }
+    function showZoomBadge(x, y) {
+      if (reduced) return;
+      var b = ensureZoomBadge();
+      b.textContent = '×' + (Math.round(zoomTarget * 10) / 10).toFixed(1);
+      b.style.left = Math.min(window.innerWidth - 70, x + 16) + 'px';
+      b.style.top = Math.max(8, y - 40) + 'px';
+      b.classList.remove('hidden');
+      if (zoomBadgeTimer) clearTimeout(zoomBadgeTimer);
+      zoomBadgeTimer = setTimeout(hideZoomBadge, 800);
+    }
+    function hideZoomBadge() {
+      if (zoomBadgeTimer) { clearTimeout(zoomBadgeTimer); zoomBadgeTimer = 0; }
+      if (zoomBadge) zoomBadge.classList.add('hidden');
+    }
+
+    // Колесо над фото с видимой лупой: при выкл. локе — только плавный зум
+    // (скролл страницы/модалки в этот момент не едет), при вкл. — обычный скролл.
+    document.addEventListener('wheel', function (e) {
+      if (lensSettings.locked) return;
+      if (!canHover || !active) return;
+      var zone = e.target && e.target.closest ? e.target.closest('.zoom-zone') : null;
+      if (!zone || zone !== active) return;
+      if (e.ctrlKey) return; // pinch-zoom браузера — не перехватываем
+      e.preventDefault();
+      var delta = e.deltaY || 0;
+      if (e.deltaMode === 1) delta *= 16; // строки → px
+      else if (e.deltaMode === 2) delta *= 400;
+      var step = Math.max(0.05, zoomTarget * 0.0016 * Math.min(150, Math.abs(delta)));
+      zoomTarget += delta < 0 ? step : -step;
+      if (zoomTarget < LENS_MIN) zoomTarget = LENS_MIN;
+      if (zoomTarget > LENS_MAX) zoomTarget = LENS_MAX;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      scheduleApply();
+      showZoomBadge(e.clientX, e.clientY);
+    }, { passive: false });
+
+    // ---------------- ПКМ-меню лупы (везде на сайте) ----------------
+    var lensMenu = null;
+    var lensSizeRange = null;
+    var lensZoomRange = null;
+    var lensSizeVal = null;
+    var lensZoomVal = null;
+    var lensLockCheck = null;
+
+    function currentMenuValues() {
+      var sizeVal = lensSettings.size;
+      var zoomVal = lensSettings.zoom;
+      if (active) {
+        var base = zoneBase(active);
+        if (!sizeVal) sizeVal = base.size;
+        if (!zoomVal) zoomVal = Math.round(zoomTarget * 10) / 10;
+      }
+      return {
+        size: sizeVal || 160,
+        zoom: zoomVal || 4,
+        locked: lensSettings.locked
+      };
+    }
+
+    function ensureLensMenu() {
+      if (lensMenu) return lensMenu;
+      lensMenu = document.createElement('div');
+      lensMenu.className = 'lens-menu hidden';
+      lensMenu.id = 'lensMenu';
+      lensMenu.setAttribute('role', 'dialog');
+      lensMenu.setAttribute('aria-label', 'Параметры лупы');
+      lensMenu.innerHTML =
+        '<div class="lens-menu-title">🔍 Лупа</div>' +
+        '<label class="lens-row"><span>Размер · <b id="lensSizeVal">160</b> px</span>' +
+        '<input type="range" id="lensSizeRange" min="' + LENS_SIZE_MIN + '" max="' + LENS_SIZE_MAX + '" step="5"></label>' +
+        '<label class="lens-row"><span>Увеличение · <b id="lensZoomVal">×4.0</b></span>' +
+        '<input type="range" id="lensZoomRange" min="' + LENS_MIN + '" max="' + LENS_MAX + '" step="0.1"></label>' +
+        '<label class="lens-check"><input type="checkbox" id="lensLockCheck"> Лок на увеличении' +
+        '<small>колесо скроллит страницу</small></label>' +
+        '<div class="lens-menu-foot">' +
+        '<button type="button" class="btn btn-outline btn-sm" id="lensResetBtn">Сбросить</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" id="lensCloseBtn">Готово</button>' +
+        '</div>';
+      document.body.appendChild(lensMenu);
+      lensSizeRange = lensMenu.querySelector('#lensSizeRange');
+      lensZoomRange = lensMenu.querySelector('#lensZoomRange');
+      lensSizeVal = lensMenu.querySelector('#lensSizeVal');
+      lensZoomVal = lensMenu.querySelector('#lensZoomVal');
+      lensLockCheck = lensMenu.querySelector('#lensLockCheck');
+
+      lensSizeRange.addEventListener('input', function () {
+        lensSettings.size = Number(lensSizeRange.value);
+        lensSizeVal.textContent = String(lensSettings.size);
+        saveLensSettings();
+        if (active) {
+          lensSize = lensSettings.size;
+          var lens = active.querySelector('.zoom-lens');
+          if (lens) lens.style.setProperty('--lens-size', lensSize + 'px');
+          scheduleApply();
+        }
+      });
+      lensZoomRange.addEventListener('input', function () {
+        lensSettings.zoom = Math.round(Number(lensZoomRange.value) * 10) / 10;
+        lensZoomVal.textContent = '×' + lensSettings.zoom.toFixed(1);
+        saveLensSettings();
+        zoomTarget = lensSettings.zoom;
+        if (reduced) zoomCur = zoomTarget;
+        scheduleApply();
+      });
+      lensLockCheck.addEventListener('change', function () {
+        lensSettings.locked = !!lensLockCheck.checked;
+        saveLensSettings();
+      });
+      lensMenu.querySelector('#lensResetBtn').addEventListener('click', function () {
+        lensSettings.size = null;
+        lensSettings.zoom = null;
+        lensSettings.locked = false;
+        saveLensSettings();
+        if (active) {
+          var base = zoneBase(active);
+          lensSize = base.size;
+          zoomTarget = base.zoom;
+          zoomCur = reduced ? zoomTarget : zoomCur;
+          var lens = active.querySelector('.zoom-lens');
+          if (lens) lens.style.setProperty('--lens-size', lensSize + 'px');
+          scheduleApply();
+        }
+        refreshLensMenu();
+      });
+      lensMenu.querySelector('#lensCloseBtn').addEventListener('click', closeLensMenu);
+      // ПКМ внутри меню — не открывать заново, не мешать
+      lensMenu.addEventListener('contextmenu', function (e) { e.preventDefault(); e.stopPropagation(); });
+      return lensMenu;
+    }
+
+    function refreshLensMenu() {
+      var v = currentMenuValues();
+      ensureLensMenu();
+      lensSizeRange.value = String(v.size);
+      lensZoomRange.value = String(v.zoom);
+      lensSizeVal.textContent = String(Math.round(v.size));
+      lensZoomVal.textContent = '×' + (Math.round(v.zoom * 10) / 10).toFixed(1);
+      lensLockCheck.checked = !!v.locked;
+    }
+
+    function openLensMenu(x, y) {
+      ensureLensMenu();
+      refreshLensMenu();
+      lensMenu.classList.remove('hidden');
+      var w = 280;
+      var h = 250;
+      try {
+        var r = lensMenu.getBoundingClientRect();
+        if (r.width) w = r.width;
+        if (r.height) h = r.height;
+      } catch (e) { /* ignore */ }
+      lensMenu.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x)) + 'px';
+      lensMenu.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, y)) + 'px';
+    }
+
+    function closeLensMenu() {
+      if (lensMenu) lensMenu.classList.add('hidden');
+    }
+
+    function isLensMenuOpen() {
+      return !!(lensMenu && !lensMenu.classList.contains('hidden'));
+    }
+
+    // ПКМ везде (кроме полей ввода — там оставляем нативное меню).
+    document.addEventListener('contextmenu', function (e) {
+      var t = e.target;
+      if (t && t.closest) {
+        if (t.closest('input, textarea, select, [contenteditable]')) return;
+        if (t.closest('.lens-menu')) return;
+      }
+      e.preventDefault();
+      openLensMenu(e.clientX, e.clientY);
+    });
+    document.addEventListener('click', function (e) {
+      if (!isLensMenuOpen()) return;
+      if (e.target && e.target.closest && e.target.closest('.lens-menu')) return;
+      closeLensMenu();
+    }, true);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && isLensMenuOpen()) {
+        e.stopPropagation();
+        closeLensMenu();
+      }
+    }, true);
+    window.addEventListener('blur', closeLensMenu);
+
+    if (canHover) {
+      document.addEventListener('pointermove', function (e) {
+        if (e.pointerType && e.pointerType !== 'mouse') return;
+        var zone = e.target && e.target.closest ? e.target.closest('.zoom-zone') : null;
+        if (zone && !zone.closest('.product-row-out')) {
+          if (zone !== active) activate(zone);
+          lastX = e.clientX;
+          lastY = e.clientY;
+          scheduleApply();
+        } else if (active) {
+          deactivate();
+        }
+      }, { passive: true });
+      window.addEventListener('blur', deactivate);
+      document.addEventListener('mouseleave', deactivate);
+      window.addEventListener('resize', function () {
+        if (!active) return;
+        var img = active.querySelector('img');
+        if (img) { imgW = img.offsetWidth || imgW; imgH = img.offsetHeight || imgH; }
+        scheduleApply();
+      });
+    }
+
+    window.LensSettings = {
+      get: function () { return { size: lensSettings.size, zoom: lensSettings.zoom, locked: lensSettings.locked }; }
+    };
   })();
 
   // ---------------- Остатки по филиалам (store-stock.json + списания Worker) ----------------

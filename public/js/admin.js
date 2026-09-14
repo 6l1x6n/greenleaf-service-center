@@ -418,6 +418,7 @@
   // ---------------- Навигация ----------------
 
   function visibleSections() {
+    if (!state.user || !state.user.role) return [];
     return Object.keys(SECTIONS).filter(function (k) {
       return SECTIONS[k].roles.indexOf(state.user.role) !== -1;
     });
@@ -468,6 +469,12 @@
   }
 
   function openSection(name) {
+    if (!state.user) { showLogin(); return; }
+    if (!SECTIONS[name]) {
+      var secs = visibleSections();
+      name = secs.indexOf(state.section) !== -1 ? state.section : (secs[0] || 'deliveries');
+      if (!SECTIONS[name]) { showLogin(); return; }
+    }
     state.section = name;
     renderNav();
     renderSection();
@@ -2773,9 +2780,35 @@
 
   // ---------------- Вход / выход ----------------
 
+  // Счётчик актуальности асинхронной загрузки: выход (и новый вход) отменяет
+  // летящий loadData().then(showPanel), иначе старая загрузка после выхода
+  // прятала форму входа и оставляла пустой экран.
+  var authSeq = 0;
+  var SESSION_LS_KEY = 'greenleaf_sc_logged_user_v1';
+
   function showLogin() {
-    document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('adminLayout').classList.add('hidden');
+    authSeq++;
+    state.user = null;
+    state.section = null;
+    var loginScreen = document.getElementById('loginScreen');
+    var layout = document.getElementById('adminLayout');
+    if (loginScreen) loginScreen.classList.remove('hidden');
+    if (layout) layout.classList.add('hidden');
+    // Внутренний вид — всегда форма входа: после вида «Регистрация СЦ»
+    // или ошибки рендера иначе оставалась пустота без полей.
+    var loginView = document.getElementById('authLoginView');
+    var ownerView = document.getElementById('authOwnerView');
+    if (loginView) loginView.classList.remove('hidden');
+    if (ownerView) ownerView.classList.add('hidden');
+    var card = document.querySelector('.admin-login-card');
+    if (card) card.classList.remove('wide');
+    var err = document.getElementById('adminLoginErr');
+    if (err) err.style.display = 'none';
+    // Чистим панель, чтобы после выхода не светились чужие данные
+    var nav = document.getElementById('adminNav');
+    if (nav) nav.innerHTML = '';
+    var content = document.getElementById('adminContent');
+    if (content) content.innerHTML = '';
     var badge = document.getElementById('adminUserBadge');
     var logout = document.getElementById('adminLogoutBtn');
     if (badge) badge.classList.add('hidden');
@@ -2783,19 +2816,27 @@
   }
 
   function showPanel() {
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('adminLayout').classList.remove('hidden');
-    if (lsGet('adminSidebarCollapsed')) {
-      document.getElementById('adminLayout').classList.add('admin-sidebar-collapsed');
-    }
-    var badge = document.getElementById('adminUserBadge');
-    var logout = document.getElementById('adminLogoutBtn');
-    if (badge) { badge.classList.remove('hidden'); badge.innerHTML = '🟢 ' + h(state.user.name); }
-    if (logout) logout.classList.remove('hidden');
-    if (state.section && visibleSections().indexOf(state.section) !== -1) {
-      openSection(state.section);
-    } else {
-      openSection(isSuper() ? 'overview' : 'cabinet');
+    // Fail-safe: без пользователя — только форма входа, никогда пустота
+    if (!state.user || !state.user.role) { showLogin(); return; }
+    try {
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('adminLayout').classList.remove('hidden');
+      if (lsGet('adminSidebarCollapsed')) {
+        document.getElementById('adminLayout').classList.add('admin-sidebar-collapsed');
+      }
+      var badge = document.getElementById('adminUserBadge');
+      var logout = document.getElementById('adminLogoutBtn');
+      if (badge) { badge.classList.remove('hidden'); badge.innerHTML = '🟢 ' + h(state.user.name); }
+      if (logout) logout.classList.remove('hidden');
+      var secs = visibleSections();
+      if (state.section && secs.indexOf(state.section) !== -1) {
+        openSection(state.section);
+      } else {
+        openSection(isSuper() ? 'overview' : 'cabinet');
+      }
+    } catch (e) {
+      console.error('showPanel error:', e);
+      showLogin();
     }
   }
 
@@ -2821,16 +2862,23 @@
 
   function bindLogin() {
     var form = document.getElementById('adminLoginForm');
+    if (!form || form.__glBound) return;
+    form.__glBound = true;
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var btn = form.querySelector('button[type="submit"]');
+      if (btn && btn.disabled) return; // защита от двойного сабмита
       if (btn) { btn.disabled = true; }
       Auth.login(form.login.value, form.password.value).then(function (user) {
         if (btn) { btn.disabled = false; }
         if (user) {
           Auth.setCurrentUser(user);
           state.user = user;
-          loadData().then(showPanel);
+          var mySeq = ++authSeq;
+          loadData().then(function () {
+            if (mySeq !== authSeq) return; // успели выйти — панель не показываем
+            showPanel();
+          });
         } else {
           document.getElementById('adminLoginErr').style.display = 'block';
         }
@@ -2839,33 +2887,66 @@
   }
 
   function init() {
+    // Скрипты подключены в конце body: readyState часто уже interactive,
+    // и без guard init срабатывал дважды (двойные хендлеры и загрузки)
+    if (window.__glAdminInit) return;
+    window.__glAdminInit = true;
     bindLogin();
     bindAuthSwitchers();
 
-    document.getElementById('adminLogoutBtn').addEventListener('click', function () {
-      Auth.setCurrentUser(null);
-      state.user = null;
-      Utils.showToast('Вы вышли из аккаунта');
-      showLogin();
-    });
+    var logoutBtn = document.getElementById('adminLogoutBtn');
+    if (logoutBtn && !logoutBtn.__glBound) {
+      logoutBtn.__glBound = true;
+      logoutBtn.addEventListener('click', function () {
+        Auth.setCurrentUser(null);
+        Utils.showToast('Вы вышли из аккаунта');
+        showLogin();
+      });
+    }
 
-    document.getElementById('adminNav').addEventListener('click', function (e) {
-      if (e.target.closest('[data-toggle-sidebar]')) {
-        toggleSidebar();
-        return;
-      }
-      var btn = e.target.closest('[data-section]');
-      if (!btn) return;
-      openSection(btn.getAttribute('data-section'));
-    });
+    var nav = document.getElementById('adminNav');
+    if (nav && !nav.__glBound) {
+      nav.__glBound = true;
+      nav.addEventListener('click', function (e) {
+        if (e.target.closest('[data-toggle-sidebar]')) {
+          toggleSidebar();
+          return;
+        }
+        var btn = e.target.closest('[data-section]');
+        if (!btn) return;
+        openSection(btn.getAttribute('data-section'));
+      });
+    }
 
     var user = Auth.getCurrentUser();
-    if (user) {
+    if (user && user.role) {
       state.user = user;
-      loadData().then(showPanel);
+      var mySeq = ++authSeq;
+      loadData().then(function () {
+        if (mySeq !== authSeq) return;
+        // Сессию могли сбросить параллельным выходом — проверяем
+        if (!Auth.getCurrentUser()) { showLogin(); return; }
+        showPanel();
+      });
     } else {
+      if (user) Auth.setCurrentUser(null); // битая сессия без роли — чистим
       showLogin();
     }
+
+    // Выход/вход в другой вкладке — сразу переключаем вид, а не пустота
+    window.addEventListener('storage', function (e) {
+      if (!e || e.key !== SESSION_LS_KEY) return;
+      var u = Auth.getCurrentUser();
+      if (!u) {
+        showLogin();
+      } else if (!state.user) {
+        state.user = u;
+        var s = ++authSeq;
+        loadData().then(function () {
+          if (s === authSeq) showPanel();
+        });
+      }
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);
