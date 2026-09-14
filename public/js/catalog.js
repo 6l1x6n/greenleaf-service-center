@@ -117,7 +117,9 @@
   // зелёная кнопка «В корзину»; после добавления она превращается в степпер
   // «− N +» с крестиком. + добавляет, − убавляет/убирает, ручной ввод задаёт
   // абсолютное количество.
-  function rowCartControl(p) {
+  // compact=true (карточки списка в мультиколоночном режиме): кнопка — только
+  // иконка корзины (текст прячется CSS), в модалке всегда полный текст.
+  function rowCartControl(p, compact) {
     var item = Cart.get().find(function (i) { return i.id === p.id; });
     var cur = item ? (Number(item.qty) || 0) : 0;
     var rawMax = (state.selectedStoreId && state.selectedStoreId !== 'all')
@@ -132,7 +134,13 @@
     }
     if (cur <= 0) {
       if (effectiveStatus(p) === 'out') {
+        if (compact) {
+          return '<button class="btn btn-primary btn-sm row-add is-disabled" type="button" disabled title="Товара нет в наличии" aria-label="Товара нет в наличии"><span class="row-add-ico">' + Utils.icon('cart', 18) + '</span><span class="row-add-txt">' + Utils.icon('cart', 15) + ' В корзину</span></button>';
+        }
         return '<button class="btn btn-primary btn-sm row-add is-disabled" type="button" disabled title="Товара нет в наличии">' + Utils.icon('cart', 15) + ' В корзину</button>';
+      }
+      if (compact) {
+        return '<button class="btn btn-primary btn-sm row-add" data-cart-add="' + Utils.esc(p.id) + '" title="В корзину" aria-label="В корзину"><span class="row-add-ico">' + Utils.icon('cart', 18) + '</span><span class="row-add-txt">' + Utils.icon('cart', 15) + ' В корзину</span></button>';
       }
       return '<button class="btn btn-primary btn-sm row-add" data-cart-add="' + Utils.esc(p.id) + '">' + Utils.icon('cart', 15) + ' В корзину</button>';
     }
@@ -219,7 +227,7 @@
       '<a class="partner-link" href="podpiska.html">Как стать партнёром →</a>' +
       '</div>' +
       '<div class="row-actions">' +
-      rowCartControl(p) +
+      rowCartControl(p, true) +
       '</div>' +
       '</div>' +
       '</article>';
@@ -918,7 +926,7 @@
       if (!p) return;
       var actions = row.querySelector('.row-actions');
       if (actions) {
-        actions.innerHTML = rowCartControl(p);
+        actions.innerHTML = rowCartControl(p, true);
       }
     });
     // Степпер в открытой модалке товара — туда же

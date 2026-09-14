@@ -807,8 +807,24 @@ a:hover { text-decoration: none; }
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
-@media (min-width: 760px) {
+@media (min-width: 840px) {
   .list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  /* Компактный фут в одну строку: цены + PV + иконка-кнопка.
+     Резерв 100px = ширина компактного степпера: при добавлении ряд не прыгает. */
+  .list { --ctrl-w: 100px; }
+  .list .row-foot { flex-wrap: nowrap; gap: 8px; }
+  .list .card-prices { gap: 6px; }
+  .list .price-partner { font-size: 19px; }
+  .list .price-old { font-size: 12px; }
+  .list .badge-sale { font-size: 11px; padding: 2px 7px; }
+  .list .pv-badge { font-size: 10px; padding: 1px 6px; }
+  .list .row-add { width: 40px; padding: 8px 0; }
+  .list .row-add-txt { display: none; }
+  .list .row-add-ico { display: inline-flex; }
+  /* Крестик не нужен: минус на «1» убирает товар (как на телефонах) */
+  .list .row-remove { display: none; }
+  .list .qty-stepper .qty-btn { width: 26px; height: 28px; font-size: 15px; }
+  .list .qty-stepper .qty-input { width: 36px; font-size: 13.5px; }
 }
 @media (min-width: 1280px) {
   .list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -921,6 +937,9 @@ a:hover { text-decoration: none; }
    при добавлении товара ряд не «прыгает». */
 .row-add { width: var(--ctrl-w); min-width: 0; }
 .row-add svg { flex: none; }
+/* Двухрежимная кнопка списка: иконка (мультиколонки) / текст (одна колонка, модалка) */
+.row-add-ico { display: none; }
+.row-add-txt { display: inline-flex; align-items: center; gap: 8px; }
 .product-row-out .row-add {
   background: var(--line) !important;
   color: var(--muted) !important;
@@ -1861,7 +1880,9 @@ a:hover { text-decoration: none; }
   border-radius: calc(var(--radius) - 1px);
 }
 .product-detail-body { display: flex; flex-direction: column; gap: 10px; }
-/* Цена снизу слева от кнопки «В корзину»: компактный нижний ряд */
+/* Цена снизу слева от кнопки «В корзину»: компактный нижний ряд.
+   Цены внутри — всегда в одну строку; кнопка уходит вниз только если
+   физически не влезла (самые дорогие товары), на телефонах — колонкой. */
 .pdetail-buy {
   display: flex;
   align-items: flex-end;
