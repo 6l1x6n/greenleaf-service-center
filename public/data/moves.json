@@ -1,6 +1,49 @@
 {
-  "updated": "2026-09-14T15:49:57+03:00",
+  "updated": "2026-09-15T08:33:59+03:00",
   "moves": [
+    {
+      "number": "3492392",
+      "who": "s240534",
+      "time": "2026-09-15 10:03:29",
+      "date": "2026-09-15",
+      "sum": 162000.0,
+      "source": "Алматы поставщик",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [
+        {
+          "sku": "ASF024",
+          "name": "iLiFE Многофункциональный мыльный порошок, 2 кг",
+          "qty": 60
+        }
+      ],
+      "itemsParsed": true
+    },
+    {
+      "number": "3492387",
+      "who": "s240534",
+      "time": "2026-09-15 10:01:54",
+      "date": "2026-09-15",
+      "sum": 207177.0,
+      "source": "Астана поставщик \"новый\"",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [
+        {
+          "sku": "KLA273",
+          "name": "CARICH Растительный тонизирующий лосьон , 55 мл / англо-русская версия.",
+          "qty": 24
+        },
+        {
+          "sku": "JDA220",
+          "name": "KARDLI Одноразовая целлофановая \"шапочка\" для сохранения свежести продуктов",
+          "qty": 91
+        }
+      ],
+      "itemsParsed": true
+    },
     {
       "number": "3487817",
       "who": "s240534",
@@ -9,8 +52,8 @@
       "sum": 832500.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "MAA049",
@@ -43,16 +86,10 @@
       "sum": 162000.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
-      "items": [
-        {
-          "sku": "ASF024",
-          "name": "iLiFE Многофункциональный мыльный порошок, 2 кг",
-          "qty": 60
-        }
-      ],
-      "itemsParsed": true
+      "status": "Отменен",
+      "statusCode": 9,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3487706",
@@ -62,8 +99,8 @@
       "sum": 652720.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "YZA127",
@@ -101,8 +138,8 @@
       "sum": 638000.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA273",
@@ -120,8 +157,8 @@
       "sum": 446540.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "JDA221",
@@ -149,21 +186,10 @@
       "sum": 149177.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
-      "items": [
-        {
-          "sku": "KLA273",
-          "name": "CARICH Растительный тонизирующий лосьон , 55 мл / англо-русская версия.",
-          "qty": 14
-        },
-        {
-          "sku": "JDA220",
-          "name": "KARDLI Одноразовая целлофановая \"шапочка\" для сохранения свежести продуктов",
-          "qty": 91
-        }
-      ],
-      "itemsParsed": true
+      "status": "Отменен",
+      "statusCode": 9,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3485060",
@@ -173,8 +199,8 @@
       "sum": 244750.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA273",
@@ -557,38 +583,12 @@
       "itemsParsed": false
     },
     {
-      "number": "3363969",
-      "who": "s240534",
-      "time": "2026-08-19 15:29:31",
-      "date": "2026-08-19",
-      "sum": 1136020.0,
-      "source": "Астана поставщик \"новый\"",
-      "recipient": "S240534",
-      "status": "Принят СЦ",
-      "statusCode": 7,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
       "number": "3362131",
       "who": "s240534",
       "time": "2026-08-19 10:54:19",
       "date": "2026-08-19",
       "sum": 348970.0,
       "source": "Алматы поставщик",
-      "recipient": "S240534",
-      "status": "Принят СЦ",
-      "statusCode": 7,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
-      "number": "3329957",
-      "who": "s240534",
-      "time": "2026-08-13 01:23:24",
-      "date": "2026-08-13",
-      "sum": 218264.0,
-      "source": "Астана поставщик",
       "recipient": "S240534",
       "status": "Принят СЦ",
       "statusCode": 7,
