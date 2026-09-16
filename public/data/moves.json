@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-15T14:19:21+03:00",
+  "updated": "2026-09-16T08:26:52+03:00",
   "moves": [
     {
       "number": "3492392",
@@ -9,8 +9,8 @@
       "sum": 162000.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "ASF024",
@@ -28,8 +28,8 @@
       "sum": 207177.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA273",
