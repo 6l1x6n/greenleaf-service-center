@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-17T08:33:56+03:00",
+  "updated": "2026-09-17T14:15:57+03:00",
   "moves": [
     {
       "number": "3501800",
@@ -28,16 +28,10 @@
       "sum": 162000.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Отправлен",
-      "statusCode": 4,
-      "items": [
-        {
-          "sku": "ASF024",
-          "name": "iLiFE Многофункциональный мыльный порошок, 2 кг",
-          "qty": 60
-        }
-      ],
-      "itemsParsed": true
+      "status": "Принят СЦ",
+      "statusCode": 7,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3492387",
@@ -47,21 +41,10 @@
       "sum": 207177.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Отправлен",
-      "statusCode": 4,
-      "items": [
-        {
-          "sku": "KLA273",
-          "name": "CARICH Растительный тонизирующий лосьон , 55 мл / англо-русская версия.",
-          "qty": 24
-        },
-        {
-          "sku": "JDA220",
-          "name": "KARDLI Одноразовая целлофановая \"шапочка\" для сохранения свежести продуктов",
-          "qty": 91
-        }
-      ],
-      "itemsParsed": true
+      "status": "Принят СЦ",
+      "statusCode": 7,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3487817",
@@ -118,36 +101,10 @@
       "sum": 652720.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Отправлен",
-      "statusCode": 4,
-      "items": [
-        {
-          "sku": "YZA127",
-          "name": "Moon Flore Кордицепс бархатный BB-крем кушон/12г*2",
-          "qty": 48
-        },
-        {
-          "sku": "ASF024",
-          "name": "iLiFE Многофункциональный мыльный порошок, 2 кг",
-          "qty": 30
-        },
-        {
-          "sku": "LYA030",
-          "name": "Greenleaf Моющее мыло 100 г",
-          "qty": 40
-        },
-        {
-          "sku": "ASF048",
-          "name": "iLiFE Fresh Floral Violet Мультиактивное антибактериальное бесфосфатное средство для стирки 500 г",
-          "qty": 120
-        },
-        {
-          "sku": "ASF049",
-          "name": "iLiFE Aroma White Пятновыводитель и бактериовыводитель бесфосфатное средство для стирки 1,5 кг",
-          "qty": 40
-        }
-      ],
-      "itemsParsed": true
+      "status": "Принят СЦ",
+      "statusCode": 7,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3486409",
@@ -157,16 +114,10 @@
       "sum": 638000.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Отправлен",
-      "statusCode": 4,
-      "items": [
-        {
-          "sku": "KLA273",
-          "name": "CARICH Растительный тонизирующий лосьон , 55 мл / англо-русская версия.",
-          "qty": 110
-        }
-      ],
-      "itemsParsed": true
+      "status": "Принят СЦ",
+      "statusCode": 7,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3486368",
@@ -176,26 +127,10 @@
       "sum": 446540.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Отправлен",
-      "statusCode": 4,
-      "items": [
-        {
-          "sku": "JDA221",
-          "name": "KARDLI Металлическая мочалка для мытья посуды (6 шт. в упаковке)",
-          "qty": 200
-        },
-        {
-          "sku": "ASA187",
-          "name": "iLiFE Сверхсильное жидкое чистящее средство для туалета 500 мл",
-          "qty": 120
-        },
-        {
-          "sku": "ASF055",
-          "name": "iLiFE Моющее средство для посуды 1 кг",
-          "qty": 100
-        }
-      ],
-      "itemsParsed": true
+      "status": "Принят СЦ",
+      "statusCode": 7,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3485270",
@@ -218,21 +153,10 @@
       "sum": 244750.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Отправлен",
-      "statusCode": 4,
-      "items": [
-        {
-          "sku": "KLA273",
-          "name": "CARICH Растительный тонизирующий лосьон , 55 мл / англо-русская версия.",
-          "qty": 10
-        },
-        {
-          "sku": "JDA220",
-          "name": "KARDLI Одноразовая целлофановая \"шапочка\" для сохранения свежести продуктов",
-          "qty": 250
-        }
-      ],
-      "itemsParsed": true
+      "status": "Принят СЦ",
+      "statusCode": 7,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3469465",
