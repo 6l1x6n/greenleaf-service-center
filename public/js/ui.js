@@ -493,16 +493,20 @@
   }
 
   // Разметка лупы для зоны .zoom-zone (каталог, модалка товара, чат).
-  // Клип и liquid-glass фильтр применяются внутри SVG — там clip-path работает
-  // после фильтра, и увеличенное фото не вылезает квадратом за круг.
+  // Два слоя внутри SVG: нижний warped (fisheye liquid glass по всей площади)
+  // и верхний sharp БЕЗ фильтра, клипнутый малым кругом — резкий центр 1в1,
+  // загиб виден только на кольце кромки. Клипы применяются внутри SVG — там
+  // clip-path работает после фильтра, и увеличенное фото не вылезает
+  // квадратом за круг.
   // Кольцо кромки — матовость края как в iOS; .zoom-glass — верхний спекулар (CSS).
   // .zoom-glass — чисто декоративный слой liquid glass поверх (стили в CSS),
   // на базовые фото и механику лупы не влияет.
   function lensHtml() {
     return '<span class="zoom-lens" aria-hidden="true">' +
-      '<svg class="zoom-lens-svg" viewBox="0 0 100 100" preserveAspectRatio="none">' +
+      '<svg class="zoom-lens-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">' +
       '<circle cx="50" cy="50" r="50" fill="#fff"/>' +
-      '<image filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none" image-rendering="optimizeQuality"/>' +
+      '<image class="lens-warped" filter="url(#glLensWarp)" clip-path="url(#glLensClip)" preserveAspectRatio="none"/>' +
+      '<image class="lens-sharp" clip-path="url(#glLensClipSharp)" preserveAspectRatio="none"/>' +
       '<circle cx="50" cy="50" r="46.5" fill="none" stroke="url(#glLensRim)" stroke-width="5" opacity="0.3" filter="url(#glLensRimSoft)"/>' +
       '</svg><span class="zoom-glass" aria-hidden="true"></span></span>';
   }
@@ -660,8 +664,22 @@
     var lensSize = 150;
     var zoomCur = 2.4;
     var zoomTarget = 2.4;
-    var imgW = 0;
-    var imgH = 0;
+    // Геометрия отображаемого фото в координатах зоны (CSS px): источник может
+    // быть неквадратным, а <img> — contain/cover с паддингами, поэтому вместо
+    // габаритов коробки считаем content-rect (см. computeMetrics).
+    // srcNatW/H — пиксели файла, показанного В ЛУПЕ (hi-res, не thumb);
+    // mSX/mSY — CSS px на пиксель исходника; mOX/mOY — origin картинки в зоне;
+    // visW/visH — видимый размер контента (для капа 1в1).
+    var srcNatW = 0;
+    var srcNatH = 0;
+    var mSX = 1;
+    var mSY = 1;
+    var mOX = 0;
+    var mOY = 0;
+    var visW = 0;
+    var visH = 0;
+    // Кэш hi-res sources: url -> {w,h} | 'pending'
+    var hiCache = {};
     var defsReady = false;
     // Бусты увеличения по зонам (размер лупы не меняется).
     // База из data-zoom разметки: 2.4 каталог, 1.8 детали, 2.8 Иса (чат).
@@ -673,16 +691,22 @@
     var LENS_SIZE_MAX = 300;
     // Скорость дотяжки зума к цели (меньше — плавнее). При reduced — снап.
     var LENS_EASE = reduced ? 1 : 0.22;
-    // Микро-сглаживание увеличенного слоя внутри лупы (единицы viewBox 0..100).
-    // 0.3 давит «пиксельноватость» апскейла на FHD, центр остаётся резким.
+    // Блюр увеличенного слоя ОТКЛЮЧЁН (0): раньше 0.35 мылил центр лупы.
+    // Резкость даёт sharp-слой без фильтра + кап зума под натив (1в1).
     // Базовые <img> товаров не затрагиваются.
-    var LENS_SMOOTH = 0.35;
+    var LENS_SMOOTH = 0;
     // Liquid glass: плоский центр + преломление у кромки (как в iOS).
     // RIM_START — радиус плоского центра (внутри смещения нет, резкость макс.),
     // RIM_POWER — крутизна загиба кромки, RIM_SCALE — сила (ед. viewBox).
-    var LENS_RIM_START = 0.62;
+    // 0.78 ≈ плоский центр 78% диаметра; совпадает с sharp-диском (r=39).
+    var LENS_RIM_START = 0.78;
     var LENS_RIM_POWER = 2.4;
     var LENS_RIM_SCALE = 26;
+    // Радиус резкого диска без искажений (ед. viewBox, r=50 — вся лупа).
+    var LENS_SHARP_R = 39;
+    // Допуск апскейла сверх 1в1: на retina без запаса зум был бы заметно меньше
+    // привычного (1 исх. px = 1 device px). 1.15 — компромисс резкость/крупность.
+    var LENS_ZOOM_HEADROOM = 1.15;
     // Запас покрытия слоя (ед. viewBox, с каждой стороны): outward-загиб кромки
     // сдвигает пиксели наружу до ~13 ед. (0.5 * RIM_SCALE), и без запаса у края
     // круга обнажается подложка — белые рамки. Слой кладётся шире на 2*BLEED
@@ -754,7 +778,7 @@
       if (defsReady) return;
       defsReady = true;
       try {
-        var map = buildWarpMap(256);
+        var map = buildWarpMap(512);
         if (!map) return;
         var NS = 'http://www.w3.org/2000/svg';
         var svg = document.createElementNS(NS, 'svg');
@@ -772,6 +796,16 @@
         circle.setAttribute('cy', '50');
         circle.setAttribute('r', '50');
         clip.appendChild(circle);
+
+        // Малый клип резкого центра (без фильтра — пиксели 1в1).
+        var clipS = document.createElementNS(NS, 'clipPath');
+        clipS.setAttribute('id', 'glLensClipSharp');
+        clipS.setAttribute('clipPathUnits', 'userSpaceOnUse');
+        var circleS = document.createElementNS(NS, 'circle');
+        circleS.setAttribute('cx', '50');
+        circleS.setAttribute('cy', '50');
+        circleS.setAttribute('r', String(LENS_SHARP_R));
+        clipS.appendChild(circleS);
 
         var filter = document.createElementNS(NS, 'filter');
         filter.setAttribute('id', 'glLensWarp');
@@ -799,8 +833,8 @@
         disp.setAttribute('result', 'warped');
         filter.appendChild(feImg);
         filter.appendChild(disp);
-        // Микро-AA только увеличенного слоя в лупе: давит aliasing
-        // апскейла/displacement на FHD, детали почти не трогает.
+        // LENS_SMOOTH = 0: блюр центра отключён (мылил фото). Резкость даёт
+        // верхний sharp-слой без фильтра. Блок оставлен на случай отката.
         if (LENS_SMOOTH > 0) {
           var soft = document.createElementNS(NS, 'feGaussianBlur');
           soft.setAttribute('in', 'warped');
@@ -809,6 +843,7 @@
         }
 
         defs.appendChild(clip);
+        defs.appendChild(clipS);
         defs.appendChild(filter);
         // Кромка liquid glass: градиент кольца (сверху светлое, снизу тёмное)
         // и мягкий блюр только кольца — матовость края как в iOS. Статика.
@@ -865,6 +900,124 @@
       };
     }
 
+    // Hi-res URL для лупы: карточки каталога показывают thumb (-small 60×60),
+    // а в лупу нужен веб-вариант -shop (600×600). Локалкам не вредит.
+    function hiResSrc(src) {
+      if (!src) return src;
+      var s = String(src);
+      if (s.indexOf('-small.') !== -1) s = s.replace('-small.', '-shop.');
+      return s;
+    }
+
+    // Потолок зума без мыла: 1 пиксель исходника = 1 device-пиксель (+headroom).
+    // 0 = натуралки не знаем, кап не применяем.
+    function sharpCap() {
+      try {
+        if (!(srcNatW > 0 && srcNatH > 0 && visW > 0 && visH > 0)) return 0;
+        var dpr = window.devicePixelRatio || 1;
+        if (!(dpr > 0)) dpr = 1;
+        var cap = Math.min(srcNatW / visW, srcNatH / visH) / dpr * LENS_ZOOM_HEADROOM;
+        if (!isFinite(cap) || cap <= 0) return 0;
+        return Math.min(LENS_MAX, cap);
+      } catch (e) { return 0; }
+    }
+
+    function clampZoom(v) {
+      v = Number(v);
+      if (!isFinite(v)) v = LENS_MIN;
+      if (v < LENS_MIN) v = LENS_MIN;
+      if (v > LENS_MAX) v = LENS_MAX;
+      var cap = sharpCap();
+      if (cap > 0 && v > Math.max(LENS_MIN, cap)) v = Math.max(LENS_MIN, cap);
+      return v;
+    }
+
+    function setLayers(zone, src) {
+      var layers = zone.querySelectorAll('.zoom-lens-svg image');
+      for (var i = 0; i < layers.length; i++) {
+        layers[i].setAttribute('href', src);
+        try { layers[i].setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', src); }
+        catch (e) { /* старые движки — хватит href */ }
+      }
+    }
+
+    // Content-rect фото в координатах зоны (CSS px). Чинит растягивание:
+    // <img> обычно contain/cover в квадратной коробке, а исходники неквадратные.
+    // Считаем реальный прямоугольник картинки (letterbox-инсеты contain,
+    // crop-офсеты cover, паддинги detail-блока), чтобы слой лупы повторял
+    // пропорции исходника, а не коробки.
+    function computeMetrics(zone, img) {
+      var natW = srcNatW || img.naturalWidth || 0;
+      var natH = srcNatH || img.naturalHeight || 0;
+      srcNatW = natW;
+      srcNatH = natH;
+      mSX = 1; mSY = 1; mOX = 0; mOY = 0; visW = 0; visH = 0;
+      try {
+        var zr = zone.getBoundingClientRect();
+        var r = img.getBoundingClientRect();
+        var cs = window.getComputedStyle ? window.getComputedStyle(img) : null;
+        var padL = cs ? (parseFloat(cs.paddingLeft) || 0) : 0;
+        var padR = cs ? (parseFloat(cs.paddingRight) || 0) : 0;
+        var padT = cs ? (parseFloat(cs.paddingTop) || 0) : 0;
+        var padB = cs ? (parseFloat(cs.paddingBottom) || 0) : 0;
+        var boxW = Math.max(1, r.width - padL - padR);
+        var boxH = Math.max(1, r.height - padT - padB);
+        var boxX = (r.left - zr.left) + padL;
+        var boxY = (r.top - zr.top) + padT;
+        var fit = cs && cs.objectFit ? String(cs.objectFit) : '';
+        if (!(natW > 0 && natH > 0)) {
+          // Натуралки нет (SVG/ещё грузится): старое поведение по коробке.
+          mSX = 1; mSY = 1; mOX = boxX; mOY = boxY; visW = boxW; visH = boxH;
+          srcNatW = boxW; srcNatH = boxH;
+          return;
+        }
+        if (fit === 'cover') {
+          var s = Math.max(boxW / natW, boxH / natH);
+          var iw = natW * s;
+          var ih = natH * s;
+          mSX = s; mSY = s;
+          mOX = boxX + (boxW - iw) / 2;
+          mOY = boxY + (boxH - ih) / 2;
+          visW = boxW; visH = boxH;
+        } else if (fit === 'fill' || fit === '') {
+          mSX = boxW / natW; mSY = boxH / natH;
+          mOX = boxX; mOY = boxY;
+          visW = boxW; visH = boxH;
+        } else if (fit === 'none') {
+          mSX = 1; mSY = 1;
+          mOX = boxX + (boxW - natW) / 2;
+          mOY = boxY + (boxH - natH) / 2;
+          visW = Math.min(boxW, natW); visH = Math.min(boxH, natH);
+        } else {
+          // contain (row/detail/dsplit) и scale-down: вписать с центрированием.
+          var sc = Math.min(boxW / natW, boxH / natH);
+          if (fit === 'scale-down' && sc > 1) sc = 1;
+          var cw = natW * sc;
+          var ch = natH * sc;
+          mSX = sc; mSY = sc;
+          mOX = boxX + (boxW - cw) / 2;
+          mOY = boxY + (boxH - ch) / 2;
+          visW = cw; visH = ch;
+        }
+      } catch (e) { /* fallback ниже */ }
+      if (!(mSX > 0)) mSX = 1;
+      if (!(mSY > 0)) mSY = 1;
+    }
+
+    // Hi-res догрузка: файл уже на экране (тот же кадр), просто меняем источник
+    // слоёв лупы на чёткий и пересчитываем кап. Позиция/зум не прыгают.
+    function applyHiRes(zone, hi, w, h) {
+      if (active !== zone || !w || !h) return;
+      srcNatW = w;
+      srcNatH = h;
+      var img = zone.querySelector('img');
+      if (img) computeMetrics(zone, img);
+      zoomTarget = clampZoom(zoomTarget);
+      if (zoomCur > zoomTarget) zoomCur = zoomTarget;
+      setLayers(zone, hi);
+      scheduleApply();
+    }
+
     function scheduleApply() {
       if (!rafId) rafId = requestAnimationFrame(tick);
     }
@@ -887,18 +1040,42 @@
       if (!src) return;
       ensureDefs();
       deactivate();
+      active = zone;
       var base = zoneBase(zone);
       lensSize = lensSettings.size || base.size;
-      zoomCur = lensSettings.zoom || base.zoom;
-      zoomTarget = zoomCur;
-      imgW = img.offsetWidth || 1;
-      imgH = img.offsetHeight || 1;
       lens.style.setProperty('--lens-size', lensSize + 'px');
-      layer.setAttribute('href', src);
-      layer.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', src);
-      zone.classList.add('is-lens');
-      active = zone;
+      // Сначала метрики по отображаемому файлу (мгновенно, без ожидания сети),
+      // затем тихий апгрейд до hi-res — резкость 1в1.
+      srcNatW = img.naturalWidth || 0;
+      srcNatH = img.naturalHeight || 0;
+      computeMetrics(zone, img);
+      var startZoom = clampZoom(lensSettings.zoom || base.zoom);
+      zoomCur = startZoom;
+      zoomTarget = startZoom;
+      setLayers(zone, src);
       tickNow();
+      zone.classList.add('is-lens');
+      // Hi-res в фоне: -small 60px -> -shop 600px (каталог/чат на thumb).
+      var hi = hiResSrc(src);
+      if (hi && hi !== src && active === zone) {
+        var cached = hiCache[hi];
+        if (cached && cached.w > 0) {
+          applyHiRes(zone, hi, cached.w, cached.h);
+        } else if (cached !== 'pending') {
+          hiCache[hi] = 'pending';
+          try {
+            var probe = new Image();
+            probe.onload = function () {
+              var w = probe.naturalWidth || 0;
+              var h = probe.naturalHeight || 0;
+              hiCache[hi] = { w: w, h: h };
+              applyHiRes(zone, hi, w, h);
+            };
+            probe.onerror = function () { hiCache[hi] = { w: 0, h: 0 }; };
+            probe.src = hi;
+          } catch (e) { hiCache[hi] = { w: 0, h: 0 }; }
+        }
+      }
     }
 
     // Один кадр: дотяжка зума к цели + позиция линзы. Зум едет плавно,
@@ -906,22 +1083,34 @@
     function tickNow() {
       if (!active) return;
       var lens = active.querySelector('.zoom-lens');
-      var layer = active.querySelector('.zoom-lens-svg image');
-      if (!lens || !layer) return;
+      var layers = active.querySelectorAll('.zoom-lens-svg image');
+      if (!lens || !layers || !layers.length) return;
       var rect = active.getBoundingClientRect();
       var x = lastX - rect.left;
       var y = lastY - rect.top;
       lens.style.setProperty('--lens-x', (x - lensSize / 2) + 'px');
       lens.style.setProperty('--lens-y', (y - lensSize / 2) + 'px');
-      // Координаты 0..100 (viewBox лупы): картинка кладётся так, чтобы
-      // точка под курсором оказалась в центре линзы. Слой шире круга
-      // на 2*LENS_BLEED симметрично — запас под outward-загиб кромки.
+      // Координаты 0..100 (viewBox лупы): точка под курсором — в центре линзы.
+      // Курсор переводим в пиксели исходника через content-rect (без letterbox
+      // и crop-офсетов contain/cover — пропорции не тянутся), клампим к краям.
+      // Оба слоя (warped + sharp) кладутся одинаково; запас BLEED симметричен
+      // под outward-загиб кромки, центровка и сила фишая не меняются.
       var k = 100 / lensSize;
       var z = zoomCur;
-      layer.setAttribute('x', (50 - x * z * k - LENS_BLEED).toFixed(2));
-      layer.setAttribute('y', (50 - y * z * k - LENS_BLEED).toFixed(2));
-      layer.setAttribute('width', (imgW * z * k + 2 * LENS_BLEED).toFixed(2));
-      layer.setAttribute('height', (imgH * z * k + 2 * LENS_BLEED).toFixed(2));
+      var px = (x - mOX) / mSX;
+      var py = (y - mOY) / mSY;
+      if (srcNatW > 0) px = Math.min(srcNatW, Math.max(0, px));
+      if (srcNatH > 0) py = Math.min(srcNatH, Math.max(0, py));
+      var lx = (50 - px * mSX * z * k - LENS_BLEED).toFixed(2);
+      var ly = (50 - py * mSY * z * k - LENS_BLEED).toFixed(2);
+      var lw = (srcNatW * mSX * z * k + 2 * LENS_BLEED).toFixed(2);
+      var lh = (srcNatH * mSY * z * k + 2 * LENS_BLEED).toFixed(2);
+      for (var i = 0; i < layers.length; i++) {
+        layers[i].setAttribute('x', lx);
+        layers[i].setAttribute('y', ly);
+        layers[i].setAttribute('width', lw);
+        layers[i].setAttribute('height', lh);
+      }
     }
 
     function tick() {
@@ -978,8 +1167,7 @@
       else if (e.deltaMode === 2) delta *= 400;
       var step = Math.max(0.05, zoomTarget * 0.0016 * Math.min(150, Math.abs(delta)));
       zoomTarget += delta < 0 ? step : -step;
-      if (zoomTarget < LENS_MIN) zoomTarget = LENS_MIN;
-      if (zoomTarget > LENS_MAX) zoomTarget = LENS_MAX;
+      zoomTarget = clampZoom(zoomTarget);
       lastX = e.clientX;
       lastY = e.clientY;
       scheduleApply();
@@ -1050,7 +1238,7 @@
         lensSettings.zoom = Math.round(Number(lensZoomRange.value) * 10) / 10;
         lensZoomVal.textContent = '×' + lensSettings.zoom.toFixed(1);
         saveLensSettings();
-        zoomTarget = lensSettings.zoom;
+        zoomTarget = clampZoom(lensSettings.zoom);
         if (reduced) zoomCur = zoomTarget;
         scheduleApply();
       });
@@ -1066,7 +1254,7 @@
         if (active) {
           var base = zoneBase(active);
           lensSize = base.size;
-          zoomTarget = base.zoom;
+          zoomTarget = clampZoom(base.zoom);
           zoomCur = reduced ? zoomTarget : zoomCur;
           var lens = active.querySelector('.zoom-lens');
           if (lens) lens.style.setProperty('--lens-size', lensSize + 'px');
@@ -1154,7 +1342,7 @@
       window.addEventListener('resize', function () {
         if (!active) return;
         var img = active.querySelector('img');
-        if (img) { imgW = img.offsetWidth || imgW; imgH = img.offsetHeight || imgH; }
+        if (img) computeMetrics(active, img);
         scheduleApply();
       });
     }

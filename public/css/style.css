@@ -982,11 +982,16 @@ a:hover { text-decoration: none; }
 }
 .zoom-zone.is-lens .zoom-lens-svg { transform: scale(1); }
 /* Качественный апскейл ТОЛЬКО увеличенного слоя в лупе.
-   Базовые img товаров не затрагиваются. На Windows FHD убирает
-   «пиксельноватость» быстрого ресемплинга внутри фильтрованного SVG. */
+   Базовые img товаров не затрагиваются. Два слоя: .lens-warped (fisheye
+   liquid glass по всей площади) и .lens-sharp поверх (без фильтра, резкий
+   центр 1в1, клип малым кругом) — пропорции считает JS по content-rect
+   (contain/cover), SVG ничего не тянет. */
 .zoom-lens-svg image {
   image-rendering: auto;
   shape-rendering: geometricPrecision;
+}
+.zoom-lens-svg .lens-sharp {
+  image-rendering: -webkit-optimize-contrast;
 }
 /* Liquid glass поверх лупы: лёгкая вуаль + «толщина стекла» по кромке.
    Верхний блик-«солнце» (radial-пятно) убран — внутри только фото.
