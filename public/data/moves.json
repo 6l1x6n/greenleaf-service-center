@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-19T13:02:48+03:00",
+  "updated": "2026-09-19T16:25:06+03:00",
   "moves": [
     {
       "number": "3501800",
@@ -9,16 +9,10 @@
       "sum": 288840.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Отправлен",
-      "statusCode": 4,
-      "items": [
-        {
-          "sku": "ASA139",
-          "name": "iLiFE Aroma White Пятновыводитель и бактериовыводитель бесфосфатное средство для стирки 1,5 кг",
-          "qty": 120
-        }
-      ],
-      "itemsParsed": true
+      "status": "Принят СЦ",
+      "statusCode": 7,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3492392",
