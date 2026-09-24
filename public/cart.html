@@ -22,7 +22,7 @@
   <meta property="og:image:alt" content="Greenleaf — Сервис-центр">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png">
-  <link rel="stylesheet" href="css/style.css?v=20260914a">
+  <link rel="stylesheet" href="css/style.css?v=20260924a">
 </head>
 
 <body>
@@ -110,16 +110,18 @@
               <div class="cart-sum-row cart-sum-qty">Позиций: <span class="sum-qty">0</span></div>
             </div>
 
-            <label class="cart-partner-label" for="partnerId">ID партнёра Greenleaf <small>(если подписаны — цена станет партнёрской)</small></label>
-            <input class="search" id="partnerId" name="partner_id" placeholder="например kz12345678" autocomplete="off" inputmode="text">
+            <label class="cart-partner-label" for="partnerId">ID клиента Greenleaf <small>(для счёта на оплату Kaspi и партнёрской цены)</small></label>
+            <input class="search" id="partnerId" name="partner_id" placeholder="kz12345678" autocomplete="off" inputmode="text">
             <p class="partner-hint" id="partnerHint"></p>
 
             <div class="pay-tabs">
               <span class="tooltip-wrap" id="payTabKaspi" data-tip=""><button class="pay-tab active" data-pay="kaspi">💳 Kaspi</button></span>
               <span class="tooltip-wrap" id="payTabCash" data-tip=""><button class="pay-tab" data-pay="cash">💵 Наличные</button></span>
-            </div>
+              <span class="tooltip-wrap" id="payTabInvoice" data-tip=""><button class="pay-tab" data-pay="kaspi_invoice">🧾 Счёт Kaspi</button></span>
+             </div>
+             <p class="form-note hidden" id="payMethodsUnavailable">Филиал временно не принимает онлайн-оплату. Выберите другой способ или свяжитесь с менеджером.</p>
 
-            <div class="pay-panel" data-pay-panel="kaspi">
+             <div class="pay-panel" data-pay-panel="kaspi">
               <div class="kaspi-amount">К оплате: <b class="sum-total" data-total="0">—</b></div>
               <button class="btn btn-primary btn-lg" type="button" id="kaspiPayBtn">💳 Оплатить через Kaspi</button>
               <p class="form-note">Сумма скопируется автоматически. Откройте приложение Kaspi → «Перевод» → вставьте сумму. Оплаченную сумму мы проверим по оповещению и включим в заказ.</p>
@@ -129,12 +131,17 @@
               </label>
             </div>
 
-            <div class="pay-panel hidden" data-pay-panel="cash">
-              <p class="form-note">Оплатите наличными при получении. По желанию укажите время — подготовим заказ заранее.</p>
-            </div>
+             <div class="pay-panel hidden" data-pay-panel="cash">
+               <p class="form-note">Оплатите наличными при получении. По желанию укажите время — подготовим заказ заранее.</p>
+             </div>
 
-            <form class="form" data-type="order" id="orderForm">
-              <input type="hidden" name="payment" id="orderPayment">
+             <div class="pay-panel hidden" data-pay-panel="kaspi_invoice">
+               <p class="form-note">Введите ID клиента Greenleaf в формате <b>kz12345678</b>. Цена станет партнёрской (−50%), счёт на оплату Kaspi подготовит менеджер. Оплата позже.</p>
+             </div>
+
+             <form class="form" data-type="order" id="orderForm">
+               <input type="hidden" name="payment" id="orderPayment">
+               <input type="hidden" name="payment_code" id="orderPaymentCode">
               <input type="hidden" name="order_items" id="orderItems">
               <input type="hidden" name="order_items_json" id="orderItemsJson">
               <input type="hidden" name="order_id" id="orderId">
@@ -142,19 +149,19 @@
               <input type="hidden" name="order_total" id="orderTotal">
               <input type="hidden" name="order_package" id="orderPackage">
               <input type="hidden" name="order_qty" id="orderQtyTotal">
-              <input type="hidden" name="order_partner_mode" id="orderPartnerMode">
-              <input type="hidden" name="partner_id" id="orderPartnerId">
-              <input type="hidden" name="order_store" id="orderStore">
+               <input type="hidden" name="order_partner_mode" id="orderPartnerMode">
+               <input type="hidden" name="partner_id" id="orderPartnerId">
+               <input type="hidden" name="order_store" id="orderStore">
               <input type="hidden" name="clientToken" id="orderClientToken">
               <input name="name" placeholder="Ваше имя *" required>
               <input name="phone" type="tel" placeholder="+7 (___) ___-__-__ *" required>
-              <div class="cash-fields hidden" data-cash-fields>
-                <label for="pickupDate">Дата приезда (по желанию)</label>
-                <select id="pickupDate" name="pickup_date"></select>
-                <label for="pickupTime">Время приезда (по желанию)</label>
-                <select id="pickupTime" name="pickup_time"></select>
-                <p class="form-note" id="pickupHint" style="margin-top:6px;"></p>
-              </div>
+               <div class="cash-fields hidden" data-pickup-fields>
+                 <label for="pickupDate">Дата приезда <small>(по желанию)</small></label>
+                 <select id="pickupDate" name="pickup_date"></select>
+                 <label for="pickupTime">Время приезда <small>(по желанию)</small></label>
+                 <select id="pickupTime" name="pickup_time"></select>
+                 <p class="form-note" id="pickupHint" style="margin-top:6px;"></p>
+               </div>
               <input class="hp" name="company" tabindex="-1" autocomplete="off">
               <button class="btn btn-primary btn-lg" type="submit" id="orderSubmitBtn" disabled>Оформить заказ</button>
               <p class="form-note" id="submitGateNote" style="color:var(--orange,#b26a00);">Для Kaspi: нажмите «Оплатить через Kaspi» и отметьте оплату, чтобы оформить заказ.</p>
@@ -201,12 +208,12 @@
     </div>
   </section>
 
-  <script src="js/ui.js?v=20260914a"></script>
-  <script src="js/auth.js?v=20260813c"></script>
+  <script src="js/ui.js?v=20260924a"></script>
+  <script src="js/auth.js?v=20260924a"></script>
   <script src="js/cart.js?v=20260910g"></script>
-  <script src="js/cart-page.js?v=20260909a"></script>
-  <script src="js/forms.js?v=20260813c"></script>
-  <script src="js/ai-chat.js?v=20260910i"></script>
+  <script src="js/cart-page.js?v=20260924a"></script>
+  <script src="js/forms.js?v=20260924a"></script>
+  <script src="js/ai-chat.js?v=20260924a"></script>
 </body>
 
 </html>

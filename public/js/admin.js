@@ -61,7 +61,10 @@
     pendingProductChanges: {},
     pendingScChanges: {},
     availabilityScId: null,
-    stockScId: null
+    stockScId: null,
+    refreshCurrent: null,
+    ordersRefreshTimer: null,
+    sessionRefreshTimer: null
   };
 
   var SECTIONS = {
@@ -448,6 +451,7 @@
   }
 
   function renderSection() {
+    state.refreshCurrent = null;
     var renderers = {
       overview: renderOverview,
       cabinet: renderCabinet,
@@ -470,9 +474,9 @@
 
   function openSection(name) {
     if (!state.user) { showLogin(); return; }
-    if (!SECTIONS[name]) {
-      var secs = visibleSections();
-      name = secs.indexOf(state.section) !== -1 ? state.section : (secs[0] || 'deliveries');
+    var allowed = visibleSections();
+    if (!SECTIONS[name] || allowed.indexOf(name) === -1) {
+      name = allowed.indexOf(state.section) !== -1 ? state.section : (allowed[0] || 'deliveries');
       if (!SECTIONS[name]) { showLogin(); return; }
     }
     state.section = name;
@@ -581,7 +585,17 @@
     var imagePreview = store.image
       ? '<img id="storeImagePreview" class="store-img-preview" src="' + h(store.image) + '" alt="Превью фото" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
       : '<img id="storeImagePreview" class="store-img-preview hidden" src="assets/images/products/placeholder.svg" alt="Превью фото" onerror="this.src=\'assets/images/products/placeholder.svg\'">';
-    var pm = store.payment_methods || ['kaspi', 'cash'];
+    var pm = Array.isArray(store.payment_methods) && store.payment_methods.length ? store.payment_methods : ['kaspi', 'cash'];
+    var pv = store.payment_method_visibility && typeof store.payment_method_visibility === 'object' ? store.payment_method_visibility : {};
+    var methodCard = function (code, emoji, name, hint) {
+      var accepted = pm.indexOf(code) !== -1;
+      var visible = accepted && pv[code] !== false;
+      return '<div class="pm-opt' + (accepted ? ' accepted' : '') + (visible ? ' visible' : '') + '">' +
+        '<label class="pm-main"><input type="checkbox" name="pay_' + code + '" value="1"' + (accepted ? ' checked' : '') + '>' +
+        '<span class="pm-emoji">' + emoji + '</span><span class="pm-name">' + name + '</span><span class="pm-hint">' + hint + '</span></label>' +
+        '<label class="pm-visibility"><input type="checkbox" name="show_' + code + '" value="1"' + (visible ? ' checked' : '') + (accepted ? '' : ' disabled') + '> Показывать клиентам</label>' +
+        '</div>';
+    };
     return '<div class="admin-card">' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;" class="store-auth-grid">' +
       '<div class="form-group"><label>Название СЦ *</label><input name="storeName" value="' + h(store.name) + '" required></div>' +
@@ -597,16 +611,11 @@
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
       '<div class="form-group"><label>Методы оплаты</label>' +
       '<div class="pay-methods-admin">' +
-      '<label class="pm-opt' + (pm.indexOf('kaspi') !== -1 ? ' checked' : '') + '">' +
-      '<input type="checkbox" name="pay_kaspi" value="1"' + (pm.indexOf('kaspi') !== -1 ? ' checked' : '') + '>' +
-      '<span class="pm-emoji">💳</span><span class="pm-name">Kaspi</span><span class="pm-hint">Оплата переводом онлайн</span>' +
-      '</label>' +
-      '<label class="pm-opt' + (pm.indexOf('cash') !== -1 ? ' checked' : '') + '">' +
-      '<input type="checkbox" name="pay_cash" value="1"' + (pm.indexOf('cash') !== -1 ? ' checked' : '') + '>' +
-      '<span class="pm-emoji">💵</span><span class="pm-name">Наличные</span><span class="pm-hint">Оплата при получении</span>' +
-      '</label>' +
+      methodCard('kaspi', '💳', 'Kaspi', 'Оплата переводом онлайн') +
+      methodCard('cash', '💵', 'Наличные', 'Оплата при получении') +
+      methodCard('kaspi_invoice', '🧾', 'Счёт на оплату Kaspi', 'ID клиента kz12345678, −50%, оплата позже') +
       '</div>' +
-      '<p class="form-note">Отключённый метод станет недоступен при оформлении заказа (кнопка неактивна с подсказкой).</p></div>' +
+      '<p class="form-note">Отмеченный метод разрешён для филиала. «Показывать клиентам» управляет видимостью в оплате; скрытый метод сервер не принимает.</p></div>' +
       '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."' + (store.image ? '' : '') + '>' + imagePreview + '</div>' +
       '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
       '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
@@ -668,9 +677,19 @@
         var row = off.closest('.sched-row');
         if (row) row.classList.toggle('has-off', off.checked);
       }
-      // Карточка-переключатель метода оплаты: подсвечиваем выбранное состояние
       var pmOpt = e.target.closest('.pm-opt');
-      if (pmOpt) pmOpt.classList.toggle('checked', e.target.checked);
+      if (pmOpt) {
+        var accept = pmOpt.querySelector('.pm-main input');
+        var show = pmOpt.querySelector('.pm-visibility input');
+        if (e.target === accept) {
+          pmOpt.classList.toggle('accepted', !!accept.checked);
+          if (show) {
+            show.disabled = !accept.checked;
+            if (!accept.checked) show.checked = false;
+          }
+        }
+        if (e.target === show) pmOpt.classList.toggle('visible', !!(show && show.checked));
+      }
     });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -717,10 +736,16 @@
       store.authPassword = authPass ? authPass : store.authPassword;
       store.phoneRaw = (store.phone || '').replace(/\D/g, '');
       if (store.phoneRaw && !store.whatsapp) store.whatsapp = store.phoneRaw;
-      // Методы оплаты: хотя бы один выбран; пустая конфигурация не сохраняется
       var paymentMethods = [];
-      if (form.pay_kaspi && form.pay_kaspi.checked) paymentMethods.push('kaspi');
-      if (form.pay_cash && form.pay_cash.checked) paymentMethods.push('cash');
+      var paymentVisibility = {};
+      ['kaspi', 'cash', 'kaspi_invoice'].forEach(function (method) {
+        var accept = form['pay_' + method];
+        var show = form['show_' + method];
+        if (accept && accept.checked) {
+          paymentMethods.push(method);
+          paymentVisibility[method] = !!(show && show.checked);
+        }
+      });
       if (!paymentMethods.length) {
         form.classList.remove('show-success');
         form.classList.add('show-error');
@@ -729,6 +754,8 @@
         return;
       }
       store.payment_methods = paymentMethods;
+      store.payment_method_visibility = paymentVisibility;
+      store.payment_methods_version = 2;
 
       // Карточка СЦ всегда пишется в Worker KV: статика для остальных в stores.json
       var isNew = !store.id || String(store.id).indexOf('sc-new-') === 0;
@@ -746,6 +773,8 @@
         image: store.image,
         description: store.description,
         payment_methods: store.payment_methods,
+        payment_method_visibility: store.payment_method_visibility,
+        payment_methods_version: 2,
         portalLogin: store.portalLogin,
         portalPassword: portalPass,
         authLogin: store.authLogin || '',
@@ -1795,14 +1824,13 @@
       return '<option value="' + h(s.id) + '"' + (orderStoreFilter === s.id ? ' selected' : '') + '>' + h(s.name) + '</option>';
     }).join('');
 
-    // Тулбар с фильтром/архивом — только у суперадмина: для СЦ он был бы
-    // пустой серой плашкой между подсказкой и списком.
-    var toolbarHtml = isSuper()
-      ? '<div class="admin-toolbar">' +
-        '<label style="font-weight:600; font-size:13.5px;">Филиал:</label><select id="orderStoreFilter">' + storeOptions + '</select>' +
-        '<label class="form-checkbox" style="margin:0;"><input type="checkbox" id="orderArchiveToggle"' + (showArchive ? ' checked' : '') + '> Архив подтверждённых</label>' +
-        '</div>'
-      : '';
+    var toolbarHtml = '<div class="admin-toolbar">' +
+      '<button class="btn btn-outline btn-sm" type="button" id="ordersRefreshBtn">🔄 Обновить</button>' +
+      (isSuper()
+        ? '<label style="font-weight:600; font-size:13.5px;">Филиал:</label><select id="orderStoreFilter">' + storeOptions + '</select>' +
+          '<label class="form-checkbox" style="margin:0;"><input type="checkbox" id="orderArchiveToggle"' + (showArchive ? ' checked' : '') + '> Архив подтверждённых</label>'
+        : '') +
+      '</div>';
 
     content.insertAdjacentHTML('beforeend',
       '<div class="admin-note">🛒 Активные заказы сайта: <b>новые</b> держат резерв товара, <b>подтверждённые</b> — состоявшиеся продажи (после синка парсера уходят в архив и на остаток не влияют), <b>отменённые</b> возвращают товар. Удаление подтверждённого заказа <b>не</b> возвращает товар.</div>' +
@@ -1810,17 +1838,25 @@
       '<div class="admin-card"><div id="ordersList">Загружаем заказы…</div></div>'
     );
 
+    var loadSeq = 0;
     var load = function () {
+      state.refreshCurrent = load;
+      var seq = ++loadSeq;
       var showArchive = isSuper() && !!state.orderShowArchive;
       var url = '/api/orders' + (showArchive ? '?archive=1' : '');
       Auth.api(url).then(function (d) {
-        var orders = (d && d.orders) || [];
+        var listEl = content.querySelector('#ordersList');
+        if (!listEl || seq !== loadSeq) return;
+        if (!d || d.ok !== true || !Array.isArray(d.orders)) {
+          listEl.innerHTML = '<div class="owner-req-empty">' + ((d && d.error === 'forbidden') ? 'Недостаточно прав для просмотра заказов.' : 'Не удалось загрузить заказы. Проверьте соединение.') + '</div>';
+          return;
+        }
+        var orders = d.orders;
         // Фильтр по филиалу (суперадмин): применяем к загруженному списку
         var sf = state.orderStoreFilter;
         if (isSuper() && sf && sf !== 'all') {
           orders = orders.filter(function (o) { return String(o.storeId) === sf; });
         }
-        var listEl = content.querySelector('#ordersList');
         if (!orders.length) {
           listEl.innerHTML = '<div class="owner-req-empty">' + (showArchive ? 'Архив пуст.' : 'Заказов пока нет.') + '</div>';
           return;
@@ -1847,10 +1883,12 @@
               '</span>';
           }).join('');
           var totalTxt = o.total ? '<span>💰 Итого: <b>' + h(String(o.total).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) + ' ₸</b></span>' : '';
-          var payTxt = o.payment ? '<span>💳 ' + h(o.payment) + '</span>' : '';
+          var paymentCode = o.paymentCode || '';
+          var payLabel = o.paymentLabel || o.payment || '—';
+          var payTxt = '<span>💳 ' + h(payLabel) + '</span>';
+          if (paymentCode === 'kaspi_invoice') payTxt += '<span class="order-pending-payment">⏳ Оплата позже</span>';
           var pickupTxt = o.pickupDate ? '<span>📅 Забрать: ' + h(o.pickupDate) + (o.pickupTime ? ' в ' + h(o.pickupTime) : '') + '</span>' : '';
-          // Партнёрская скидка — приглушённый текст в строке метаданных, а не яркая плашка
-          var partnerTxt = o.partnerMode ? '<span class="order-partner-txt">🎫 Партнёрская цена (−50%)</span>' : '';
+          var partnerTxt = (o.partnerId || o.partnerMode) ? '<span class="order-partner-txt">🎫 ID клиента: ' + h(o.partnerId || 'не указан') + (o.partnerMode ? ' · −50%' : '') + '</span>' : '';
           var noteTxt = o.managerNote ? '<span style="color:var(--muted);">💬 Менеджер: ' + h(o.managerNote) + '</span>' : '';
           var canResolve = o.status === 'new' || o.status === 'ready';
           var dispNum = o.number ? ('#' + o.number) : o.id;
@@ -1920,10 +1958,17 @@
             btn.disabled = false;
           });
         };
-      }).catch(function () {
-        content.querySelector('#ordersList').innerHTML = '<div class="owner-req-empty">Не удалось загрузить заказы. Войдите заново.</div>';
+      }).catch(function (err) {
+        if (seq !== loadSeq) return;
+        var listEl = content.querySelector('#ordersList');
+        if (listEl && (!err || err.status !== 401)) {
+          listEl.innerHTML = '<div class="owner-req-empty">Не удалось загрузить заказы. Проверьте соединение.</div>';
+        }
       });
     };
+
+    var refreshBtn = content.querySelector('#ordersRefreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', load);
 
     var filterEl = content.querySelector('#orderStoreFilter');
     if (filterEl) filterEl.addEventListener('change', function () {
@@ -2786,10 +2831,42 @@
   var authSeq = 0;
   var SESSION_LS_KEY = 'greenleaf_sc_logged_user_v1';
 
+  function refreshActiveOrders() {
+    if (!state.user || state.section !== 'orders' || typeof state.refreshCurrent !== 'function') return;
+    if (state.ordersRefreshTimer) return;
+    state.ordersRefreshTimer = setTimeout(function () {
+      state.ordersRefreshTimer = null;
+      if (state.user && state.section === 'orders' && typeof state.refreshCurrent === 'function') state.refreshCurrent();
+    }, 250);
+  }
+
+  function refreshSessionOnResume() {
+    if (!Auth.getCurrentUser() || state.sessionRefreshTimer) return;
+    state.sessionRefreshTimer = setTimeout(function () {
+      state.sessionRefreshTimer = null;
+      Auth.revalidate().then(function (session) {
+        if (session === null) {
+          showLogin();
+          return;
+        }
+        if (session && state.section === 'orders') refreshActiveOrders();
+      });
+    }, 250);
+  }
+
   function showLogin() {
     authSeq++;
     state.user = null;
     state.section = null;
+    state.refreshCurrent = null;
+    if (state.ordersRefreshTimer) {
+      clearTimeout(state.ordersRefreshTimer);
+      state.ordersRefreshTimer = null;
+    }
+    if (state.sessionRefreshTimer) {
+      clearTimeout(state.sessionRefreshTimer);
+      state.sessionRefreshTimer = null;
+    }
     var loginScreen = document.getElementById('loginScreen');
     var layout = document.getElementById('adminLayout');
     if (loginScreen) loginScreen.classList.remove('hidden');
@@ -2873,16 +2950,27 @@
         if (btn) { btn.disabled = false; }
         if (user) {
           Auth.setCurrentUser(user);
-          state.user = user;
-          var mySeq = ++authSeq;
-          loadData().then(function () {
-            if (mySeq !== authSeq) return; // успели выйти — панель не показываем
-            showPanel();
-          });
         } else {
           document.getElementById('adminLoginErr').style.display = 'block';
         }
       });
+    });
+  }
+
+  function loadPanelForUser(user) {
+    if (!user || !user.role) return Promise.resolve(false);
+    state.user = user;
+    var seq = ++authSeq;
+    return loadData().then(function () {
+      if (seq !== authSeq || !Auth.getCurrentUser()) return false;
+      showPanel();
+      return true;
+    }).catch(function () {
+      if (seq === authSeq && Auth.getCurrentUser()) {
+        Utils.showToast('Не удалось загрузить кабинет. Проверьте соединение.');
+        showLogin();
+      }
+      return false;
     });
   }
 
@@ -2920,32 +3008,51 @@
 
     var user = Auth.getCurrentUser();
     if (user && user.role) {
-      state.user = user;
-      var mySeq = ++authSeq;
-      loadData().then(function () {
-        if (mySeq !== authSeq) return;
-        // Сессию могли сбросить параллельным выходом — проверяем
-        if (!Auth.getCurrentUser()) { showLogin(); return; }
-        showPanel();
+      Auth.revalidate().then(function (session) {
+        if (session === null) {
+          showLogin();
+          return;
+        }
+        var current = Auth.getCurrentUser();
+        if (!current || !current.role) {
+          showLogin();
+          return;
+        }
+        loadPanelForUser(current);
       });
     } else {
-      if (user) Auth.setCurrentUser(null); // битая сессия без роли — чистим
+      if (user) Auth.setCurrentUser(null);
       showLogin();
     }
 
-    // Выход/вход в другой вкладке — сразу переключаем вид, а не пустота
+    document.addEventListener('auth:expired', function () {
+      showLogin();
+    });
+    document.addEventListener('auth:changed', function (e) {
+      var next = e && e.detail ? e.detail.user : Auth.getCurrentUser();
+      if (!next) {
+        showLogin();
+        return;
+      }
+      if (state.user && next.token === state.user.token) return;
+      loadPanelForUser(next);
+    });
+
     window.addEventListener('storage', function (e) {
       if (!e || e.key !== SESSION_LS_KEY) return;
-      var u = Auth.getCurrentUser();
-      if (!u) {
+      var next = Auth.getCurrentUser();
+      if (!next) {
         showLogin();
-      } else if (!state.user) {
-        state.user = u;
-        var s = ++authSeq;
-        loadData().then(function () {
-          if (s === authSeq) showPanel();
-        });
+      } else if (!state.user || next.token !== state.user.token) {
+        loadPanelForUser(next);
       }
+    });
+
+    window.addEventListener('focus', refreshSessionOnResume);
+    window.addEventListener('online', refreshSessionOnResume);
+    window.addEventListener('pageshow', refreshSessionOnResume);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) refreshSessionOnResume();
     });
   }
 

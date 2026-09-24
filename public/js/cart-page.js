@@ -227,14 +227,29 @@
   function updateSubmitGate() {
     if (!submitBtn) return;
     var needPay = state.payment === 'kaspi';
-    var ok = !reserve.expired && (!needPay || (paymentStarted && kaspiPaid));
+    var needPartner = state.payment === 'kaspi_invoice' && !state.partnerMode;
+    var ok = state.payment && !reserve.expired && (!needPay || (paymentStarted && kaspiPaid)) && !needPartner;
     submitBtn.disabled = !ok;
     var note = document.getElementById('submitGateNote');
-    if (note) note.style.display = needPay && !ok ? '' : 'none';
+    if (note) {
+      if (needPartner) {
+        note.textContent = 'Для счёта на оплату Kaspi укажите ID клиента в формате kz12345678.';
+        note.style.display = '';
+      } else if (needPay && !ok) {
+        note.textContent = 'Для Kaspi: нажмите «Оплатить через Kaspi» и отметьте оплату, чтобы оформить заказ.';
+        note.style.display = '';
+      } else {
+        note.style.display = 'none';
+      }
+    }
   }
 
   function partnerModeValid(id) {
     return /^[a-z]{2}\d{8}$/i.test(String(id || '').trim());
+  }
+
+  function invoicePartnerValid(id) {
+    return /^kz\d{8}$/i.test(String(id || '').trim());
   }
 
   function packageFee(totalQty) {
@@ -393,40 +408,43 @@
       '</div>';
   }
 
-  // Методы оплаты выбранного СЦ (по умолчанию Kaspi + наличные)
   function paymentMethods() {
     var st = selectedStoreObj();
-    var m = st && Array.isArray(st.payment_methods) && st.payment_methods.length
-      ? st.payment_methods
-      : ['kaspi', 'cash'];
-    return m;
+    if (!st) return [];
+    if (Array.isArray(st.payment_methods)) return st.payment_methods.slice();
+    return ['kaspi', 'cash'];
   }
 
-  // Обновляет доступность вкладок оплаты: отключённый у СЦ метод — неактивен,
-  // при наведении показывается подсказка; метод автопереключается на доступный
+  function paymentLabel(method) {
+    if (method === 'kaspi_invoice') return 'Счёт на оплату Kaspi';
+    if (method === 'cash') return 'Наличные при получении';
+    return 'Kaspi';
+  }
+
   function updatePayTabs() {
-    var m = paymentMethods();
-    var hasKaspi = m.indexOf('kaspi') !== -1;
-    var hasCash = m.indexOf('cash') !== -1;
-    var st = selectedStoreObj();
-    var name = st ? st.name : '';
-    var tip = 'Данный метод оплаты у СЦ «' + name + '» временно недоступен';
-    var kaspiWrap = document.getElementById('payTabKaspi');
-    var cashWrap = document.getElementById('payTabCash');
-    var kaspiBtn = kaspiWrap ? kaspiWrap.querySelector('.pay-tab') : null;
-    var cashBtn = cashWrap ? cashWrap.querySelector('.pay-tab') : null;
-    if (kaspiBtn) kaspiBtn.disabled = !hasKaspi;
-    if (cashBtn) cashBtn.disabled = !hasCash;
-    if (kaspiWrap) {
-      if (hasKaspi) kaspiWrap.removeAttribute('data-tip');
-      else kaspiWrap.setAttribute('data-tip', tip);
+    var methods = paymentMethods();
+    ['kaspi', 'cash', 'kaspi_invoice'].forEach(function (method) {
+      var wrap = document.getElementById(method === 'kaspi' ? 'payTabKaspi' : (method === 'cash' ? 'payTabCash' : 'payTabInvoice'));
+      if (!wrap) return;
+      var available = methods.indexOf(method) !== -1;
+      wrap.classList.toggle('hidden', !available);
+      var button = wrap.querySelector('.pay-tab');
+      if (button) button.disabled = !available;
+    });
+    var noMethods = document.getElementById('payMethodsUnavailable');
+    if (noMethods) noMethods.classList.toggle('hidden', methods.length > 0);
+    var selected = methods.indexOf(state.payment) !== -1 ? state.payment : (methods[0] || null);
+    if (selected) setPayment(selected);
+    else {
+      state.payment = null;
+      setField('orderPayment', '');
+      setField('orderPaymentCode', '');
+      var partnerInput = document.getElementById('partnerId');
+      if (partnerInput) partnerInput.required = false;
+      setField('orderPartnerId', partnerInput ? partnerInput.value.trim() : '');
+      document.querySelectorAll('[data-pickup-fields]').forEach(function (el) { el.classList.add('hidden'); });
+      if (submitBtn) submitBtn.disabled = true;
     }
-    if (cashWrap) {
-      if (hasCash) cashWrap.removeAttribute('data-tip');
-      else cashWrap.setAttribute('data-tip', tip);
-    }
-    if (!hasKaspi && state.payment === 'kaspi') setPayment('cash');
-    else if (!hasCash && state.payment === 'cash') setPayment('kaspi');
   }
 
   function render() {
@@ -596,8 +614,12 @@
       opts.push('<option value="' + iso + '">' + pickupDateLabel(d) + '</option>');
       picked++;
     }
-    date.innerHTML = opts.join('');
+    date.innerHTML = '<option value="">Не указан</option>' + opts.join('');
     function buildTimes() {
+      if (!date.value) {
+        time.innerHTML = '<option value="">Не указан</option>';
+        return;
+      }
       var minMin = 9 * 60;
       var maxMin = 19 * 60 + 30;
       var excludeEnd = false;
@@ -627,26 +649,31 @@
   }
 
   function setPayment(method) {
-    var m = paymentMethods();
-    if (method === 'kaspi' && m.indexOf('kaspi') === -1) return;
-    if (method === 'cash' && m.indexOf('cash') === -1) return;
+    var methods = paymentMethods();
+    if (methods.indexOf(method) === -1) return;
     state.payment = method;
-    setField('orderPayment', method === 'cash' ? 'Наличные при получении' : 'Kaspi');
+    setField('orderPayment', paymentLabel(method));
+    setField('orderPaymentCode', method);
     document.querySelectorAll('.pay-tab').forEach(function (b) {
       b.classList.toggle('active', b.getAttribute('data-pay') === method);
     });
     document.querySelectorAll('.pay-panel').forEach(function (p) {
       p.classList.toggle('hidden', p.getAttribute('data-pay-panel') !== method);
     });
-    document.querySelectorAll('[data-cash-fields]').forEach(function (el) {
-      el.classList.toggle('hidden', method !== 'cash');
+    document.querySelectorAll('[data-pickup-fields]').forEach(function (el) {
+      el.classList.toggle('hidden', method !== 'cash' && method !== 'kaspi_invoice');
     });
+    var partnerInput = document.getElementById('partnerId');
+    if (partnerInput) {
+      partnerInput.required = method === 'kaspi_invoice';
+      setField('orderPartnerId', partnerInput.value.trim());
+      if (method === 'kaspi_invoice') state.partnerMode = invoicePartnerValid(partnerInput.value);
+    }
     var date = document.getElementById('pickupDate');
     var time = document.getElementById('pickupTime');
-    // Дата и время приезда необязательны для любого способа оплаты
     if (date) date.required = false;
     if (time) time.required = false;
-    if (method === 'cash') {
+    if (method !== 'kaspi') {
       kaspiPaid = false;
       paymentStarted = false;
       var paidWrap = document.getElementById('kaspiPaidWrap');
@@ -845,6 +872,19 @@
         if (inp) blink(inp);
         return;
       }
+      if (state.payment === 'kaspi_invoice') {
+        var invoiceInput = document.getElementById('partnerId');
+        var invoiceId = invoiceInput ? String(invoiceInput.value || '').trim().toLowerCase() : String(orderForm.partner_id && orderForm.partner_id.value || '').trim().toLowerCase();
+        setField('orderPartnerId', invoiceId);
+        if (!invoicePartnerValid(invoiceId)) {
+          e.preventDefault();
+          Utils.showToast('⚠️ Укажите ID клиента в формате kz12345678');
+          if (invoiceInput) blink(invoiceInput);
+          return;
+        }
+        state.partnerMode = true;
+        setField('orderPartnerMode', '1');
+      }
       if (state.payment === 'kaspi' && !(paymentStarted && kaspiPaid)) {
         e.preventDefault();
         Utils.showToast('⚠️ Сначала оплатите через Kaspi и отметьте «Я оплатил(а) заказ»');
@@ -856,6 +896,11 @@
       // дата не раньше сегодня, время — не раньше чем через 30 минут (по Астане)
       var pDate = orderForm.pickup_date ? orderForm.pickup_date.value : '';
       var pTime = orderForm.pickup_time ? orderForm.pickup_time.value : '';
+      if (pTime && !pDate) {
+        e.preventDefault();
+        Utils.showToast('⚠️ Сначала выберите дату приезда');
+        return;
+      }
       if (pDate) {
         var ast = astanaNow();
         var todayS = ast.date;
@@ -924,14 +969,21 @@
   if (partnerInput) {
     partnerInput.addEventListener('input', function () {
       var valid = partnerModeValid(partnerInput.value);
-      state.partnerMode = valid;
+      var invoiceValid = invoicePartnerValid(partnerInput.value);
+      state.partnerMode = state.payment === 'kaspi_invoice' ? invoiceValid : valid;
       setField('orderPartnerId', partnerInput.value.trim());
       var hint = document.getElementById('partnerHint');
       if (hint) {
-        hint.textContent = valid
-          ? '✅ Подтверждён: применяются партнёрские цены (−50%)'
-          : partnerInput.value.trim() ? 'ID партнёра не распознан — цены розничные. Формат: 2 буквы + 8 цифр (kz12345678).' : '';
-        hint.className = 'partner-hint' + (valid ? ' ok' : '');
+        if (state.payment === 'kaspi_invoice' && partnerInput.value.trim() && !invoiceValid) {
+          hint.textContent = 'ID клиента должен быть в формате kz12345678.';
+          hint.className = 'partner-hint';
+        } else if (state.partnerMode) {
+          hint.textContent = '✅ Подтверждён: применяются партнёрские цены (−50%)';
+          hint.className = 'partner-hint ok';
+        } else {
+          hint.textContent = partnerInput.value.trim() ? 'ID не распознан — для счёта укажите kz12345678.' : '';
+          hint.className = 'partner-hint';
+        }
       }
       render();
     });
@@ -958,7 +1010,9 @@
     if (payEl) {
       payEl.textContent = state.payment === 'cash'
         ? 'Оплата наличными при получении — ничего предоплачивать не нужно. Менеджер подтвердит заказ и свяжется с вами.'
-        : 'Оплату по Kaspi проверим по оповещению. Менеджер подтвердит заказ и свяжется с вами.';
+        : (state.payment === 'kaspi_invoice'
+          ? 'Счёт на оплату Kaspi подготовит менеджер. Оплата позже — он свяжется с вами.'
+          : 'Оплату по Kaspi проверим по оповещению. Менеджер подтвердит заказ и свяжется с вами.');
     }
     var copyBtn = document.getElementById('successCopyBtn');
     if (copyBtn) {

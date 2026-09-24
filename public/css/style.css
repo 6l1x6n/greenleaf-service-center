@@ -677,7 +677,7 @@ a:hover { text-decoration: none; }
 .cart-item-sku { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .cart-item-price { font-size: 13px; font-weight: 800; color: var(--green-dark); margin-top: 3px; }
 .cart-item-price .badge-sale { margin-left: 6px; }
-.cart-item-ctrl { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cart-item-ctrl { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-left: auto; }
 .cart-item-total { font-size: 15px; font-weight: 800; color: var(--green-dark); white-space: nowrap; }
 
 .cart-summary {
@@ -795,7 +795,8 @@ a:hover { text-decoration: none; }
   }
   .cart-item-media { grid-area: media; }
   .cart-item-body { grid-area: body; }
-  .cart-item-ctrl { grid-area: ctrl; flex-direction: row; justify-content: flex-start; }
+  .cart-item-ctrl { grid-area: ctrl; width: 100%; flex-direction: row; align-items: center; justify-content: flex-end; }
+  .cart-item-x { display: none; }
   .cart-item-total { grid-area: total; }
 }
 
@@ -811,7 +812,7 @@ a:hover { text-decoration: none; }
   .list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   /* Компактный фут в одну строку: цены + PV + иконка-кнопка.
      Резерв 100px = ширина компактного степпера: при добавлении ряд не прыгает. */
-  .list { --ctrl-w: 100px; }
+  .list .product-row { --ctrl-w: 100px; }
   .list .row-foot { flex-wrap: nowrap; gap: 8px; }
   .list .card-prices { gap: 6px; }
   .list .price-partner { font-size: 19px; }
@@ -833,7 +834,7 @@ a:hover { text-decoration: none; }
   .list .row-title { font-size: 14px; }
 }
 .product-row {
-  --ctrl-w: 150px;
+  --ctrl-w: 104px;
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   grid-template-areas: "media body" "foot foot";
@@ -915,11 +916,10 @@ a:hover { text-decoration: none; }
 .row-prices .partner-link { display: none; }
 .row-foot {
   grid-area: foot;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--ctrl-w);
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 10px;
+  gap: 8px;
   border-top: 1px dashed var(--line);
   padding-top: 8px;
 }
@@ -929,13 +929,16 @@ a:hover { text-decoration: none; }
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  min-width: var(--ctrl-w);
-  margin-left: auto;
+  width: 100%;
+  min-width: 0;
+  margin-left: 0;
 }
 
 /* Кнопка «В корзину» ровно того же размера, что и степпер с крестиком:
    при добавлении товара ряд не «прыгает». */
-.row-add { width: var(--ctrl-w); min-width: 0; }
+.row-add { width: 100%; min-width: 0; }
+.row-actions .row-add { gap: 4px; padding-left: 7px; padding-right: 7px; font-size: 12.5px; }
+.row-actions .qty-stepper { width: 100%; min-width: 0; justify-content: space-between; }
 .row-add svg { flex: none; }
 /* Двухрежимная кнопка списка: иконка (мультиколонки) / текст (одна колонка, модалка) */
 .row-add-ico { display: none; }
@@ -1115,19 +1118,15 @@ a:hover { text-decoration: none; }
 }
 
 @media (max-width: 420px) {
-  .row-foot { flex-wrap: wrap; }
-  .row-prices { width: 100%; }
-  /* Компактная цена в одну строку: 11 500 ₸ + −50% влезают без переноса */
+  .row-foot { grid-template-columns: minmax(0, 1fr) 104px; gap: 6px; }
   .row-prices .card-prices, .pdetail-price { gap: 6px; }
   .row-prices .price-partner, .pdetail-price .price-partner { font-size: 18px; }
   .row-prices .price-old, .pdetail-price .price-old { font-size: 12px; }
   .row-prices .badge-sale, .pdetail-price .badge-sale { font-size: 11px; padding: 2px 7px; }
   .row-prices .pv-badge, .pdetail-price .pv-badge { font-size: 10px; padding: 1px 7px; }
-  .row-actions { width: 100%; min-width: 0; }
-  .row-actions .row-add { flex: 1; width: auto; }
-  .row-actions .qty-stepper { flex: 1; justify-content: space-between; }
-  /* Крестик не нужен: минус на «1» убирает товар, а кнопка и степпер
-     должны быть ровно одной ширины */
+  .row-actions { width: 104px; min-width: 104px; }
+  .row-actions .row-add { flex: 0 0 104px; width: 104px; }
+  .row-actions .qty-stepper { flex: 0 0 104px; width: 104px; }
   .row-actions .row-remove { display: none; }
 }
 
@@ -1177,7 +1176,8 @@ a:hover { text-decoration: none; }
 .card-prices { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* Цена + скидка + бейдж всегда в одну строку: при 5-значных суммах
    (11 500 ₸) бейдж −50% раньше падал на вторую строку на телефонах */
-.row-prices .card-prices, .pdetail-price { flex-wrap: nowrap; white-space: nowrap; }
+.row-prices .card-prices { flex-wrap: wrap; white-space: normal; min-width: 0; }
+.pdetail-price { flex-wrap: nowrap; white-space: nowrap; }
 .price-old { font-size: 14px; color: var(--muted); text-decoration: line-through; font-weight: 600; white-space: nowrap; }
 .price-partner { font-size: 22px; font-weight: 800; color: var(--green-dark); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .price-ask { font-size: 15px; font-weight: 700; color: var(--muted); }
@@ -1555,21 +1555,23 @@ a:hover { text-decoration: none; }
 .pm-opt {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
   padding: 10px 12px;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-sm);
   background: #fff;
-  cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
-.pm-opt input { display: none; }
-.pm-opt:hover { border-color: rgba(27, 107, 63, 0.45); }
-.pm-opt.checked { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 1px var(--green) inset; }
+.pm-opt.accepted { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 1px var(--green) inset; }
+.pm-opt.visible { box-shadow: 0 0 0 1px var(--green) inset, 0 0 0 3px rgba(27, 107, 63, 0.12) inset; }
+.pm-main, .pm-visibility { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.pm-main input, .pm-visibility input { flex: none; width: 17px; height: 17px; margin: 2px 0 0; accent-color: var(--green); }
 .pm-emoji { font-size: 20px; line-height: 1; }
 .pm-name { font-size: 14px; font-weight: 800; color: var(--ink); margin-top: 3px; }
-.pm-opt.checked .pm-name { color: var(--green-dark); }
+.pm-opt.accepted .pm-name { color: var(--green-dark); }
 .pm-hint { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.pm-visibility { border-top: 1px solid var(--line); padding-top: 7px; font-size: 12px; color: var(--muted); }
+.pm-visibility input:disabled { cursor: not-allowed; }
 @media (max-width: 580px) {
   .pay-methods-admin { grid-template-columns: 1fr; }
 }
@@ -3539,7 +3541,7 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
 .ai-send:disabled { opacity: 0.5; cursor: default; }
 
 @media (max-width: 640px) {
-  .ai-fab { left: 14px; bottom: 18px; height: 54px; min-width: 54px; padding: 0 14px 0 12px; font-size: 14px; touch-action: manipulation; }
+  .ai-fab { display: none !important; }
   .ai-fab-ico { font-size: 22px; }
   .ai-panel {
     left: 8px;
@@ -3572,4 +3574,14 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
   .form input, .form select, .form textarea,
   .search, .sc-search, .ai-input, .qty-input,
   .modal .form input, .modal .form select, .modal .form textarea { font-size: 16px; }
+}
+.order-pending-payment, .sum-pending { color: #8a5a00; font-size: 12px; font-weight: 700; }
+.sum-partner { color: var(--green-dark); font-size: 12px; }
+.cash-fields label small { color: var(--muted); font-weight: 500; }
+.pay-tabs { flex-wrap: wrap; }
+.pay-tabs .tooltip-wrap { min-width: 120px; }
+@media (max-width: 420px) {
+  .pay-tabs .tooltip-wrap { min-width: calc(50% - 4px); }
+  .pay-tab { font-size: 12.5px; padding: 9px 6px; }
+  .cart-item-x { display: none; }
 }

@@ -91,6 +91,7 @@
     if (!overlay) return;
     var wasOpen = !overlay.classList.contains('hidden');
     overlay.classList.add('hidden');
+    myOrdersRender = null;
     if (wasOpen) unlockScroll();
   }
 
@@ -247,6 +248,7 @@
   }
 
   var CLIENT_TOKEN_KEY = 'greenleaf_client_token_v1';
+  var myOrdersRender = null;
 
   // Токен устройства: привязывает заказы к этому браузеру (localStorage)
   function clientToken() {
@@ -295,7 +297,16 @@
     var render = function () {
       listEl.innerHTML = 'Загружаем…';
       fetch('/api/my-orders?token=' + encodeURIComponent(token))
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          return r.json().then(function (body) {
+            if (!r.ok) {
+              var error = new Error((body && body.error) || 'Не удалось загрузить заказы');
+              error.status = r.status;
+              throw error;
+            }
+            return body;
+          });
+        })
         .then(function (d) {
           var orders = (d && d.orders) || [];
           if (!orders.length) {
@@ -334,7 +345,11 @@
             if (goodsTotal) {
               summaryParts.push('<span class="sum-total">Итого: <b>' + fmtPrice(goodsTotal) + '</b></span>');
             }
-            if (o.payment) summaryParts.push('<span class="sum-pay">' + esc(o.payment) + '</span>');
+             var paymentCode = o.paymentCode || '';
+             var paymentText = o.paymentLabel || o.payment || '—';
+             summaryParts.push('<span class="sum-pay">' + esc(paymentText) + '</span>');
+             if (paymentCode === 'kaspi_invoice') summaryParts.push('<span class="sum-pending">Оплата позже</span>');
+             if (o.partnerId || o.partnerMode) summaryParts.push('<span class="sum-partner">ID: ' + esc(o.partnerId || 'не указан') + (o.partnerMode ? ' · −50%' : '') + '</span>');
             if (o.pickupDate) summaryParts.push('<span class="sum-pickup">' + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' }).replace(/\./g, '')) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : '') + '</span>');
             var noteTxt = o.managerNote ? '<div class="order-manager-note">' + icon('info', 14) + '<span><b>Сообщение менеджера:</b> ' + esc(o.managerNote) + '</span></div>' : '';
             return '<li class="order-card">' +
@@ -351,36 +366,38 @@
               '</li>';
           }).join('') + '</ul>';
 
-          listEl.addEventListener('click', function (e) {
-            var copyBtn = e.target.closest('[data-copy-order]');
-            if (copyBtn) {
-              var txt = copyBtn.getAttribute('data-copy-order');
-              if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(txt).then(function () { showToast('Номер заказа скопирован'); });
-              }
-              return;
-            }
-            var btn = e.target.closest('[data-my-cancel]');
-            if (!btn) return;
-            e.preventDefault();
-            var oid = btn.getAttribute('data-my-cancel');
-            if (!confirm('Отменить заказ? Зарезервированный товар вернётся в наличие. Отменить можно только пока заказ ещё «Новый».')) return;
-            fetch('/api/my-orders/action', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: oid, token: token, action: 'cancel' })
-            }).then(function (r) { return r.json(); }).then(function (res) {
-              showToast(res && res.ok ? 'Заказ отменён' : ((res && res.error) || 'Не удалось отменить заказ'));
-              render();
-            }).catch(function () { showToast('Нет связи — попробуйте ещё раз'); });
-          });
-          var ref = document.getElementById('myOrdersRefreshBtn');
-          if (ref) ref.addEventListener('click', function (e) { e.preventDefault(); render(); });
         })
         .catch(function () {
           listEl.innerHTML = '<div class="owner-req-empty">Не удалось загрузить заказы. Проверьте соединение и попробуйте ещё раз.</div>';
         });
     };
+    myOrdersRender = render;
+    listEl.addEventListener('click', function (e) {
+      var copyBtn = e.target.closest('[data-copy-order]');
+      if (copyBtn) {
+        var txt = copyBtn.getAttribute('data-copy-order');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(function () { showToast('Номер заказа скопирован'); });
+        }
+        return;
+      }
+      var btn = e.target.closest('[data-my-cancel]');
+      if (!btn) return;
+      e.preventDefault();
+      var oid = btn.getAttribute('data-my-cancel');
+      if (!confirm('Отменить заказ? Зарезервированный товар вернётся в наличие. Отменить можно только пока заказ ещё «Новый».')) return;
+      fetch('/api/my-orders/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: oid, token: token, action: 'cancel' })
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        showToast(res && res.ok ? 'Заказ отменён' : ((res && res.error) || 'Не удалось отменить заказ'));
+        render();
+        refreshMyOrdersBadge();
+      }).catch(function () { showToast('Нет связи — попробуйте ещё раз'); });
+    });
+    var ref = document.getElementById('myOrdersRefreshBtn');
+    if (ref) ref.addEventListener('click', function (e) { e.preventDefault(); render(); });
     render();
   }
 
@@ -400,12 +417,20 @@
     try { token = localStorage.getItem(CLIENT_TOKEN_KEY) || ''; } catch (e) { token = ''; }
     if (!token) return;
     fetch('/api/my-orders?token=' + encodeURIComponent(token))
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json().then(function (body) {
+          if (!r.ok) throw new Error((body && body.error) || 'request failed');
+          return body;
+        });
+      })
       .then(function (d) {
-        var n = (d && d.orders) ? d.orders.length : 0;
-        if (!n) return;
+        var n = (d && Array.isArray(d.orders)) ? d.orders.length : 0;
         document.querySelectorAll('.my-orders-link').forEach(function (btn) {
           var count = btn.querySelector('.my-orders-count');
+          if (!n) {
+            if (count) count.remove();
+            return;
+          }
           if (!count) {
             count = document.createElement('span');
             count.className = 'cart-badge my-orders-count';
@@ -417,7 +442,33 @@
       .catch(function () { });
   }
 
+  function refreshOpenMyOrders() {
+    if (typeof myOrdersRender === 'function') myOrdersRender();
+  }
+
   document.addEventListener('DOMContentLoaded', refreshMyOrdersBadge);
+  document.addEventListener('order:sent', function () {
+    refreshMyOrdersBadge();
+    refreshOpenMyOrders();
+  });
+  window.addEventListener('focus', function () {
+    refreshMyOrdersBadge();
+    refreshOpenMyOrders();
+  });
+  window.addEventListener('online', function () {
+    refreshMyOrdersBadge();
+    refreshOpenMyOrders();
+  });
+  window.addEventListener('pageshow', function () {
+    refreshMyOrdersBadge();
+    refreshOpenMyOrders();
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+      refreshMyOrdersBadge();
+      refreshOpenMyOrders();
+    }
+  });
   if (document.readyState === 'interactive' || document.readyState === 'complete') refreshMyOrdersBadge();
 
   function esc(s) {

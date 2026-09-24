@@ -11,6 +11,7 @@
   var input = document.getElementById('aiInput');
   var sendBtn = document.getElementById('aiSend');
   var statusEl = document.getElementById('aiStatus');
+  var compactFabMq = window.matchMedia ? window.matchMedia('(max-width: 640px)') : null;
   if (!fab || !panel) return;
 
   function esc(s) {
@@ -70,8 +71,12 @@
     try { return localStorage.getItem(FAB_KEY) === '1'; } catch (e) { return false; }
   }
 
+  function isFabSuppressed() {
+    return isHidden() || !!(compactFabMq && compactFabMq.matches);
+  }
+
   function applyFabVisibility() {
-    fab.classList.toggle('hidden', isHidden());
+    fab.classList.toggle('hidden', isFabSuppressed());
   }
 
   function hideFab() {
@@ -840,7 +845,7 @@
 
   function fireNudge() {
     nudgeTimer = null;
-    if (nudgeDoneToday() || isHidden()) return;
+    if (nudgeDoneToday() || isFabSuppressed()) return;
     // Не перебиваем живой диалог: ждём ответ сервера или идёт печать —
     // переносим нудж, а не дублируем пузыри
     if (pending || saying || body.querySelector('.ai-typing-msg')) {
@@ -867,7 +872,7 @@
 
   function resetNudgeTimer() {
     if (nudgeTimer) clearTimeout(nudgeTimer);
-    if (nudgeDoneToday()) return;
+    if (nudgeDoneToday() || isFabSuppressed()) return;
     nudgeTimer = setTimeout(fireNudge, NUDGE_DELAY);
   }
 
@@ -910,5 +915,9 @@
     _hideFab();
   };
 
+  if (compactFabMq) {
+    if (compactFabMq.addEventListener) compactFabMq.addEventListener('change', applyFabVisibility);
+    else if (compactFabMq.addListener) compactFabMq.addListener(applyFabVisibility);
+  }
   applyFabVisibility();
 })();

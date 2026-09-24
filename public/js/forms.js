@@ -137,6 +137,10 @@
                   if (window.Utils) Utils.showToast('⏰ ' + (errData.message || 'Выбранное время недоступно — измените дату/время получения'));
                   markError(form);
                 }
+                if (errData && errData.error === 'payment') {
+                  if (window.Utils) Utils.showToast('⚠️ ' + (errData.message || 'Метод оплаты недоступен'));
+                  markError(form);
+                }
                 if (errData && errData.error === 'expired') {
                   if (window.Utils) Utils.showToast('⏳ ' + (errData.message || 'Время бронирования истекло — соберите корзину заново'));
                   window.dispatchEvent(new CustomEvent('order:expired'));
