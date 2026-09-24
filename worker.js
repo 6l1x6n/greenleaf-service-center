@@ -18,7 +18,7 @@
 //                   storeName, city, address, officeCode, portalLogin, portalPassword, comment,
 //                   status: pending|approved|rejected|new, createdAt }}
 //   reservations — {"<orderId>": { storeId, items: [{productId, qty}], createdAt, expiresAt }}
-//                  временная бронь на 5 минут при оформлении заказа (как места в кино)
+//                  временная бронь на 10 минут при оформлении заказа (как места в кино)
 //   orders       — {"<orderId>": { id, storeId, items: [{productId, qty}], name, phone,
 //                  comment, total, payment, pickupDate, pickupTime, status: new|confirmed|cancelled,
 //                  createdAt, confirmedAt?, cancelledAt? }} — активные заказы сайта.
@@ -62,8 +62,48 @@ function normalizePartnerId(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function isInvoicePartnerId(value) {
+function isPartnerId(value) {
   return /^kz\d{8}$/i.test(normalizePartnerId(value));
+}
+
+function hasOwn(object, key) {
+  return !!object && Object.prototype.hasOwnProperty.call(object, String(key));
+}
+
+function normalizeOrderId(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function isOrderId(value) {
+  return /^GL-[A-Z0-9]{6}$/.test(normalizeOrderId(value));
+}
+
+function orderFingerprint(data) {
+  let items = Array.isArray(data && data.items) ? data.items : [];
+  if (!items.length) {
+    try { items = JSON.parse(String(data && data.order_items_json || '[]')); } catch (e) { items = []; }
+  }
+  if (!Array.isArray(items)) items = [];
+  const quantities = Object.create(null);
+  items.forEach(function (item) {
+    const productId = String(item && item.productId || '');
+    if (!productId) return;
+    const qty = Math.max(1, Number(item && item.qty) || 1);
+    quantities[productId] = Math.min(999, (quantities[productId] || 0) + qty);
+  });
+  return JSON.stringify({
+    clientToken: String(data && (data.clientToken || data.client_token) || ''),
+    storeId: String(data && (data.storeId || data.orderStoreId || data.order_store_id || data.store_id) || ''),
+    paymentCode: paymentCodeFromData(data || {}),
+    partnerId: normalizePartnerId(data && (data.partnerId || data.partner_id)),
+    name: String(data && data.name || '').trim(),
+    phone: String(data && data.phone || '').trim(),
+    pickupDate: String(data && (data.pickupDate || data.pickup_date) || ''),
+    pickupTime: String(data && (data.pickupTime || data.pickup_time) || ''),
+    items: Object.keys(quantities).sort().map(function (productId) {
+      return [productId, quantities[productId]];
+    })
+  });
 }
 
 function normalizePaymentConfig(store) {
@@ -199,7 +239,7 @@ async function decryptSecret(env, value) {
 
 // ---------------- Остатки: база − продажи − активные брони ----------------
 
-const RESERVE_TTL_MS = 300 * 1000; // 5 минут
+const RESERVE_TTL_MS = 600 * 1000; // 10 минут
 
 function parseStockCount(text) {
   const t = String(text || '').trim();
@@ -328,7 +368,7 @@ async function handleStockSave(env, url, body) {
   return jsonResponse({ ok: true, deltas: (deltas && deltas[scId]) || {} });
 }
 
-// Активные 2-минутные брони корзины.
+// Активные 10-минутные брони корзины.
 // Каждая бронь — отдельный ключ res_<orderId> с expirationTtl (KV сам удаляет
 // истёкшие). Отдельные ключи исключают гонку «прочитать-изменить-записать»,
 // из-за которой при параллельных резервах с двух устройств терялась бронь.
@@ -348,7 +388,20 @@ async function activeReservations(env) {
     try {
       const r = JSON.parse(raw);
       const id = String(key).slice(4);
-      if (r && r.expiresAt && r.expiresAt > now) out[id] = r;
+      if (r && r.expiresAt && r.expiresAt > now) {
+        const quantities = Object.create(null);
+        (Array.isArray(r.items) ? r.items : []).forEach(function (item) {
+          const productId = String(item && item.productId || '');
+          if (!productId) return;
+          const qty = Math.max(1, Number(item && item.qty) || 1);
+          quantities[productId] = Math.min(999, (quantities[productId] || 0) + qty);
+        });
+        out[id] = Object.assign({}, r, {
+          items: Object.keys(quantities).map(function (productId) {
+            return { productId: productId, qty: quantities[productId], storeId: r.storeId };
+          })
+        });
+      }
     } catch (e) { /* повреждённая бронь — пропускаем */ }
   }
   return out;
@@ -367,7 +420,24 @@ async function deleteReservation(env, orderId) {
   } catch (e) { /* ключа нет — не страшно */ }
 }
 
-// Эффективные остатки: факт(парсер) − 2-мин холды − активные заказы (new)
+async function getOrderNoticeMarker(env, orderId) {
+  try {
+    const raw = await env.SC_STORES.get('order_notice_' + orderId);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function markOrderNoticeSent(env, orderId, number, fingerprint) {
+  await env.SC_STORES.put('order_notice_' + orderId, JSON.stringify({
+    sentAt: new Date().toISOString(),
+    number: Number(number) || null,
+    fingerprint: String(fingerprint || '')
+  }), { expirationTtl: 30 * 24 * 60 * 60 });
+}
+
+// Эффективные остатки: факт(парсер) − 10-мин холды − активные заказы (new)
 // − подтверждённые заказы после последнего синка базы.
 // excludeOrderId — своя бронь при валидации новой.
 async function computeEffectiveStock(env, url, excludeOrderId) {
@@ -383,8 +453,9 @@ async function computeEffectiveStock(env, url, excludeOrderId) {
       const baseCount = parseStockCount(src[pid]);
       if (baseCount === null) { stock[scId][pid] = src[pid]; return; }
       let res = 0;
-      Object.keys(reservations).forEach((oid) => {
+      Object.keys(reservations).forEach(function (oid) {
         if (excludeOrderId && oid === excludeOrderId) return;
+        if (orders[oid]) return;
         const r = reservations[oid];
         if (!r) return;
         const item = (r.items || []).find((i) => i.productId === pid && i.storeId === scId);
@@ -474,16 +545,37 @@ async function handleReserve(request, env, url) {
   } catch (e) {
     return jsonResponse({ ok: false, error: 'invalid json' }, 400);
   }
-  const orderId = String(data.orderId || '').trim();
+  const orderId = normalizeOrderId(data.orderId);
   const storeId = String(data.storeId || '').trim();
-  const items = Array.isArray(data.items) ? data.items.slice(0, 200) : [];
-  if (!orderId || !storeId || !items.length) {
+  const rawItems = Array.isArray(data.items) ? data.items.slice(0, 200) : [];
+  if (!orderId || !storeId || !rawItems.length) {
     return jsonResponse({ ok: false, error: 'orderId, storeId и items обязательны' }, 400);
+  }
+  if (!isOrderId(orderId)) {
+    return jsonResponse({ ok: false, error: 'Некорректный orderId' }, 400);
+  }
+  const itemMap = Object.create(null);
+  for (const raw of rawItems) {
+    const productId = String(raw && raw.productId || '');
+    if (!productId) return jsonResponse({ ok: false, error: 'Некорректный productId' }, 400);
+    const qty = Math.max(1, Math.min(Number(raw && raw.qty) || 1, 999));
+    itemMap[productId] = Math.min(999, (itemMap[productId] || 0) + qty);
+  }
+  const items = Object.keys(itemMap).map(function (productId) {
+    return { productId: productId, qty: itemMap[productId] };
+  });
+  const catalog = await loadOrderCatalog(env, url);
+  if (!catalog) {
+    return jsonResponse({ ok: false, error: 'Каталог временно недоступен. Попробуйте ещё раз.' }, 503);
+  }
+  const unknown = items.find(function (item) { return !hasOwn(catalog.products, item.productId); });
+  if (unknown) {
+    return jsonResponse({ ok: false, error: 'Товар больше недоступен: ' + unknown.productId }, 400);
   }
 
   // Бронь доступна в любое время суток: ограничение по рабочим часам применяется
   // только к выбору времени получения (validatePickupSchedule при оформлении заказа).
-  const ttl = Math.min(Number(data.ttlSeconds) || 300, 600) * 1000;
+  const ttl = RESERVE_TTL_MS;
   const eff = await computeEffectiveStock(env, url, orderId);
   const reservations = await activeReservations(env);
   const now = Date.now();
@@ -493,7 +585,7 @@ async function handleReserve(request, env, url) {
     const qty = Math.max(1, Math.min(Number(i.qty) || 1, 999));
     i.qty = qty;
     i.storeId = storeId;
-    const txt = eff.stock[storeId] && eff.stock[storeId][pid];
+    const txt = hasOwn(eff.stock, storeId) && hasOwn(eff.stock[storeId], pid) ? eff.stock[storeId][pid] : null;
     const avail = parseStockCount(txt);
     if (avail !== null && qty > avail && !error) {
       error = { productId: pid, available: avail };
@@ -763,7 +855,10 @@ async function nextOrderNumber(env) {
   return next;
 }
 
+let orderCatalogCache = null;
+
 async function loadOrderCatalog(env, url) {
+  if (orderCatalogCache && orderCatalogCache.expiresAt > Date.now()) return orderCatalogCache.catalog;
   const asset = await env.ASSETS.fetch(new URL('/data/products.base.json', url));
   if (!asset.ok) return null;
   let data;
@@ -775,7 +870,7 @@ async function loadOrderCatalog(env, url) {
   const overrides = await kvGet(env, 'product_overrides');
   const scOverrides = await kvGet(env, 'sc_product_overrides');
   const custom = await kvGet(env, 'custom_products');
-  const products = {};
+  const products = Object.create(null);
   (Array.isArray(data.products) ? data.products : []).forEach(function (p) {
     if (p && p.id) products[String(p.id)] = p;
   });
@@ -783,7 +878,9 @@ async function loadOrderCatalog(env, url) {
     const p = custom[id];
     if (p && p.id) products[String(p.id)] = p;
   });
-  return { products, overrides, scOverrides };
+  const catalog = { products, overrides, scOverrides };
+  orderCatalogCache = { catalog: catalog, expiresAt: Date.now() + 30000 };
+  return catalog;
 }
 
 function orderProductPrice(catalog, storeId, productId, partnerMode) {
@@ -809,28 +906,33 @@ async function authoritativeOrderTotals(env, url, storeId, items, partnerMode) {
   let qtyTotal = 0;
   const pricedItems = items.map(function (item) {
     const qty = Math.max(1, Number(item.qty) || 1);
-    const price = orderProductPrice(catalog, storeId, item.productId, partnerMode);
-    const product = catalog.products[String(item.productId)] || {};
+    const productId = String(item.productId || '');
+    if (!hasOwn(catalog.products, productId)) return null;
+    const product = catalog.products[productId];
+    if (!product) return null;
+    const price = Number(orderProductPrice(catalog, storeId, productId, partnerMode));
+    if (!isFinite(price) || price < 0) return null;
     qtyTotal += qty;
-    total += (price == null ? Number(item.price) || 0 : price) * qty;
+    total += price * qty;
     return Object.assign({}, item, {
-      sku: product.sku || item.sku || item.productId,
+      sku: product.sku || item.sku || productId,
       name: product.name || item.name || '',
-      price: price == null ? Number(item.price) || 0 : price
+      price: price
     });
   });
+  if (pricedItems.some(function (item) { return !item; })) return null;
   const packageFee = qtyTotal >= 4 ? 30 : 15;
   return { items: pricedItems, package: packageFee, total: total + packageFee };
 }
 
-// Создание заказа из оформленной корзины: 2-минутный холд конвертируется в заказ,
+// Создание заказа из оформленной корзины: 10-минутный холд конвертируется в заказ,
 // который и держит резерв до подтверждения/отмены.
 // Бронь читаем напрямую по ключу (как в validateOrderReservation): обход списка
 // всех броней (activeReservations) опаздывает на KV-репликах, из-за чего заказ
 // молча не создавался («Заказ отправлен!» без заказа в базе).
 async function createOrder(env, data, url) {
-  const orderId = String(data.order_id || data.orderId || '').trim();
-  if (!orderId) return null;
+  const orderId = normalizeOrderId(data.order_id || data.orderId);
+  if (!isOrderId(orderId)) return null;
   let res = null;
   try {
     const raw = await env.SC_STORES.get('res_' + orderId);
@@ -840,46 +942,69 @@ async function createOrder(env, data, url) {
     }
   } catch (e) { /* нет брони или повреждена */ }
   if (!res || !res.items || !res.items.length) return null;
-  let items = [];
+  let submittedItems = [];
   try {
-    items = JSON.parse(String(data.order_items_json || '[]'));
+    submittedItems = JSON.parse(String(data.order_items_json || '[]'));
   } catch (e) {
-    items = [];
+    submittedItems = [];
   }
-  if (!Array.isArray(items)) items = [];
+  if (!Array.isArray(submittedItems)) submittedItems = [];
+  const submittedById = Object.create(null);
+  submittedItems.forEach(function (item) {
+    const productId = String(item && item.productId || '');
+    if (productId && !submittedById[productId]) submittedById[productId] = item;
+  });
+  const reservedById = Object.create(null);
+  res.items.forEach(function (item) {
+    const productId = String(item && item.productId || '');
+    if (!productId) return;
+    const qty = Math.max(1, Number(item && item.qty) || 1);
+    reservedById[productId] = Math.min(999, (reservedById[productId] || 0) + qty);
+  });
+  const items = Object.keys(reservedById).map(function (productId) {
+    const submitted = submittedById[productId] || {};
+    return {
+      productId: productId,
+      sku: String(submitted.sku || productId),
+      name: String(submitted.name || '').trim(),
+      qty: reservedById[productId]
+    };
+  });
+  if (!items.length) {
+    const error = new Error('catalog unavailable');
+    error.code = 'catalog';
+    throw error;
+  }
   const paymentCode = paymentCodeFromData(data);
-  const partnerId = normalizePartnerId(data.partner_id || data.partnerId);
-  const partnerMode = isInvoicePartnerId(partnerId);
-  const priced = (paymentCode === 'kaspi_invoice' || partnerMode)
-    ? await authoritativeOrderTotals(env, url, res.storeId, items, true)
-    : null;
-  const orderItems = priced
-    ? priced.items
-    : items.map(function (i) {
-      return {
-        productId: String(i.productId || ''),
-        sku: String(i.sku || i.productId || ''),
-        name: String(i.name || '').trim(),
-        qty: Math.max(1, Number(i.qty) || 1),
-        price: Number(i.price) || 0
-      };
-    });
+  const submittedPartnerId = normalizePartnerId(data.partner_id || data.partnerId);
+  const partnerMode = isPartnerId(submittedPartnerId);
+  const partnerId = partnerMode ? submittedPartnerId : '';
+  const priced = await authoritativeOrderTotals(env, url, res.storeId, items, partnerMode);
+  if (!priced) {
+    const error = new Error('catalog unavailable');
+    error.code = 'catalog';
+    throw error;
+  }
+  const orderItems = priced.items;
+  const storeRecords = await kvGet(env, 'stores');
+  const store = hasOwn(storeRecords, res.storeId) ? storeRecords[res.storeId] : null;
   const order = {
     id: orderId,
     number: await nextOrderNumber(env),
     storeId: res.storeId,
+    storeName: String(store && store.name || '').trim(),
     items: orderItems,
     name: String(data.name || '').trim(),
     phone: String(data.phone || '').trim(),
     comment: String(data.comment || data.order_comment || '').trim(),
     clientToken: String(data.clientToken || '').trim(),
     managerNote: '',
-    total: priced ? priced.total : (Number(data.order_total) || 0),
-    package: priced ? priced.package : (Number(data.order_package) || 0),
+    total: priced.total,
+    package: priced.package,
     paymentCode: paymentCode,
     payment: paymentLabel(paymentCode, data.payment),
     partnerId: partnerId,
-    partnerMode: paymentCode === 'kaspi_invoice' ? true : partnerMode,
+    partnerMode: partnerMode,
     pickupDate: String(data.pickup_date || data.pickupDate || ''),
     pickupTime: String(data.pickup_time || data.pickupTime || ''),
     status: 'new',
@@ -888,9 +1013,7 @@ async function createOrder(env, data, url) {
   const orders = await loadOrders(env);
   orders[orderId] = order;
   await kvPut(env, 'orders', orders);
-  // Резерв не удаляем: заказ сам удерживает остаток (computeEffectiveStock
-  // вычитает заказы, включая статус «новый»), а ключ res_<orderId> истекает
-  // сам через TTL — это экономит одну запись KV на каждый заказ.
+  await deleteReservation(env, orderId);
   console.log('Заказ создан:', orderId, 'СЦ', res.storeId, order.items.length, 'поз.');
   return order;
 }
@@ -981,6 +1104,7 @@ async function handleOrdersAction(request, env, auth) {
     order.cancelledAt = new Date().toISOString();
     if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
+    await deleteReservation(env, id);
     return jsonResponse({ ok: true, order });
   }
 
@@ -988,6 +1112,7 @@ async function handleOrdersAction(request, env, auth) {
     const wasNew = order.status === 'new' || order.status === 'ready';
     delete orders[id];
     await kvPut(env, 'orders', orders);
+    await deleteReservation(env, id);
     // Суперадмин может удалять и архивные заказы
     if (auth.role === 'superadmin') {
       const history = await kvGet(env, 'orders_history');
@@ -1064,6 +1189,7 @@ async function handleMyOrdersAction(request, env) {
     order.cancelledAt = new Date().toISOString();
     order.managerNote = order.managerNote || 'Отменён клиентом';
     await kvPut(env, 'orders', orders);
+    await deleteReservation(env, id);
     return jsonResponse({ ok: true, order });
   }
   return jsonResponse({ ok: false, error: 'unknown action' }, 400);
@@ -1074,9 +1200,9 @@ async function handleMyOrdersAction(request, env) {
 // Читаем бронь напрямую по ключу (res_<orderId>) — быстрее и без обхода всех
 // броней; в пределах одного расположения KV отдаёт запись сразу после записи.
 async function validateOrderReservation(env, data) {
-  const orderId = String(data.order_id || data.orderId || '').trim();
+  const orderId = normalizeOrderId(data.order_id || data.orderId);
   const expiredRes = jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409);
-  if (!orderId) return { ok: false, res: expiredRes };
+  if (!isOrderId(orderId)) return { ok: false, res: expiredRes };
   let res = null;
   try {
     const raw = await env.SC_STORES.get('res_' + orderId);
@@ -1095,9 +1221,22 @@ async function validateOrderReservation(env, data) {
     items = [];
   }
   if (!Array.isArray(items)) items = [];
-  const bad = items.find(function (i) {
-    const reserved = (res.items || []).find(function (r) { return r.productId === String(i.productId); });
-    return !reserved || (Number(i.qty) || 0) > (Number(reserved.qty) || 0);
+  const requestedById = Object.create(null);
+  items.forEach(function (item) {
+    const productId = String(item && item.productId || '');
+    if (!productId) return;
+    const qty = Math.max(1, Number(item && item.qty) || 1);
+    requestedById[productId] = Math.min(999, (requestedById[productId] || 0) + qty);
+  });
+  const reservedById = Object.create(null);
+  res.items.forEach(function (item) {
+    const productId = String(item && item.productId || '');
+    if (!productId) return;
+    const qty = Math.max(1, Number(item && item.qty) || 1);
+    reservedById[productId] = Math.min(999, (reservedById[productId] || 0) + qty);
+  });
+  const bad = Object.keys(requestedById).find(function (productId) {
+    return !hasOwn(reservedById, productId) || requestedById[productId] > reservedById[productId];
   });
   if (bad) {
     return { ok: false, res: jsonResponse({ ok: false, error: 'expired', message: 'Состав заказа изменился — соберите корзину заново' }, 409) };
@@ -1429,6 +1568,7 @@ async function handleScStore(request, env, auth) {
     email: existing.email || '',
     image: String(data.image || '').trim() || existing.image || '',
     description: String(data.description || '').trim() || existing.description || '',
+    show_pickup_fields: typeof data.show_pickup_fields === 'boolean' ? data.show_pickup_fields : existing.show_pickup_fields !== false,
     kaspi_qr: String(data.kaspi_qr || '').trim() || existing.kaspi_qr || '',
     partner: existing.partner || 'kz44326234',
     portalLogin: String(data.portalLogin || '').trim() || existing.portalLogin || '',
@@ -1590,6 +1730,7 @@ async function handleStores(env) {
       whatsapp: s.whatsapp || '',
       image: s.image || '',
       description: s.description || '',
+      show_pickup_fields: s.show_pickup_fields !== false,
       kaspi_qr: s.kaspi_qr || '',
       payment_methods: visiblePaymentMethods(s)
     }));
@@ -1812,7 +1953,7 @@ async function handleAdminProducts(request, env) {
     const filtered = (map) => {
       if (!fields) return {};
       if (!map || typeof map !== 'object') return {};
-      const out = {};
+  const out = Object.create(null);
       Object.keys(map).forEach((pid) => {
         const o = map[pid];
         if (!o || typeof o !== 'object') return;
@@ -3242,20 +3383,30 @@ function buildText(data) {
   const paymentCode = data.paymentCode || paymentCodeFromData(data);
   const paymentText = paymentLabel(paymentCode, data.payment);
   const partnerId = data.partnerId || data.partner_id || '';
+  const orderStoreName = data.storeName || data.order_store || '';
   const orderMeta = [
     '💳 ' + (paymentText || '—'),
-    data.order_store ? '🏬 Филиал: ' + data.order_store : null,
-    '📅 Приезд: ' + (data.pickupDate || data.pickup_date ? ruDate(data.pickupDate || data.pickup_date) + ((data.pickupTime || data.pickup_time) ? ' в ' + (data.pickupTime || data.pickup_time) : '') : 'не уточнили'),
-    partnerId ? '🎫 ID клиента: ' + partnerId + ((data.partnerMode || data.order_partner_mode === '1') ? ' (−50%)' : '') : null,
-    paymentCode === 'kaspi_invoice' ? '⏳ Оплата: согласуется с менеджером позже' : null
-  ].filter(Boolean);
+    orderStoreName ? '🏬 Филиал: ' + orderStoreName : null,
+    '📅 Приезд: ' + (data.pickupDate || data.pickup_date ? ruDate(data.pickupDate || data.pickup_date) + ((data.pickupTime || data.pickup_time) ? ' в ' + (data.pickupTime || data.pickup_time) : '') : 'не уточнили')
+  ];
   const orderTotals = [
     '📦 Упаковка: ' + money(data.package != null ? data.package : data.order_package || 0) + ' ₸',
     '💰 ИТОГО: ' + money(data.total != null ? data.total : data.order_total || 0) + ' ₸' + (paymentCode === 'kaspi' ? ' · оплачено' : '')
   ];
+  const orderItemsText = Array.isArray(data.items) && data.items.length
+    ? data.items.map(function (item) {
+      const qty = Math.max(1, Number(item && item.qty) || 1);
+      const unit = Number(item && item.price) || 0;
+      const name = String(item && item.name || item && item.sku || item && item.productId || '—');
+      return name + ' × ' + qty + (unit ? ' = ' + money(unit * qty) + ' ₸' : '');
+    }).join('\n')
+    : (data.order_items || '—');
   const orderFooter = [
-    '👤 ' + name,
-    '📞 ' + phone,
+    [
+      partnerId ? '🎫 ' + partnerId : null,
+      name ? '👤 ' + name : null,
+      phone ? '📞 ' + phone : null
+    ].filter(Boolean).join(' · '),
     '🕐 ' + new Date().toLocaleDateString('ru-RU', { timeZone: 'Asia/Almaty' }) + ' ' + new Date().toLocaleTimeString('ru-RU', { timeZone: 'Asia/Almaty', hour: '2-digit', minute: '2-digit' })
   ];
 
@@ -3266,7 +3417,7 @@ function buildText(data) {
       ...orderMeta,
       '',
       '— Состав заказа —',
-      data.order_items ? data.order_items : '—',
+      orderItemsText,
       '',
       ...orderTotals,
       '',
@@ -3340,11 +3491,14 @@ async function validatePickupSchedule(env, data) {
   const storeId = String(data.orderStoreId || data.order_store_id || data.store_id || '');
   const pDate = String(data.pickup_date || data.pickupDate || '');
   const pTime = String(data.pickup_time || data.pickupTime || '');
-  if (!storeId) return null;
+  if (!storeId || (!pDate && !pTime)) return null;
+  const stores = await kvGet(env, 'stores');
+  const store = hasOwn(stores, storeId) ? stores[storeId] : null;
+  if (store && store.show_pickup_fields === false) {
+    return 'Этот Сервис-Центр не принимает выбор даты и времени получения.';
+  }
   if (pTime && !pDate) return 'Укажите дату приезда, если выбрано время.';
   if (!pDate) return null;
-  const stores = await kvGet(env, 'stores');
-  const store = (stores && typeof stores === 'object') ? stores[storeId] : null;
   let sch = null;
   if (store) {
     sch = (store.schedule && typeof store.schedule === 'object') ? store.schedule : scheduleFromText(store.hours);
@@ -3383,14 +3537,11 @@ async function validatePaymentMethod(env, data) {
   const paymentCode = paymentCodeFromData(data);
   if (!storeId || !paymentCode) return 'Выберите доступный способ оплаты.';
   const stores = await kvGet(env, 'stores');
-  const store = (stores && typeof stores === 'object') ? stores[storeId] : null;
+  const store = hasOwn(stores, storeId) ? stores[storeId] : null;
   if (!store) return 'Филиал не найден.';
   const config = normalizePaymentConfig(store);
   if (config.methods.indexOf(paymentCode) === -1 || config.visibility[paymentCode] === false) {
     return 'Данный метод оплаты у СЦ «' + (store.name || storeId) + '» временно недоступен';
-  }
-  if (paymentCode === 'kaspi_invoice' && !isInvoicePartnerId(data.partner_id || data.partnerId)) {
-    return 'Укажите ID клиента в формате kz12345678.';
   }
   return null;
 }
@@ -3409,22 +3560,54 @@ async function handleTelegram(request, env) {
     return new Response('ok', { status: 200 });
   }
 
-  // Оформленный заказ: бронь на 5 минут должна быть активной, иначе 409.
+  // Оформленный заказ: бронь на 10 минут должна быть активной, иначе 409.
   // При успехе — конверсия брони в заказ (до проверки токена).
   let createdOrder = null;
   if (data.type === 'order') {
-    const check = await validateOrderReservation(env, data);
-    if (!check.ok) return check.res;
-    const orderData = Object.assign({}, data, { orderStoreId: check.res.storeId });
-    if (!String(data.name || '').trim() || !String(data.phone || '').trim()) {
-      return jsonResponse({ ok: false, error: 'Укажите имя и телефон.' }, 400);
+    const orderId = normalizeOrderId(data.order_id || data.orderId);
+    if (!isOrderId(orderId)) {
+      return jsonResponse({ ok: false, error: 'Некорректный номер заказа' }, 400);
     }
-    const schedErr = await validatePickupSchedule(env, orderData);
-    if (schedErr) return jsonResponse({ ok: false, error: 'schedule', message: schedErr }, 409);
-    const payErr = await validatePaymentMethod(env, orderData);
-    if (payErr) return jsonResponse({ ok: false, error: 'payment', message: payErr }, 409);
-    try { createdOrder = await createOrder(env, orderData, new URL(request.url)); } catch (e) { console.error('createOrder error:', e); }
-    if (!createdOrder) return jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409);
+    const submissionFingerprint = orderFingerprint(data);
+    const noticeMarker = await getOrderNoticeMarker(env, orderId);
+    if (noticeMarker) {
+      if (noticeMarker.fingerprint !== submissionFingerprint) {
+        return jsonResponse({ ok: false, error: 'expired', message: 'Состав заказа изменился — соберите корзину заново' }, 409);
+      }
+      return jsonResponse({ ok: true, number: noticeMarker.number || null }, 200);
+    }
+    const existingOrders = await loadOrders(env);
+    const existingOrder = hasOwn(existingOrders, orderId) ? existingOrders[orderId] : null;
+    if (existingOrder) {
+      if (orderFingerprint(existingOrder) !== submissionFingerprint) {
+        return jsonResponse({ ok: false, error: 'expired', message: 'Состав заказа изменился — соберите корзину заново' }, 409);
+      }
+      if (existingOrder.status === 'cancelled') {
+        return jsonResponse({ ok: false, error: 'expired', message: 'Заказ отменён — соберите корзину заново' }, 409);
+      }
+      createdOrder = existingOrder;
+    } else {
+      const check = await validateOrderReservation(env, data);
+      if (!check.ok) return check.res;
+      const orderData = Object.assign({}, data, { orderStoreId: check.res.storeId });
+      if (!String(data.name || '').trim() || !String(data.phone || '').trim()) {
+        return jsonResponse({ ok: false, error: 'Укажите имя и телефон.' }, 400);
+      }
+      const schedErr = await validatePickupSchedule(env, orderData);
+      if (schedErr) return jsonResponse({ ok: false, error: 'schedule', message: schedErr }, 409);
+      const payErr = await validatePaymentMethod(env, orderData);
+      if (payErr) return jsonResponse({ ok: false, error: 'payment', message: payErr }, 409);
+      try {
+        createdOrder = await createOrder(env, orderData, new URL(request.url));
+      } catch (e) {
+        console.error('createOrder error:', e);
+        if (e && e.code === 'catalog') {
+          return jsonResponse({ ok: false, error: 'order_pricing', message: 'Не удалось рассчитать заказ. Попробуйте ещё раз.' }, 503);
+        }
+        return jsonResponse({ ok: false, error: 'order_create', message: 'Не удалось сохранить заказ. Попробуйте ещё раз.' }, 503);
+      }
+      if (!createdOrder) return jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409);
+    }
   }
 
   // Заказы (корзина) — в группу заказов, остальное — в основной чат
@@ -3433,26 +3616,42 @@ async function handleTelegram(request, env) {
 
   if (!BOT_TOKEN || !CHAT_ID) {
     console.error('TG_BOT_TOKEN или TG_CHAT_ID не заданы');
-    return new Response('Telegram not configured', { status: 500 });
+    return jsonResponse({ ok: false, error: 'telegram', message: 'Временно не удалось отправить заказ. Попробуйте ещё раз.' }, 500);
   }
 
   // Номер #N знаем только после создания заказа — передаём в текст сообщения
   const text = buildText(Object.assign({}, data, createdOrder || {}, createdOrder && createdOrder.number ? { orderNumber: createdOrder.number } : {}));
 
-  const res = await fetch(`${TELEGRAM_API}${BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: CHAT_ID, text, disable_web_page_preview: true })
-  });
+  let res;
+  try {
+    res = await fetch(`${TELEGRAM_API}${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: CHAT_ID, text, disable_web_page_preview: true })
+    });
+  } catch (e) {
+    console.error('Telegram API request error:', e);
+    return jsonResponse({ ok: false, error: 'telegram', message: 'Не удалось отправить сообщение. Попробуйте ещё раз.' }, 502);
+  }
 
   if (!res.ok) {
     const body = await res.text();
     console.error('Telegram API error:', res.status, body);
-    return new Response('Telegram error', { status: 502 });
+    return jsonResponse({
+      ok: false,
+      error: 'telegram',
+      message: isOrder
+        ? 'Заказ сохранён, но сообщение менеджеру не отправлено. Нажмите «Оформить заказ» ещё раз.'
+        : 'Не удалось отправить заявку. Попробуйте ещё раз.'
+    }, 502);
   }
 
   // Заказам возвращаем номер (#N) — экран успеха показывает его сразу
   if (isOrder) {
+    const orderId = normalizeOrderId(createdOrder ? createdOrder.id : data.order_id || data.orderId);
+    const noticeFingerprint = orderFingerprint(createdOrder);
+    try { await markOrderNoticeSent(env, orderId, createdOrder ? createdOrder.number : null, noticeFingerprint); } catch (e) { console.error('mark order notice error:', e); }
+    await deleteReservation(env, orderId);
     return new Response(JSON.stringify({ ok: true, number: createdOrder ? createdOrder.number : null }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -3564,7 +3763,7 @@ export default {
       return handleDeliveriesGet(env, url);
     }
 
-    // 1.4.2 Бронь товаров на 5 минут (оформление заказа)
+    // 1.4.2 Бронь товаров на 10 минут (оформление заказа)
     if (path === '/api/reserve' && request.method === 'POST') {
       return handleReserve(request, env, url);
     }

@@ -608,13 +608,14 @@
       '<div class="form-group"><label>WhatsApp (только цифры, с 7)</label><input name="whatsapp" value="' + h(store.whatsapp) + '" placeholder="77001234567"></div>' +
       '</div>' +
             Utils.scheduleFormHtml(store) +
+      '<label class="form-checkbox" style="margin-top:8px;"><input type="checkbox" name="show_pickup_fields" value="1"' + (store.show_pickup_fields !== false ? ' checked' : '') + '> Показывать дату и время клиенту</label>' +
       '<p class="form-note" style="max-width:360px;">🕐 Часы работы — по времени Астаны (UTC+5), общий часовой пояс для всех филиалов. Бронь и выдача проверяются по нему.</p>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
       '<div class="form-group payment-methods-field"><div class="payment-methods-heading"><label>Методы оплаты</label><span>Настройка филиала</span></div>' +
       '<div class="pay-methods-admin">' +
       methodRow('kaspi', '💳', 'Kaspi', 'Оплата переводом онлайн') +
       methodRow('cash', '💵', 'Наличные', 'Оплата при получении') +
-      methodRow('kaspi_invoice', '🧾', 'Счёт на оплату Kaspi', 'ID клиента kz12345678, −50%, оплата позже') +
+      methodRow('kaspi_invoice', '🧾', 'Счёт на оплату Kaspi', 'Менеджер отправляет счёт на номер клиента') +
       '</div>' +
       '<p class="form-note">«Разрешён» включает приём оплаты, «Виден клиентам» — показ способа в checkout.</p></div>' +
       '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."' + (store.image ? '' : '') + '>' + imagePreview + '</div>' +
@@ -729,6 +730,7 @@
       store.kaspi_qr = form.kaspi_qr.value.trim();
       store.image = form.image.value.trim();
       store.description = form.description.value.trim();
+      store.show_pickup_fields = !!(form.show_pickup_fields && form.show_pickup_fields.checked);
       store.portalLogin = form.portalLogin ? form.portalLogin.value.trim() : '';
       // Пароль портала/кабинета: пустое значение = не менять (для СЦ значение скрыто)
       var portalPass = form.portalPassword ? form.portalPassword.value : '';
@@ -774,6 +776,7 @@
         whatsapp: store.whatsapp,
         image: store.image,
         description: store.description,
+        show_pickup_fields: store.show_pickup_fields,
         payment_methods: store.payment_methods,
         payment_method_visibility: store.payment_method_visibility,
         payment_methods_version: 2,
@@ -1885,22 +1888,24 @@
               '</span>';
           }).join('');
           var totalTxt = o.total ? '<span>💰 Итого: <b>' + h(String(o.total).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) + ' ₸</b></span>' : '';
-          var paymentCode = o.paymentCode || '';
           var payLabel = o.paymentLabel || o.payment || '—';
           var payTxt = '<span>💳 ' + h(payLabel) + '</span>';
-          if (paymentCode === 'kaspi_invoice') payTxt += '<span class="order-pending-payment">⏳ Оплата позже</span>';
           var pickupTxt = o.pickupDate ? '<span>📅 Забрать: ' + h(o.pickupDate) + (o.pickupTime ? ' в ' + h(o.pickupTime) : '') + '</span>' : '';
-          var partnerTxt = (o.partnerId || o.partnerMode) ? '<span class="order-partner-txt">🎫 ID клиента: ' + h(o.partnerId || 'не указан') + (o.partnerMode ? ' · −50%' : '') + '</span>' : '';
+          var contactParts = [];
+          if (o.partnerId) contactParts.push('🎫 ' + h(o.partnerId));
+          contactParts.push('👤 ' + h(o.name || '—'));
+          if (o.phone) contactParts.push('📞 ' + h(o.phone));
+          var contactTxt = contactParts.join(' · ');
           var noteTxt = o.managerNote ? '<span style="color:var(--muted);">💬 Менеджер: ' + h(o.managerNote) + '</span>' : '';
           var canResolve = o.status === 'new' || o.status === 'ready';
           var dispNum = o.number ? ('#' + o.number) : o.id;
           return '<li>' +
             '<div class="admin-list-main">' +
             '<strong>' + (o.number ? 'Заказ #' + h(o.number) : 'Заказ ' + h(o.id)) + ' ' + statusBadge + '</strong>' +
-            '<span>👤 ' + h(o.name || '—') + (o.phone ? ' · 📞 ' + h(o.phone) : '') + '</span>' +
+            '<span>' + contactTxt + '</span>' +
             '<span>🏬 ' + h(storeName[o.storeId] || o.storeId || '—') + ' · 🕐 ' + h(new Date(o.createdAt).toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })) + '</span>' +
             '<div class="delivery-items order-receipt" style="margin:6px 0 0; display:flex; flex-direction:column; align-items:flex-start; gap:4px;">' + itemsHtml + '</div>' +
-            '<span style="font-size:13px;color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center;">' + [totalTxt, payTxt, partnerTxt, pickupTxt].filter(Boolean).join('') + '</span>' +
+            '<span style="font-size:13px;color:var(--muted); display:flex; flex-wrap:wrap; gap:6px; align-items:center;">' + [totalTxt, payTxt, pickupTxt].filter(Boolean).join('') + '</span>' +
             (o.comment ? '<span style="color:var(--muted);">💬 Клиент: ' + h(o.comment) + '</span>' : '') +
             noteTxt +
             '</div>' +

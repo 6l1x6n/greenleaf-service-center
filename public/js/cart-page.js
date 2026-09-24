@@ -15,8 +15,8 @@
 
   var SELECTED_KEY = 'greenleaf_sc_selected_v1';
 
-  // ---- Бронь товаров (5 минут, как места в кинотеатре) ----
-  var RESERVE_TTL = 300;
+  // ---- Бронь товаров (10 минут, как места в кинотеатре) ----
+  var RESERVE_TTL = 600;
   var RESERVE_KEY = 'greenleaf_order_reservation_v1';
   var reserve = { orderId: '', expiresAt: 0, interval: null, signature: '', expired: false };
   var kaspiPaid = false;
@@ -97,7 +97,7 @@
     if (reserve.interval) { clearInterval(reserve.interval); reserve.interval = null; }
   }
 
-  // Истечение 5 минут: бронь снята, оплата на сайте технически невозможна,
+  // Истечение 10 минут: бронь снята, оплата на сайте технически невозможна,
   // нужно собрать корзину заново (как места в кинотеатре).
   function expiredState() {
     reserve.expired = true;
@@ -227,15 +227,11 @@
   function updateSubmitGate() {
     if (!submitBtn) return;
     var needPay = state.payment === 'kaspi';
-    var needPartner = state.payment === 'kaspi_invoice' && !state.partnerMode;
-    var ok = state.payment && !reserve.expired && (!needPay || (paymentStarted && kaspiPaid)) && !needPartner;
+    var ok = state.payment && !reserve.expired && (!needPay || (paymentStarted && kaspiPaid));
     submitBtn.disabled = !ok;
     var note = document.getElementById('submitGateNote');
     if (note) {
-      if (needPartner) {
-        note.textContent = 'Для счёта на оплату Kaspi укажите ID клиента в формате kz12345678.';
-        note.style.display = '';
-      } else if (needPay && !ok) {
+      if (needPay && !ok) {
         note.textContent = 'Для Kaspi: нажмите «Оплатить через Kaspi» и отметьте оплату, чтобы оформить заказ.';
         note.style.display = '';
       } else {
@@ -245,10 +241,6 @@
   }
 
   function partnerModeValid(id) {
-    return /^[a-z]{2}\d{8}$/i.test(String(id || '').trim());
-  }
-
-  function invoicePartnerValid(id) {
     return /^kz\d{8}$/i.test(String(id || '').trim());
   }
 
@@ -325,6 +317,24 @@
 
   function selectedStoreObj() {
     return stores.find(function (s) { return s.id === state.storeId; }) || null;
+  }
+
+  function pickupFieldsVisible() {
+    var store = selectedStoreObj();
+    return !!store && store.show_pickup_fields !== false;
+  }
+
+  function updatePickupFields() {
+    var visible = pickupFieldsVisible();
+    document.querySelectorAll('[data-pickup-fields]').forEach(function (el) {
+      el.classList.toggle('hidden', !visible);
+    });
+    if (!visible) {
+      var date = document.getElementById('pickupDate');
+      var time = document.getElementById('pickupTime');
+      if (date) date.value = '';
+      if (time) time.value = '';
+    }
   }
 
   function syncStoreSelection() {
@@ -439,10 +449,7 @@
       state.payment = null;
       setField('orderPayment', '');
       setField('orderPaymentCode', '');
-      var partnerInput = document.getElementById('partnerId');
-      if (partnerInput) partnerInput.required = false;
-      setField('orderPartnerId', partnerInput ? partnerInput.value.trim() : '');
-      document.querySelectorAll('[data-pickup-fields]').forEach(function (el) { el.classList.add('hidden'); });
+      updatePickupFields();
       if (submitBtn) submitBtn.disabled = true;
     }
   }
@@ -514,7 +521,6 @@
     setField('orderTotal', t.total);
     setField('orderPackage', t.pkg);
     setField('orderQtyTotal', t.qtyTotal);
-    setField('orderPartnerMode', state.partnerMode ? '1' : '0');
   }
 
   function pickupDateLabel(d) {
@@ -660,15 +666,7 @@
     document.querySelectorAll('.pay-panel').forEach(function (p) {
       p.classList.toggle('hidden', p.getAttribute('data-pay-panel') !== method);
     });
-    document.querySelectorAll('[data-pickup-fields]').forEach(function (el) {
-      el.classList.toggle('hidden', method !== 'cash' && method !== 'kaspi_invoice');
-    });
-    var partnerInput = document.getElementById('partnerId');
-    if (partnerInput) {
-      partnerInput.required = method === 'kaspi_invoice';
-      setField('orderPartnerId', partnerInput.value.trim());
-      if (method === 'kaspi_invoice') state.partnerMode = invoicePartnerValid(partnerInput.value);
-    }
+    updatePickupFields();
     var date = document.getElementById('pickupDate');
     var time = document.getElementById('pickupTime');
     if (date) date.required = false;
@@ -872,19 +870,16 @@
         if (inp) blink(inp);
         return;
       }
-      if (state.payment === 'kaspi_invoice') {
-        var invoiceInput = document.getElementById('partnerId');
-        var invoiceId = invoiceInput ? String(invoiceInput.value || '').trim().toLowerCase() : String(orderForm.partner_id && orderForm.partner_id.value || '').trim().toLowerCase();
-        setField('orderPartnerId', invoiceId);
-        if (!invoicePartnerValid(invoiceId)) {
-          e.preventDefault();
-          Utils.showToast('⚠️ Укажите ID клиента в формате kz12345678');
-          if (invoiceInput) blink(invoiceInput);
-          return;
-        }
-        state.partnerMode = true;
-        setField('orderPartnerMode', '1');
+      var partnerInput = document.getElementById('partnerId');
+      var partnerId = partnerInput ? String(partnerInput.value || '').trim().toLowerCase() : '';
+      if (partnerId && !partnerModeValid(partnerId)) {
+        e.preventDefault();
+        Utils.showToast('⚠️ ID клиента должен быть в формате kz12345678');
+        if (partnerInput) blink(partnerInput);
+        return;
       }
+      if (partnerInput) partnerInput.value = partnerId;
+      state.partnerMode = !!partnerId && partnerModeValid(partnerId);
       if (state.payment === 'kaspi' && !(paymentStarted && kaspiPaid)) {
         e.preventDefault();
         Utils.showToast('⚠️ Сначала оплатите через Kaspi и отметьте «Я оплатил(а) заказ»');
@@ -968,23 +963,8 @@
   var partnerInput = document.getElementById('partnerId');
   if (partnerInput) {
     partnerInput.addEventListener('input', function () {
-      var valid = partnerModeValid(partnerInput.value);
-      var invoiceValid = invoicePartnerValid(partnerInput.value);
-      state.partnerMode = state.payment === 'kaspi_invoice' ? invoiceValid : valid;
-      setField('orderPartnerId', partnerInput.value.trim());
-      var hint = document.getElementById('partnerHint');
-      if (hint) {
-        if (state.payment === 'kaspi_invoice' && partnerInput.value.trim() && !invoiceValid) {
-          hint.textContent = 'ID клиента должен быть в формате kz12345678.';
-          hint.className = 'partner-hint';
-        } else if (state.partnerMode) {
-          hint.textContent = '✅ Подтверждён: применяются партнёрские цены (−50%)';
-          hint.className = 'partner-hint ok';
-        } else {
-          hint.textContent = partnerInput.value.trim() ? 'ID не распознан — для счёта укажите kz12345678.' : '';
-          hint.className = 'partner-hint';
-        }
-      }
+      var value = String(partnerInput.value || '').trim();
+      state.partnerMode = partnerModeValid(value);
       render();
     });
   }
@@ -1003,15 +983,17 @@
     var detail = (e && e.detail) || {};
     var orderNumber = detail.orderNumber || '';
     var oid = orderId();
+    try { sessionStorage.removeItem(RESERVE_KEY); } catch (e) { }
+    reserve.orderId = '';
     var displayNumber = orderNumber ? ('#' + orderNumber) : oid;
     var oidEl = document.getElementById('successOrderId');
     if (oidEl) oidEl.textContent = displayNumber;
     var payEl = document.getElementById('successPayText');
     if (payEl) {
       payEl.textContent = state.payment === 'cash'
-        ? 'Оплата наличными при получении — ничего предоплачивать не нужно. Менеджер подтвердит заказ и свяжется с вами.'
+        ? 'Оплата при получении.'
         : (state.payment === 'kaspi_invoice'
-          ? 'Счёт на оплату Kaspi подготовит менеджер. Оплата позже — он свяжется с вами.'
+          ? 'Счёт отправят на номер телефона.'
           : 'Оплату по Kaspi проверим по оповещению. Менеджер подтвердит заказ и свяжется с вами.');
     }
     var copyBtn = document.getElementById('successCopyBtn');

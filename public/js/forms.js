@@ -141,6 +141,10 @@
                   if (window.Utils) Utils.showToast('⚠️ ' + (errData.message || 'Метод оплаты недоступен'));
                   markError(form);
                 }
+                if (errData && (errData.error === 'order_pricing' || errData.error === 'order_create' || errData.error === 'telegram')) {
+                  if (window.Utils) Utils.showToast('⚠️ ' + (errData.message || 'Не удалось оформить заказ. Попробуйте ещё раз.'));
+                  markError(form);
+                }
                 if (errData && errData.error === 'expired') {
                   if (window.Utils) Utils.showToast('⏳ ' + (errData.message || 'Время бронирования истекло — соберите корзину заново'));
                   window.dispatchEvent(new CustomEvent('order:expired'));

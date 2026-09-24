@@ -345,11 +345,9 @@
             if (goodsTotal) {
               summaryParts.push('<span class="sum-total">Итого: <b>' + fmtPrice(goodsTotal) + '</b></span>');
             }
-             var paymentCode = o.paymentCode || '';
              var paymentText = o.paymentLabel || o.payment || '—';
              summaryParts.push('<span class="sum-pay">' + esc(paymentText) + '</span>');
-             if (paymentCode === 'kaspi_invoice') summaryParts.push('<span class="sum-pending">Оплата позже</span>');
-             if (o.partnerId || o.partnerMode) summaryParts.push('<span class="sum-partner">ID: ' + esc(o.partnerId || 'не указан') + (o.partnerMode ? ' · −50%' : '') + '</span>');
+             if (o.partnerId) summaryParts.push('<span class="sum-partner">ID: ' + esc(o.partnerId) + '</span>');
             if (o.pickupDate) summaryParts.push('<span class="sum-pickup">' + esc(Utils.fmtDate(o.pickupDate + 'T00:00:00', { day: 'numeric', month: 'short' }).replace(/\./g, '')) + (o.pickupTime ? ' · ' + esc(o.pickupTime) : '') + '</span>');
             var noteTxt = o.managerNote ? '<div class="order-manager-note">' + icon('info', 14) + '<span><b>Сообщение менеджера:</b> ' + esc(o.managerNote) + '</span></div>' : '';
             return '<li class="order-card">' +
