@@ -2,7 +2,19 @@
   'use strict';
 
   var KEY = 'greenleaf_cart_v1';
+  var RESERVE_KEY = 'greenleaf_order_reservation_v1';
   var listeners = [];
+
+  function releaseReservation() {
+    var orderId = '';
+    try { orderId = sessionStorage.getItem(RESERVE_KEY) || ''; sessionStorage.removeItem(RESERVE_KEY); } catch (e) { }
+    if (!orderId) return;
+    fetch('/api/reserve', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: orderId })
+    }).catch(function () { });
+  }
 
   function load() {
     try {
@@ -16,6 +28,7 @@
 
   function save(items) {
     try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) { }
+    if (!items.length) releaseReservation();
     emit();
   }
 

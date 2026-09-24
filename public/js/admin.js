@@ -608,7 +608,7 @@
       '<div class="form-group"><label>WhatsApp (только цифры, с 7)</label><input name="whatsapp" value="' + h(store.whatsapp) + '" placeholder="77001234567"></div>' +
       '</div>' +
             Utils.scheduleFormHtml(store) +
-      '<label class="form-checkbox" style="margin-top:8px;"><input type="checkbox" name="show_pickup_fields" value="1"' + (store.show_pickup_fields !== false ? ' checked' : '') + '> Показывать дату и время клиенту</label>' +
+      '<label class="form-checkbox" style="margin-top:8px;"><input type="checkbox" name="show_pickup_fields" value="1"' + (store.show_pickup_fields !== false ? ' checked' : '') + '> Показывать дату и время клиенту <span id="pickupVisibilityStatus"></span></label>' +
       '<p class="form-note" style="max-width:360px;">🕐 Часы работы — по времени Астаны (UTC+5), общий часовой пояс для всех филиалов. Бронь и выдача проверяются по нему.</p>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
       '<div class="form-group payment-methods-field"><div class="payment-methods-heading"><label>Методы оплаты</label><span>Настройка филиала</span></div>' +
@@ -673,12 +673,44 @@
 
   function bindStoreForm(content, store, withAuth) {
     var form = content.querySelector('#storeForm');
+    var pickupInput = form.show_pickup_fields;
+    var pickupStatus = form.querySelector('#pickupVisibilityStatus');
+    function savePickupVisibility() {
+      if (!pickupInput || !store.id || String(store.id).indexOf('sc-new-') === 0) {
+        if (pickupStatus) pickupStatus.textContent = 'Сохраните филиал';
+        return;
+      }
+      var previous = store.show_pickup_fields !== false;
+      var next = pickupInput.checked;
+      pickupInput.disabled = true;
+      if (pickupStatus) pickupStatus.textContent = 'Сохраняем…';
+      Auth.api('/api/sc-store', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: store.id, show_pickup_fields: next })
+      }).then(function (data) {
+        if (!data || !data.ok) throw new Error((data && data.error) || 'Не удалось сохранить настройку');
+        store.show_pickup_fields = !!(data.store && data.store.show_pickup_fields);
+        state.stores = state.stores.map(function (item) {
+          return item.id === store.id ? Object.assign({}, item, { show_pickup_fields: store.show_pickup_fields }) : item;
+        });
+        pickupInput.checked = store.show_pickup_fields;
+        if (pickupStatus) pickupStatus.textContent = store.show_pickup_fields ? 'Показывается' : 'Скрыто';
+        Utils.showToast('✅ Видимость даты и времени сохранена');
+      }).catch(function (err) {
+        pickupInput.checked = previous;
+        if (pickupStatus) pickupStatus.textContent = 'Не сохранено';
+        Utils.showToast('⚠️ ' + ((err && err.message) || 'Не удалось сохранить настройку'));
+      }).finally(function () {
+        pickupInput.disabled = false;
+      });
+    }
     form.addEventListener('change', function (e) {
       var off = e.target.closest('[data-sched-off]');
       if (off) {
         var row = off.closest('.sched-row');
         if (row) row.classList.toggle('has-off', off.checked);
       }
+      if (e.target === pickupInput) savePickupVisibility();
       var pmRow = e.target.closest('.pm-row');
       if (pmRow) {
         var accept = pmRow.querySelector('.pm-toggle-accept input');
@@ -1893,7 +1925,6 @@
           var pickupTxt = o.pickupDate ? '<span>📅 Забрать: ' + h(o.pickupDate) + (o.pickupTime ? ' в ' + h(o.pickupTime) : '') + '</span>' : '';
           var contactParts = [];
           if (o.partnerId) contactParts.push('🎫 ' + h(o.partnerId));
-          contactParts.push('👤 ' + h(o.name || '—'));
           if (o.phone) contactParts.push('📞 ' + h(o.phone));
           var contactTxt = contactParts.join(' · ');
           var noteTxt = o.managerNote ? '<span style="color:var(--muted);">💬 Менеджер: ' + h(o.managerNote) + '</span>' : '';

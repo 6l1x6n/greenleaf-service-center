@@ -19,7 +19,7 @@
 //                   status: pending|approved|rejected|new, createdAt }}
 //   reservations — {"<orderId>": { storeId, items: [{productId, qty}], createdAt, expiresAt }}
 //                  временная бронь на 10 минут при оформлении заказа (как места в кино)
-//   orders       — {"<orderId>": { id, storeId, items: [{productId, qty}], name, phone,
+//   orders       — {"<orderId>": { id, storeId, items: [{productId, qty}], phone,
 //                  comment, total, payment, pickupDate, pickupTime, status: new|confirmed|cancelled,
 //                  createdAt, confirmedAt?, cancelledAt? }} — активные заказы сайта.
 //                  Доступно = факт(парсер) − 2-мин холды − Σ new − Σ confirmed после последнего
@@ -70,6 +70,11 @@ function hasOwn(object, key) {
   return !!object && Object.prototype.hasOwnProperty.call(object, String(key));
 }
 
+function pickupFieldsEnabled(settings, store) {
+  if (hasOwn(settings, store && store.id)) return settings[store.id] !== false;
+  return !store || store.show_pickup_fields !== false;
+}
+
 function normalizeOrderId(value) {
   return String(value || '').trim().toUpperCase();
 }
@@ -78,7 +83,7 @@ function isOrderId(value) {
   return /^GL-[A-Z0-9]{6}$/.test(normalizeOrderId(value));
 }
 
-function orderFingerprint(data) {
+function orderFingerprintBase(data, includeName) {
   let items = Array.isArray(data && data.items) ? data.items : [];
   if (!items.length) {
     try { items = JSON.parse(String(data && data.order_items_json || '[]')); } catch (e) { items = []; }
@@ -91,19 +96,32 @@ function orderFingerprint(data) {
     const qty = Math.max(1, Number(item && item.qty) || 1);
     quantities[productId] = Math.min(999, (quantities[productId] || 0) + qty);
   });
-  return JSON.stringify({
+  const fingerprint = {
     clientToken: String(data && (data.clientToken || data.client_token) || ''),
     storeId: String(data && (data.storeId || data.orderStoreId || data.order_store_id || data.store_id) || ''),
     paymentCode: paymentCodeFromData(data || {}),
     partnerId: normalizePartnerId(data && (data.partnerId || data.partner_id)),
-    name: String(data && data.name || '').trim(),
     phone: String(data && data.phone || '').trim(),
     pickupDate: String(data && (data.pickupDate || data.pickup_date) || ''),
     pickupTime: String(data && (data.pickupTime || data.pickup_time) || ''),
     items: Object.keys(quantities).sort().map(function (productId) {
       return [productId, quantities[productId]];
     })
-  });
+  };
+  if (includeName) fingerprint.name = String(data && data.name || '').trim();
+  return JSON.stringify(fingerprint);
+}
+
+function orderFingerprint(data) {
+  return orderFingerprintBase(data, false);
+}
+
+function legacyOrderFingerprint(data) {
+  return orderFingerprintBase(data, true);
+}
+
+function orderFingerprintMatches(expected, data) {
+  return String(expected || '') === orderFingerprint(data) || String(expected || '') === legacyOrderFingerprint(data);
 }
 
 function normalizePaymentConfig(store) {
@@ -433,6 +451,7 @@ async function markOrderNoticeSent(env, orderId, number, fingerprint) {
   await env.SC_STORES.put('order_notice_' + orderId, JSON.stringify({
     sentAt: new Date().toISOString(),
     number: Number(number) || null,
+    fingerprintVersion: 2,
     fingerprint: String(fingerprint || '')
   }), { expirationTtl: 30 * 24 * 60 * 60 });
 }
@@ -440,7 +459,7 @@ async function markOrderNoticeSent(env, orderId, number, fingerprint) {
 // Эффективные остатки: факт(парсер) − 10-мин холды − активные заказы (new)
 // − подтверждённые заказы после последнего синка базы.
 // excludeOrderId — своя бронь при валидации новой.
-async function computeEffectiveStock(env, url, excludeOrderId) {
+async function computeEffectiveStock(env, url, excludeOrderId, excludeOrderIds) {
   const base = await loadBaseStock(env, url);
   const reservations = await activeReservations(env);
   const orders = await loadOrders(env);
@@ -455,6 +474,7 @@ async function computeEffectiveStock(env, url, excludeOrderId) {
       let res = 0;
       Object.keys(reservations).forEach(function (oid) {
         if (excludeOrderId && oid === excludeOrderId) return;
+        if (excludeOrderIds && excludeOrderIds[oid]) return;
         if (orders[oid]) return;
         const r = reservations[oid];
         if (!r) return;
@@ -554,6 +574,11 @@ async function handleReserve(request, env, url) {
   if (!isOrderId(orderId)) {
     return jsonResponse({ ok: false, error: 'Некорректный orderId' }, 400);
   }
+  const excludeOrderIds = Object.create(null);
+  (Array.isArray(data.excludeOrderIds) ? data.excludeOrderIds.slice(0, 20) : []).forEach(function (value) {
+    const excludedId = normalizeOrderId(value);
+    if (isOrderId(excludedId) && excludedId !== orderId) excludeOrderIds[excludedId] = true;
+  });
   const itemMap = Object.create(null);
   for (const raw of rawItems) {
     const productId = String(raw && raw.productId || '');
@@ -561,7 +586,7 @@ async function handleReserve(request, env, url) {
     const qty = Math.max(1, Math.min(Number(raw && raw.qty) || 1, 999));
     itemMap[productId] = Math.min(999, (itemMap[productId] || 0) + qty);
   }
-  const items = Object.keys(itemMap).map(function (productId) {
+  let items = Object.keys(itemMap).map(function (productId) {
     return { productId: productId, qty: itemMap[productId] };
   });
   const catalog = await loadOrderCatalog(env, url);
@@ -572,12 +597,27 @@ async function handleReserve(request, env, url) {
   if (unknown) {
     return jsonResponse({ ok: false, error: 'Товар больше недоступен: ' + unknown.productId }, 400);
   }
+  const priced = items.map(function (item) {
+    const product = catalog.products[item.productId];
+    const regularPrice = Number(orderProductPrice(catalog, storeId, item.productId, false));
+    const partnerPrice = Number(orderProductPrice(catalog, storeId, item.productId, true));
+    if (!isFinite(regularPrice) || regularPrice < 0 || !isFinite(partnerPrice) || partnerPrice < 0) return null;
+    return Object.assign({}, item, {
+      sku: String(product.sku || item.productId),
+      name: String(product.name || ''),
+      regularPrice: regularPrice,
+      partnerPrice: partnerPrice
+    });
+  });
+  if (priced.some(function (item) { return !item; })) {
+    return jsonResponse({ ok: false, error: 'Не удалось рассчитать цену товара. Обновите каталог.' }, 503);
+  }
+  items = priced;
 
   // Бронь доступна в любое время суток: ограничение по рабочим часам применяется
   // только к выбору времени получения (validatePickupSchedule при оформлении заказа).
   const ttl = RESERVE_TTL_MS;
-  const eff = await computeEffectiveStock(env, url, orderId);
-  const reservations = await activeReservations(env);
+  const eff = await computeEffectiveStock(env, url, orderId, excludeOrderIds);
   const now = Date.now();
   let error = null;
   items.forEach((i) => {
@@ -612,8 +652,21 @@ async function handleReserve(request, env, url) {
     }
   } catch (e) { /* брони нет или повреждена — записываем заново */ }
 
-  await saveReservation(env, orderId, { storeId, items, createdAt: new Date().toISOString(), expiresAt: now + ttl }, ttl);
+  await saveReservation(env, orderId, { storeId, items, priceVersion: 1, createdAt: new Date().toISOString(), expiresAt: now + ttl }, ttl);
   return jsonResponse({ ok: true, expiresAt: now + ttl, ttlSeconds: ttl / 1000 });
+}
+
+async function handleReserveRelease(request, env) {
+  let data;
+  try {
+    data = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const orderId = normalizeOrderId(data.orderId);
+  if (!isOrderId(orderId)) return jsonResponse({ ok: false, error: 'invalid orderId' }, 400);
+  await deleteReservation(env, orderId);
+  return jsonResponse({ ok: true });
 }
 
 // Бронь места на мероприятие (единый счётчик в KV)
@@ -844,7 +897,8 @@ async function archiveConfirmedOrders(env, url) {
 // Страховка от KV-лага счётчика: номер не ниже максимума среди существующих заказов,
 // чтобы два заказа не получили одинаковый #N.
 async function nextOrderNumber(env) {
-  const counter = Number(await kvGet(env, 'order_counter')) || 0;
+  let counter = 0;
+  try { counter = Number(await env.SC_STORES.get('order_counter', 'json')) || 0; } catch (e) { counter = 0; }
   let next = Math.max(10000, counter + 1);
   const orders = await loadOrders(env);
   Object.keys(orders).forEach(function (oid) {
@@ -867,9 +921,11 @@ async function loadOrderCatalog(env, url) {
   } catch (e) {
     return null;
   }
-  const overrides = await kvGet(env, 'product_overrides');
-  const scOverrides = await kvGet(env, 'sc_product_overrides');
-  const custom = await kvGet(env, 'custom_products');
+  const [overrides, scOverrides, custom] = await Promise.all([
+    kvGet(env, 'product_overrides'),
+    kvGet(env, 'sc_product_overrides'),
+    kvGet(env, 'custom_products')
+  ]);
   const products = Object.create(null);
   (Array.isArray(data.products) ? data.products : []).forEach(function (p) {
     if (p && p.id) products[String(p.id)] = p;
@@ -925,22 +981,38 @@ async function authoritativeOrderTotals(env, url, storeId, items, partnerMode) {
   return { items: pricedItems, package: packageFee, total: total + packageFee };
 }
 
+function reservationOrderTotals(reservation, partnerMode) {
+  if (!reservation || Number(reservation.priceVersion) !== 1) return null;
+  let total = 0;
+  let qtyTotal = 0;
+  const pricedItems = (reservation.items || []).map(function (item) {
+    const qty = Math.max(1, Number(item && item.qty) || 1);
+    const price = Number(partnerMode ? item && item.partnerPrice : item && item.regularPrice);
+    if (!isFinite(price) || price < 0) return null;
+    qtyTotal += qty;
+    total += price * qty;
+    return {
+      productId: String(item && item.productId || ''),
+      sku: String(item && item.sku || item && item.productId || ''),
+      name: String(item && item.name || ''),
+      qty: qty,
+      price: price
+    };
+  });
+  if (!pricedItems.length || pricedItems.some(function (item) { return !item; })) return null;
+  const packageFee = qtyTotal >= 4 ? 30 : 15;
+  return { items: pricedItems, package: packageFee, total: total + packageFee };
+}
+
 // Создание заказа из оформленной корзины: 10-минутный холд конвертируется в заказ,
 // который и держит резерв до подтверждения/отмены.
 // Бронь читаем напрямую по ключу (как в validateOrderReservation): обход списка
 // всех броней (activeReservations) опаздывает на KV-репликах, из-за чего заказ
 // молча не создавался («Заказ отправлен!» без заказа в базе).
-async function createOrder(env, data, url) {
+async function createOrder(env, data, url, reservation, store) {
   const orderId = normalizeOrderId(data.order_id || data.orderId);
   if (!isOrderId(orderId)) return null;
-  let res = null;
-  try {
-    const raw = await env.SC_STORES.get('res_' + orderId);
-    if (raw) {
-      const r = JSON.parse(raw);
-      if (r && r.expiresAt && r.expiresAt > Date.now()) res = r;
-    }
-  } catch (e) { /* нет брони или повреждена */ }
+  const res = reservation;
   if (!res || !res.items || !res.items.length) return null;
   let submittedItems = [];
   try {
@@ -979,22 +1051,19 @@ async function createOrder(env, data, url) {
   const submittedPartnerId = normalizePartnerId(data.partner_id || data.partnerId);
   const partnerMode = isPartnerId(submittedPartnerId);
   const partnerId = partnerMode ? submittedPartnerId : '';
-  const priced = await authoritativeOrderTotals(env, url, res.storeId, items, partnerMode);
+  const priced = reservationOrderTotals(res, partnerMode) || await authoritativeOrderTotals(env, url, res.storeId, items, partnerMode);
   if (!priced) {
     const error = new Error('catalog unavailable');
     error.code = 'catalog';
     throw error;
   }
   const orderItems = priced.items;
-  const storeRecords = await kvGet(env, 'stores');
-  const store = hasOwn(storeRecords, res.storeId) ? storeRecords[res.storeId] : null;
   const order = {
     id: orderId,
     number: await nextOrderNumber(env),
     storeId: res.storeId,
     storeName: String(store && store.name || '').trim(),
     items: orderItems,
-    name: String(data.name || '').trim(),
     phone: String(data.phone || '').trim(),
     comment: String(data.comment || data.order_comment || '').trim(),
     clientToken: String(data.clientToken || '').trim(),
@@ -1018,6 +1087,12 @@ async function createOrder(env, data, url) {
   return order;
 }
 
+function publicOrder(order, extra) {
+  const result = Object.assign({}, order || {}, extra || {});
+  delete result.name;
+  return result;
+}
+
 // GET /api/orders — СЦ видит свои заказы, суперадмин — все (и архив при ?archive=1)
 async function handleOrdersGet(request, env, auth) {
   const url = new URL(request.url);
@@ -1037,7 +1112,7 @@ async function handleOrdersGet(request, env, auth) {
     .sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); })
     .map(function (o) {
       const code = o.paymentCode || paymentCodeFromData(o);
-      return Object.assign({}, o, {
+      return publicOrder(o, {
         paymentCode: code,
         paymentLabel: paymentLabel(code, o.payment),
         partnerId: o.partnerId || o.partner_id || ''
@@ -1082,7 +1157,7 @@ async function handleOrdersAction(request, env, auth) {
     order.readyAt = new Date().toISOString();
     if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
-    return jsonResponse({ ok: true, order });
+    return jsonResponse({ ok: true, order: publicOrder(order) });
   }
 
   if (action === 'confirm') {
@@ -1093,7 +1168,7 @@ async function handleOrdersAction(request, env, auth) {
     order.confirmedAt = new Date().toISOString();
     if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
-    return jsonResponse({ ok: true, order });
+    return jsonResponse({ ok: true, order: publicOrder(order) });
   }
 
   if (action === 'cancel') {
@@ -1105,7 +1180,7 @@ async function handleOrdersAction(request, env, auth) {
     if (note) order.managerNote = note;
     await kvPut(env, 'orders', orders);
     await deleteReservation(env, id);
-    return jsonResponse({ ok: true, order });
+    return jsonResponse({ ok: true, order: publicOrder(order) });
   }
 
   if (action === 'delete') {
@@ -1149,7 +1224,7 @@ async function handleMyOrders(request, env) {
     if (!o || String(o.clientToken || '') !== token) return;
     const store = stores[o.storeId];
     const code = o.paymentCode || paymentCodeFromData(o);
-    list.push(Object.assign({}, o, {
+    list.push(publicOrder(o, {
       paymentCode: code,
       paymentLabel: paymentLabel(code, o.payment),
       partnerId: o.partnerId || o.partner_id || '',
@@ -1190,7 +1265,7 @@ async function handleMyOrdersAction(request, env) {
     order.managerNote = order.managerNote || 'Отменён клиентом';
     await kvPut(env, 'orders', orders);
     await deleteReservation(env, id);
-    return jsonResponse({ ok: true, order });
+    return jsonResponse({ ok: true, order: publicOrder(order) });
   }
   return jsonResponse({ ok: false, error: 'unknown action' }, 400);
 }
@@ -1461,6 +1536,7 @@ async function handleScApplicationAction(request, env) {
           description: existing.description || (app.hasCabinet
             ? ''
             : (app.comment || 'Магазин-партнёр Greenleaf. Приходите за эко-продукцией!')),
+          show_pickup_fields: existing.show_pickup_fields !== false,
           partner: existing.partner || '',
           portalLogin: String(app.portalLogin || '').trim() || existing.portalLogin || '',
           portalPassword: (appPortalPass ? await encryptSecret(env, await decryptSecret(env, appPortalPass)) : '') || existing.portalPassword || '',
@@ -1568,7 +1644,7 @@ async function handleScStore(request, env, auth) {
     email: existing.email || '',
     image: String(data.image || '').trim() || existing.image || '',
     description: String(data.description || '').trim() || existing.description || '',
-    show_pickup_fields: typeof data.show_pickup_fields === 'boolean' ? data.show_pickup_fields : existing.show_pickup_fields !== false,
+    show_pickup_fields: hasOwn(existing, 'id') ? existing.show_pickup_fields !== false : (typeof data.show_pickup_fields === 'boolean' ? data.show_pickup_fields : true),
     kaspi_qr: String(data.kaspi_qr || '').trim() || existing.kaspi_qr || '',
     partner: existing.partner || 'kz44326234',
     portalLogin: String(data.portalLogin || '').trim() || existing.portalLogin || '',
@@ -1581,12 +1657,41 @@ async function handleScStore(request, env, auth) {
     payment_methods: finalPaymentMethods,
     payment_method_visibility: finalVisibility,
     payment_methods_version: 2,
-    createdAt: existing.createdAt || new Date().toISOString()
+    createdAt: existing.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   stores[storeId] = record;
   await kvPut(env, 'stores', stores);
   // Пароль парсера и кабинета СЦ не отдаём в ответе
   const publicRecord = Object.assign({}, record, { portalPassword: undefined, authPassword: undefined });
+  return jsonResponse({ ok: true, store: publicRecord });
+}
+
+async function handleScStorePatch(request, env, auth) {
+  let data;
+  try {
+    data = await request.json();
+  } catch (e) {
+    return jsonResponse({ ok: false, error: 'invalid json' }, 400);
+  }
+  const id = String(data.id || '').trim();
+  if (!id || typeof data.show_pickup_fields !== 'boolean') {
+    return jsonResponse({ ok: false, error: 'id и show_pickup_fields обязательны' }, 400);
+  }
+  if (auth.role === 'sc') {
+    const ownId = await scOwnStoreId(env, auth);
+    if (!ownId || String(ownId) !== id) return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+  }
+  const stores = await kvGet(env, 'stores');
+  if (!hasOwn(stores, id)) return jsonResponse({ ok: false, error: 'Филиал не найден' }, 404);
+  const settings = await kvGet(env, 'store_pickup_settings');
+  settings[id] = data.show_pickup_fields;
+  await kvPut(env, 'store_pickup_settings', settings);
+  const publicRecord = Object.assign({}, stores[id], {
+    show_pickup_fields: data.show_pickup_fields,
+    portalPassword: undefined,
+    authPassword: undefined
+  });
   return jsonResponse({ ok: true, store: publicRecord });
 }
 
@@ -1611,8 +1716,13 @@ async function handleScStoreResetPassword(request, env) {
 // Полные карточки СЦ для админки (креды, статус). Суперадмин — все,
 // СЦ — только свой филиал; пароль портала (для парсера) виден только суперадмину.
 async function handleScStoresAdmin(env, auth) {
-  const stores = await kvGet(env, 'stores');
-  const list = Object.values(stores);
+  const [stores, pickupSettings] = await Promise.all([
+    kvGet(env, 'stores'),
+    kvGet(env, 'store_pickup_settings')
+  ]);
+  const list = Object.values(stores).map(function (store) {
+    return Object.assign({}, store, { show_pickup_fields: pickupFieldsEnabled(pickupSettings, store) });
+  });
   if (auth.role !== 'superadmin') {
     const ownId = await scOwnStoreId(env, auth);
     if (!ownId) return jsonResponse({ ok: false, error: 'unauthorized' }, 401);
@@ -1713,7 +1823,10 @@ async function handleScArchiveAction(request, env) {
 // ---------------- Список СЦ для сайта (публично) ----------------
 
 async function handleStores(env) {
-  const stores = await kvGet(env, 'stores');
+  const [stores, pickupSettings] = await Promise.all([
+    kvGet(env, 'stores'),
+    kvGet(env, 'store_pickup_settings')
+  ]);
   const list = Object.values(stores)
     .filter(s => s.status === 'active')
     .map(s => ({
@@ -1730,7 +1843,7 @@ async function handleStores(env) {
       whatsapp: s.whatsapp || '',
       image: s.image || '',
       description: s.description || '',
-      show_pickup_fields: s.show_pickup_fields !== false,
+      show_pickup_fields: pickupFieldsEnabled(pickupSettings, s),
       kaspi_qr: s.kaspi_qr || '',
       payment_methods: visiblePaymentMethods(s)
     }));
@@ -3367,11 +3480,48 @@ async function sendTelegram(env, text) {
   }
 }
 
+async function postOrderTelegram(env, chatId, text) {
+  const controller = new AbortController();
+  const timeout = setTimeout(function () { controller.abort(); }, 4000);
+  try {
+    const res = await fetch(`${TELEGRAM_API}${env.TG_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: text, disable_web_page_preview: true }),
+      signal: controller.signal
+    });
+    if (!res.ok) console.error('Telegram order error:', res.status, await res.text());
+    return res.ok;
+  } catch (e) {
+    console.error('Telegram order request error:', e);
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function deliverOrderNotification(env, order, text) {
+  const chatId = env.TG_ORDERS_CHAT_ID || env.TG_CHAT_ID;
+  if (!env.TG_BOT_TOKEN || !chatId) {
+    console.error('Telegram order notification not configured');
+    return false;
+  }
+  let delivered = await postOrderTelegram(env, chatId, text);
+  if (!delivered) {
+    await new Promise(function (resolve) { setTimeout(resolve, 800); });
+    delivered = await postOrderTelegram(env, chatId, text);
+  }
+  if (delivered) {
+    try { await markOrderNoticeSent(env, order.id, order.number, orderFingerprint(order)); } catch (e) { console.error('mark order notice error:', e); }
+  }
+  return delivered;
+}
+
 function buildText(data) {
-  const name = (data.name || '').trim();
-  const phone = (data.phone || '').trim();
   const type = data.type || 'other';
   const isOrder = type === 'order';
+  const name = isOrder ? '' : (data.name || '').trim();
+  const phone = (data.phone || '').trim();
   // Деньги с разделителями тысяч: 5615 → «5 615»
   const money = (n) => String(Number(n) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   // Дата «2026-08-13» → «13.08.2026»
@@ -3404,7 +3554,6 @@ function buildText(data) {
   const orderFooter = [
     [
       partnerId ? '🎫 ' + partnerId : null,
-      name ? '👤 ' + name : null,
       phone ? '📞 ' + phone : null
     ].filter(Boolean).join(' · '),
     '🕐 ' + new Date().toLocaleDateString('ru-RU', { timeZone: 'Asia/Almaty' }) + ' ' + new Date().toLocaleTimeString('ru-RU', { timeZone: 'Asia/Almaty', hour: '2-digit', minute: '2-digit' })
@@ -3487,14 +3636,17 @@ function buildText(data) {
 
 // Проверка даты/времени получения по расписанию филиала: сообщение об ошибке или null.
 // Страховка поверх клиентских ограничений — прямое обращение к /telegram не обойдёт.
-async function validatePickupSchedule(env, data) {
+async function validatePickupSchedule(env, data, store) {
   const storeId = String(data.orderStoreId || data.order_store_id || data.store_id || '');
   const pDate = String(data.pickup_date || data.pickupDate || '');
   const pTime = String(data.pickup_time || data.pickupTime || '');
   if (!storeId || (!pDate && !pTime)) return null;
-  const stores = await kvGet(env, 'stores');
-  const store = hasOwn(stores, storeId) ? stores[storeId] : null;
-  if (store && store.show_pickup_fields === false) {
+  if (!store) {
+    const stores = await kvGet(env, 'stores');
+    store = hasOwn(stores, storeId) ? stores[storeId] : null;
+  }
+  const pickupSettings = await kvGet(env, 'store_pickup_settings');
+  if (store && !pickupFieldsEnabled(pickupSettings, store)) {
     return 'Этот Сервис-Центр не принимает выбор даты и времени получения.';
   }
   if (pTime && !pDate) return 'Укажите дату приезда, если выбрано время.';
@@ -3532,12 +3684,14 @@ async function validatePickupSchedule(env, data) {
 
 // Проверка метода оплаты: СЦ мог отключить Kaspi/наличные (payment_methods в карточке).
 // Если выбранный метод не принимается — заказ не создаём (защита от подмены в форме).
-async function validatePaymentMethod(env, data) {
+async function validatePaymentMethod(env, data, store) {
   const storeId = String(data.orderStoreId || data.order_store_id || data.store_id || '');
   const paymentCode = paymentCodeFromData(data);
   if (!storeId || !paymentCode) return 'Выберите доступный способ оплаты.';
-  const stores = await kvGet(env, 'stores');
-  const store = hasOwn(stores, storeId) ? stores[storeId] : null;
+  if (!store) {
+    const stores = await kvGet(env, 'stores');
+    store = hasOwn(stores, storeId) ? stores[storeId] : null;
+  }
   if (!store) return 'Филиал не найден.';
   const config = normalizePaymentConfig(store);
   if (config.methods.indexOf(paymentCode) === -1 || config.visibility[paymentCode] === false) {
@@ -3546,40 +3700,34 @@ async function validatePaymentMethod(env, data) {
   return null;
 }
 
-async function handleTelegram(request, env) {
-  const BOT_TOKEN = env.TG_BOT_TOKEN;
-
+async function handleTelegram(request, env, ctx) {
   let data;
   try {
     data = await request.json();
   } catch (err) {
-    return new Response('Invalid JSON', { status: 400 });
+    return jsonResponse({ ok: false, error: 'invalid json', message: 'Некорректный запрос.' }, 400);
   }
 
-  if (data.company) {
-    return new Response('ok', { status: 200 });
-  }
+  if (data.company) return new Response('ok', { status: 200 });
 
-  // Оформленный заказ: бронь на 10 минут должна быть активной, иначе 409.
-  // При успехе — конверсия брони в заказ (до проверки токена).
+  const isOrder = data.type === 'order';
   let createdOrder = null;
-  if (data.type === 'order') {
+  let orderCreated = false;
+
+  if (isOrder) {
     const orderId = normalizeOrderId(data.order_id || data.orderId);
     if (!isOrderId(orderId)) {
-      return jsonResponse({ ok: false, error: 'Некорректный номер заказа' }, 400);
+      return jsonResponse({ ok: false, error: 'invalid json', message: 'Некорректный номер заказа.' }, 400);
     }
-    const submissionFingerprint = orderFingerprint(data);
     const noticeMarker = await getOrderNoticeMarker(env, orderId);
-    if (noticeMarker) {
-      if (noticeMarker.fingerprint !== submissionFingerprint) {
-        return jsonResponse({ ok: false, error: 'expired', message: 'Состав заказа изменился — соберите корзину заново' }, 409);
-      }
-      return jsonResponse({ ok: true, number: noticeMarker.number || null }, 200);
+    if (noticeMarker && orderFingerprintMatches(noticeMarker.fingerprint, data)) {
+      return jsonResponse({ ok: true, number: noticeMarker.number || null, notification: 'sent' }, 200);
     }
+
     const existingOrders = await loadOrders(env);
     const existingOrder = hasOwn(existingOrders, orderId) ? existingOrders[orderId] : null;
     if (existingOrder) {
-      if (orderFingerprint(existingOrder) !== submissionFingerprint) {
+      if (!orderFingerprintMatches(orderFingerprint(existingOrder), data)) {
         return jsonResponse({ ok: false, error: 'expired', message: 'Состав заказа изменился — соберите корзину заново' }, 409);
       }
       if (existingOrder.status === 'cancelled') {
@@ -3587,18 +3735,24 @@ async function handleTelegram(request, env) {
       }
       createdOrder = existingOrder;
     } else {
+      if (noticeMarker) {
+        return jsonResponse({ ok: false, error: 'expired', message: 'Состав заказа изменился — соберите корзину заново' }, 409);
+      }
       const check = await validateOrderReservation(env, data);
       if (!check.ok) return check.res;
       const orderData = Object.assign({}, data, { orderStoreId: check.res.storeId });
-      if (!String(data.name || '').trim() || !String(data.phone || '').trim()) {
-        return jsonResponse({ ok: false, error: 'Укажите имя и телефон.' }, 400);
+      if (!String(data.phone || '').trim()) {
+        return jsonResponse({ ok: false, error: 'invalid_contact', message: 'Укажите номер телефона.' }, 400);
       }
-      const schedErr = await validatePickupSchedule(env, orderData);
+      const stores = await kvGet(env, 'stores');
+      const store = hasOwn(stores, check.res.storeId) ? stores[check.res.storeId] : null;
+      if (!store) return jsonResponse({ ok: false, error: 'order_create', message: 'Филиал не найден. Обновите страницу.' }, 503);
+      const schedErr = await validatePickupSchedule(env, orderData, store);
       if (schedErr) return jsonResponse({ ok: false, error: 'schedule', message: schedErr }, 409);
-      const payErr = await validatePaymentMethod(env, orderData);
+      const payErr = await validatePaymentMethod(env, orderData, store);
       if (payErr) return jsonResponse({ ok: false, error: 'payment', message: payErr }, 409);
       try {
-        createdOrder = await createOrder(env, orderData, new URL(request.url));
+        createdOrder = await createOrder(env, orderData, new URL(request.url), check.res, store);
       } catch (e) {
         console.error('createOrder error:', e);
         if (e && e.code === 'catalog') {
@@ -3607,61 +3761,30 @@ async function handleTelegram(request, env) {
         return jsonResponse({ ok: false, error: 'order_create', message: 'Не удалось сохранить заказ. Попробуйте ещё раз.' }, 503);
       }
       if (!createdOrder) return jsonResponse({ ok: false, error: 'expired', message: 'Время бронирования истекло — соберите корзину заново' }, 409);
+      orderCreated = true;
     }
   }
 
-  // Заказы (корзина) — в группу заказов, остальное — в основной чат
-  const isOrder = data.type === 'order';
-  const CHAT_ID = (isOrder ? env.TG_ORDERS_CHAT_ID : null) || env.TG_CHAT_ID;
-
-  if (!BOT_TOKEN || !CHAT_ID) {
-    console.error('TG_BOT_TOKEN или TG_CHAT_ID не заданы');
-    return jsonResponse({ ok: false, error: 'telegram', message: 'Временно не удалось отправить заказ. Попробуйте ещё раз.' }, 500);
-  }
-
-  // Номер #N знаем только после создания заказа — передаём в текст сообщения
   const text = buildText(Object.assign({}, data, createdOrder || {}, createdOrder && createdOrder.number ? { orderNumber: createdOrder.number } : {}));
-
-  let res;
-  try {
-    res = await fetch(`${TELEGRAM_API}${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: CHAT_ID, text, disable_web_page_preview: true })
-    });
-  } catch (e) {
-    console.error('Telegram API request error:', e);
-    return jsonResponse({ ok: false, error: 'telegram', message: 'Не удалось отправить сообщение. Попробуйте ещё раз.' }, 502);
-  }
-
-  if (!res.ok) {
-    const body = await res.text();
-    console.error('Telegram API error:', res.status, body);
-    return jsonResponse({
-      ok: false,
-      error: 'telegram',
-      message: isOrder
-        ? 'Заказ сохранён, но сообщение менеджеру не отправлено. Нажмите «Оформить заказ» ещё раз.'
-        : 'Не удалось отправить заявку. Попробуйте ещё раз.'
-    }, 502);
-  }
-
-  // Заказам возвращаем номер (#N) — экран успеха показывает его сразу
   if (isOrder) {
-    const orderId = normalizeOrderId(createdOrder ? createdOrder.id : data.order_id || data.orderId);
-    const noticeFingerprint = orderFingerprint(createdOrder);
-    try { await markOrderNoticeSent(env, orderId, createdOrder ? createdOrder.number : null, noticeFingerprint); } catch (e) { console.error('mark order notice error:', e); }
-    await deleteReservation(env, orderId);
-    return new Response(JSON.stringify({ ok: true, number: createdOrder ? createdOrder.number : null }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    if (orderCreated) {
+      const notification = deliverOrderNotification(env, createdOrder, text);
+      if (ctx && ctx.waitUntil) ctx.waitUntil(notification);
+      else notification.catch(function () { });
+    }
+    return jsonResponse({ ok: true, number: createdOrder ? createdOrder.number : null, notification: orderCreated ? 'queued' : 'pending' }, 200);
   }
+
+  if (!env.TG_BOT_TOKEN || !env.TG_CHAT_ID) {
+    return jsonResponse({ ok: false, error: 'telegram', message: 'Отправка заявок временно недоступна.' }, 500);
+  }
+  const sent = await sendTelegram(env, text);
+  if (!sent) return jsonResponse({ ok: false, error: 'telegram', message: 'Не удалось отправить заявку. Попробуйте ещё раз.' }, 502);
   return new Response('ok', { status: 200 });
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -3685,7 +3808,7 @@ export default {
 
     // 1. Формы → Telegram
     if (path === '/telegram' && request.method === 'POST') {
-      return handleTelegram(request, env);
+      return handleTelegram(request, env, ctx);
     }
 
     // 1.1 Вход в кабинет филиала (креды только в секрете STORE_CREDS / KV)
@@ -3767,6 +3890,9 @@ export default {
     if (path === '/api/reserve' && request.method === 'POST') {
       return handleReserve(request, env, url);
     }
+    if (path === '/api/reserve' && request.method === 'DELETE') {
+      return handleReserveRelease(request, env);
+    }
 
     // 1.4.3 Брони мест на мероприятия (единая БД на всех устройствах)
     if (path === '/api/event-bookings' && request.method === 'GET') {
@@ -3816,6 +3942,10 @@ export default {
       // Сервис-Центр может сохранять только свой филиал
       if (path === '/api/sc-store' && request.method === 'POST' && auth.role === 'sc') {
         return handleScStore(request, env, auth);
+      }
+      if (path === '/api/sc-store' && request.method === 'PATCH') {
+        if (auth.role !== 'superadmin' && auth.role !== 'sc') return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+        return handleScStorePatch(request, env, auth);
       }
       // Подтверждение/отмена/удаление заказов: СЦ — только свои, суперадмин — все
       if (path === '/api/orders/action' && request.method === 'POST') {

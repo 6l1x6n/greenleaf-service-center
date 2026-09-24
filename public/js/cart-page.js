@@ -18,7 +18,7 @@
   // ---- Бронь товаров (10 минут, как места в кинотеатре) ----
   var RESERVE_TTL = 600;
   var RESERVE_KEY = 'greenleaf_order_reservation_v1';
-  var reserve = { orderId: '', expiresAt: 0, interval: null, signature: '', expired: false };
+  var reserve = { orderId: '', expiresAt: 0, interval: null, signature: '', expired: false, state: 'idle', requestSeq: 0, storeId: null, staleOrderIds: [] };
   var kaspiPaid = false;
   var paymentStarted = false;
   var submitBtn = document.getElementById('orderSubmitBtn');
@@ -39,6 +39,22 @@
       }
     }
     return reserve.orderId;
+  }
+
+  function resetOrderId() {
+    var oldOrderId = reserve.orderId;
+    reserve.orderId = '';
+    try { sessionStorage.removeItem(RESERVE_KEY); } catch (e) { }
+    return oldOrderId;
+  }
+
+  function releaseOrderReservation(orderId) {
+    if (!orderId) return;
+    fetch('/api/reserve', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: orderId })
+    }).catch(function () { });
   }
 
   // Токен устройства для «Моих заказов»: привязывает заказы к этому браузеру
@@ -101,6 +117,7 @@
   // нужно собрать корзину заново (как места в кинотеатре).
   function expiredState() {
     reserve.expired = true;
+    reserve.state = 'expired';
     reserve.expiresAt = 0;
     if (reserve.interval) { clearInterval(reserve.interval); reserve.interval = null; }
     if (reserveTimerEl) {
@@ -125,6 +142,7 @@
       var mm = Math.floor(s / 60);
       var ss = s % 60;
       reserveTimerEl.innerHTML = '⏳ Товары зарезервированы на <b>' + mm + ':' + (ss < 10 ? '0' : '') + ss + '</b> — успейте оплатить заказ, иначе бронь снимется и товар снова станет доступен другим покупателям.';
+      updateSubmitGate();
     }
     tick();
     reserve.interval = setInterval(tick, 1000);
@@ -132,111 +150,166 @@
 
   var reserveDebounceTimer = null;
 
-  // Дебаунс: серии кликов «+/−» и других изменений корзины схлопываются
-  // в одну запись брони (экономия KV-записей на сервере)
-  function scheduleReserve() {
-    if (window.__stockReserveOff) return;
-    if (reserveDebounceTimer) clearTimeout(reserveDebounceTimer);
-    reserveDebounceTimer = setTimeout(doReserve, 800);
+  function currentReserveSignature() {
+    var t = totals();
+    if (!state.storeId || !t.lines.length) return '';
+    return state.storeId + '|' + t.lines.map(function (l) { return l.p.id + ':' + l.qty; }).join(',');
   }
 
-  function doReserve() {
-    reserveDebounceTimer = null;
-    var t = totals();
-    if (!state.storeId || !t.lines.length) {
+  function scheduleReserve() {
+    if (window.__stockReserveOff) return;
+    var signature = currentReserveSignature();
+    if (!signature) {
+      if (reserveDebounceTimer) clearTimeout(reserveDebounceTimer);
+      reserveDebounceTimer = null;
+      reserve.requestSeq++;
+      reserve.staleOrderIds.forEach(releaseOrderReservation);
+      reserve.staleOrderIds = [];
+      releaseOrderReservation(resetOrderId());
+      reserve.state = 'idle';
       reserve.expired = false;
+      reserve.expiresAt = 0;
       reserve.signature = '';
+      reserve.storeId = state.storeId;
+      var t = totals();
       if (!state.storeId && t.lines.length && reserveTimerEl) {
         reserveTimerEl.innerHTML = '🛒 Выберите Сервис-Центр в каталоге, чтобы зарезервировать товары.';
         reserveTimerEl.classList.remove('hidden');
       } else {
         hideTimer();
       }
+      updateSubmitGate();
       return;
     }
-    var signature = state.storeId + '|' + t.lines.map(function (l) { return l.p.id + ':' + l.qty; }).join(',');
-    if (signature === reserve.signature && reserve.expiresAt > Date.now()) return;
-    // После истечения бронь не продлевается сама собой — только при изменении корзины
-    if (reserve.expired && signature === reserve.signature) return;
+    if (signature === reserve.signature && reserve.state === 'ready' && reserve.expiresAt > Date.now()) return;
+    if (reserve.signature && signature !== reserve.signature) {
+      var previousOrderId = resetOrderId();
+      if (previousOrderId) reserve.staleOrderIds.push(previousOrderId);
+      reserve.requestSeq++;
+    }
+    reserve.state = 'pending';
     reserve.expired = false;
+    reserve.expiresAt = 0;
     reserve.signature = signature;
-    setField('orderId', orderId());
-    setField('orderStoreId', state.storeId);
+    reserve.storeId = state.storeId;
+    if (reserveTimerEl) {
+      reserveTimerEl.innerHTML = '⏳ Подготавливаем бронь товаров…';
+      reserveTimerEl.classList.remove('hidden');
+    }
+    updateSubmitGate();
+    if (reserveDebounceTimer) clearTimeout(reserveDebounceTimer);
+    reserveDebounceTimer = setTimeout(doReserve, 500);
+  }
+
+  function doReserve() {
+    reserveDebounceTimer = null;
+    var t = totals();
+    var signature = currentReserveSignature();
+    if (!state.storeId || !t.lines.length || signature !== reserve.signature || state.storeId !== reserve.storeId) return;
+    var requestSeq = ++reserve.requestSeq;
+    var storeId = state.storeId;
+    var reservationOrderId = orderId();
+    setField('orderId', reservationOrderId);
+    setField('orderStoreId', storeId);
     fetch('/api/reserve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        orderId: orderId(),
-        storeId: state.storeId,
+        orderId: reservationOrderId,
+        storeId: storeId,
         items: t.lines.map(function (l) { return { productId: l.p.id, qty: l.qty }; }),
+        excludeOrderIds: reserve.staleOrderIds.slice(0, 20),
         ttlSeconds: RESERVE_TTL
       })
-    }).then(function (r) { return r.json(); }).then(function (d) {
-      if (!d || !d.ok) {
-        if (d && d.error === 'closed' && window.Utils) {
-          Utils.showToast('⏰ ' + (d.message || 'Филиал сейчас закрыт — оформить можно в рабочее время'));
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (body) {
+        return { ok: r.ok, body: body };
+      });
+    }).then(function (result) {
+      if (requestSeq !== reserve.requestSeq || signature !== reserve.signature || storeId !== state.storeId) {
+        if (reservationOrderId && reservationOrderId !== orderId()) {
+          releaseOrderReservation(reservationOrderId);
+        }
+        return;
+      }
+      var d = result.body || {};
+      if (!result.ok || !d.ok) {
+        if (d.error === 'closed') {
+          if (window.Utils) Utils.showToast('⏰ ' + (d.message || 'Филиал сейчас закрыт'));
           expiredState();
           return;
         }
-        if (d && d.error === 'not enough' && window.Utils) {
-          var pid = d.product && d.product.productId;
-          var avail = d.product && d.product.available;
+        if (d.error === 'not enough' && d.product) {
+          var pid = d.product.productId;
+          var avail = d.product.available;
           var p = products.find(function (x) { return x.id === pid; });
           var name = p ? p.name : (pid || 'товар');
-          // Сервер знает точный остаток: срезаем позицию до него (100 → 50),
-          // а не блокируем весь заказ — бронь перевыпустим под новый состав
           if (avail !== null && avail !== undefined && Number(avail) > 0) {
-            Utils.showToast('⚠️ «' + name + '» — осталось ' + avail + ' шт., количество уменьшено');
-            try { Cart.setQty(pid, Math.max(1, Math.min(Number(avail), 999))); } catch (e) { }
-            reserve.signature = '';
-            retryReserve(800);
+            if (window.Utils) Utils.showToast('⚠️ «' + name + '» — осталось ' + avail + ' шт., количество уменьшено');
+            try { Cart.setQty(pid, Math.max(1, Math.min(Number(avail), 999))); } catch (err) { }
             return;
           }
-          Utils.showToast('⚠️ «' + name + '» сейчас зарезервирован другим покупателем — измените количество');
         }
-        expiredState();
+        reserve.state = 'failed';
+        reserve.expiresAt = 0;
+        if (reserveTimerEl) {
+          reserveTimerEl.innerHTML = '⚠️ ' + (d.message || d.error || 'Не удалось подготовить бронь. Попробуйте ещё раз.');
+          reserveTimerEl.classList.remove('hidden');
+        }
+        updateSubmitGate();
         return;
       }
       reserve.expiresAt = Number(d.expiresAt) || 0;
-      // Ответ пришёл, но срок брони уже прошёл — перебронируем заново
       if (reserve.expiresAt <= Date.now()) {
-        reserve.expiresAt = 0;
-        retryReserve(500);
+        reserve.state = 'failed';
+        if (reserveTimerEl) {
+          reserveTimerEl.innerHTML = '⚠️ Бронь не подтверждена. Попробуйте ещё раз.';
+          reserveTimerEl.classList.remove('hidden');
+        }
+        updateSubmitGate();
         return;
       }
+      reserve.state = 'ready';
+      reserve.staleOrderIds.forEach(releaseOrderReservation);
+      reserve.staleOrderIds = [];
       startTimer();
+      updateSubmitGate();
     }).catch(function () {
-      // Ошибка сети: бронь не снимаем, пробуем ещё раз через 3 секунды
+      if (requestSeq !== reserve.requestSeq || signature !== reserve.signature || storeId !== state.storeId) return;
+      reserve.state = 'failed';
+      reserve.expiresAt = 0;
       if (reserveTimerEl) {
-        reserveTimerEl.innerHTML = '⚠️ Не удалось зарезервировать — проверьте соединение. Повтор через 3 с…';
+        reserveTimerEl.innerHTML = '⚠️ Не удалось подготовить бронь. Проверьте соединение и попробуйте ещё раз.';
         reserveTimerEl.classList.remove('hidden');
       }
-      retryReserve(3000);
+      updateSubmitGate();
     });
-  }
-
-  var reserveRetryTimer = null;
-  function retryReserve(delay) {
-    if (reserveRetryTimer) clearTimeout(reserveRetryTimer);
-    reserveRetryTimer = setTimeout(function () {
-      reserveRetryTimer = null;
-      scheduleReserve();
-    }, delay);
   }
 
   function updateSubmitGate() {
     if (!submitBtn) return;
     var needPay = state.payment === 'kaspi';
-    var ok = state.payment && !reserve.expired && (!needPay || (paymentStarted && kaspiPaid));
+    var submitting = orderForm && orderForm.getAttribute('data-submitting') === '1';
+    var reserveReady = reserve.state === 'ready' && !reserve.expired &&
+      reserve.expiresAt > Date.now() && reserve.storeId === state.storeId;
+    var ok = !!state.payment && reserveReady && !submitting && (!needPay || (paymentStarted && kaspiPaid));
     submitBtn.disabled = !ok;
     var note = document.getElementById('submitGateNote');
-    if (note) {
-      if (needPay && !ok) {
-        note.textContent = 'Для Kaspi: нажмите «Оплатить через Kaspi» и отметьте оплату, чтобы оформить заказ.';
-        note.style.display = '';
-      } else {
-        note.style.display = 'none';
-      }
+    if (!note) return;
+    if (reserve.state === 'pending' || reserve.state === 'idle') {
+      note.textContent = 'Подготавливаем бронь товаров…';
+      note.style.display = '';
+    } else if (reserve.state === 'failed') {
+      note.textContent = 'Бронь не готова. Обновите корзину и попробуйте ещё раз.';
+      note.style.display = '';
+    } else if (reserve.state === 'expired') {
+      note.textContent = 'Время брони истекло. Соберите корзину заново.';
+      note.style.display = '';
+    } else if (needPay && !ok) {
+      note.textContent = 'Для Kaspi: нажмите «Оплатить через Kaspi» и отметьте оплату, чтобы оформить заказ.';
+      note.style.display = '';
+    } else {
+      note.style.display = 'none';
     }
   }
 
@@ -649,7 +722,7 @@
       }
       time.innerHTML = out.length ? out.join('') : '<option value="">Нет доступного времени</option>';
     }
-    date.addEventListener('change', buildTimes);
+    date.onchange = buildTimes;
     buildTimes();
     if (hint) hint.textContent = pickupHintText();
   }
@@ -689,13 +762,13 @@
   }
 
   function contactFieldsOk() {
-    var name = orderForm.querySelector('input[name="name"]');
     var phone = orderForm.querySelector('input[name="phone"]');
-    var ok = true;
-    if (!name.value.trim()) { blink(name); ok = false; }
-    if (!phone.value.trim()) { blink(phone); ok = false; }
-    if (!ok) (name.value.trim() ? phone : name).focus();
-    return ok;
+    if (!phone.value.trim()) {
+      blink(phone);
+      phone.focus();
+      return false;
+    }
+    return true;
   }
 
   function cashFieldsOk() {
@@ -750,6 +823,7 @@
     var rebuild = e.target.closest('[data-cart-rebuild]');
     if (rebuild) {
       Cart.clear();
+      resetOrderId();
       Utils.showToast('🛒 Корзина очищена — соберите заново');
       return;
     }
@@ -954,9 +1028,10 @@
 
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
-      if (!confirm('Очистить корзину?')) return;
-      Cart.clear();
-      Utils.showToast('🗑 Корзина очищена');
+    if (!confirm('Очистить корзину?')) return;
+    Cart.clear();
+    resetOrderId();
+    Utils.showToast('🗑 Корзина очищена');
     });
   }
 
@@ -973,6 +1048,8 @@
     reserve.signature = '';
     reserve.expiresAt = 0;
     reserve.expired = false;
+    reserve.state = 'idle';
+    reserve.storeId = null;
     hideTimer();
     Cart.clear();
     emptyEl.classList.add('hidden');
@@ -983,8 +1060,7 @@
     var detail = (e && e.detail) || {};
     var orderNumber = detail.orderNumber || '';
     var oid = orderId();
-    try { sessionStorage.removeItem(RESERVE_KEY); } catch (e) { }
-    reserve.orderId = '';
+    resetOrderId();
     var displayNumber = orderNumber ? ('#' + orderNumber) : oid;
     var oidEl = document.getElementById('successOrderId');
     if (oidEl) oidEl.textContent = displayNumber;
@@ -1020,11 +1096,38 @@
     expiredState();
   });
 
+  window.addEventListener('form:state', function (e) {
+    if (e && e.detail && e.detail.form === orderForm) updateSubmitGate();
+  });
+
   Cart.onChange(function () {
     Cart.updateBadge();
     render();
     scheduleReserve();
   });
+
+  var storeRefreshPending = false;
+  async function refreshStoreSettings() {
+    if (storeRefreshPending || !products.length) return;
+    storeRefreshPending = true;
+    try {
+      var res = await fetch('/api/stores', { cache: 'no-store' });
+      var data = await res.json();
+      (data && Array.isArray(data.stores) ? data.stores : []).forEach(function (store) {
+        var index = stores.findIndex(function (item) { return item.id === store.id; });
+        if (index === -1) stores.push(store);
+        else stores[index] = Object.assign({}, stores[index], store);
+      });
+      if (state.storeId) {
+        render();
+        initPickupSelectors();
+      }
+    } catch (e) { }
+    storeRefreshPending = false;
+  }
+
+  window.addEventListener('focus', refreshStoreSettings);
+  window.addEventListener('pageshow', refreshStoreSettings);
 
   async function init() {
     try {
