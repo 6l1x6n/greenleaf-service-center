@@ -1551,29 +1551,49 @@ a:hover { text-decoration: none; }
 .form-group label { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: 0.01em; }
 
 /* ---------- Методы оплаты СЦ (карточки-переключатели в админке) ---------- */
-.pay-methods-admin { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 2px; }
-.pm-opt {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-sm);
+.payment-methods-heading { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.payment-methods-heading label { margin: 0; }
+.payment-methods-heading span { color: var(--muted); font-size: 12px; }
+.pay-methods-admin { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.pm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
   background: #fff;
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
-.pm-opt.accepted { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 1px var(--green) inset; }
-.pm-opt.visible { box-shadow: 0 0 0 1px var(--green) inset, 0 0 0 3px rgba(27, 107, 63, 0.12) inset; }
-.pm-main, .pm-visibility { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
-.pm-main input, .pm-visibility input { flex: none; width: 17px; height: 17px; margin: 2px 0 0; accent-color: var(--green); }
-.pm-emoji { font-size: 20px; line-height: 1; }
-.pm-name { font-size: 14px; font-weight: 800; color: var(--ink); margin-top: 3px; }
-.pm-opt.accepted .pm-name { color: var(--green-dark); }
-.pm-hint { font-size: 12px; color: var(--muted); line-height: 1.3; }
-.pm-visibility { border-top: 1px solid var(--line); padding-top: 7px; font-size: 12px; color: var(--muted); }
-.pm-visibility input:disabled { cursor: not-allowed; }
-@media (max-width: 580px) {
-  .pay-methods-admin { grid-template-columns: 1fr; }
+.pm-row:hover { border-color: rgba(27, 107, 63, 0.45); box-shadow: 0 3px 12px rgba(22, 48, 31, 0.06); }
+.pm-row.accepted { border-color: #b8d8be; background: #f8fcf8; }
+.pm-row.visible { box-shadow: 0 0 0 2px rgba(27, 107, 63, 0.12); }
+.pm-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pm-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 11px; background: var(--green-soft); font-size: 20px; flex: none; }
+.pm-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pm-name { font-size: 14px; font-weight: 800; color: var(--ink); }
+.pm-row.accepted .pm-name { color: var(--green-dark); }
+.pm-row:not(.accepted) .pm-icon { background: #f1f4f1; filter: grayscale(0.45); }
+.pm-row:not(.accepted) .pm-name { color: var(--muted); }
+.pm-hint { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.pm-controls { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+.pm-toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; color: var(--muted); font-size: 12.5px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.pm-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.pm-switch { position: relative; width: 36px; height: 21px; border-radius: 999px; background: #d8e2da; box-shadow: inset 0 0 0 1px rgba(27, 107, 63, 0.08); transition: background 0.15s ease, opacity 0.15s ease; flex: none; }
+.pm-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(22, 48, 31, 0.25); transition: transform 0.15s ease; }
+.pm-toggle input:checked + .pm-switch { background: var(--green); }
+.pm-toggle input:checked + .pm-switch::after { transform: translateX(15px); }
+.pm-toggle input:focus-visible + .pm-switch { outline: 3px solid rgba(27, 107, 63, 0.25); outline-offset: 2px; }
+.pm-toggle input:disabled + .pm-switch { opacity: 0.45; }
+.pm-toggle input:disabled ~ .pm-toggle-label { color: #9aaba0; }
+@media (max-width: 680px) {
+  .pm-row { grid-template-columns: 1fr; gap: 10px; }
+  .pm-controls { justify-content: flex-start; padding-top: 9px; border-top: 1px solid var(--line); }
+}
+@media (max-width: 380px) {
+  .pm-controls { gap: 8px; }
+  .pm-toggle { flex: 1 1 130px; }
 }
 
 /* ---------- Карточки магазинов-партнёров ---------- */

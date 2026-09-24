@@ -587,14 +587,15 @@
       : '<img id="storeImagePreview" class="store-img-preview hidden" src="assets/images/products/placeholder.svg" alt="Превью фото" onerror="this.src=\'assets/images/products/placeholder.svg\'">';
     var pm = Array.isArray(store.payment_methods) && store.payment_methods.length ? store.payment_methods : ['kaspi', 'cash'];
     var pv = store.payment_method_visibility && typeof store.payment_method_visibility === 'object' ? store.payment_method_visibility : {};
-    var methodCard = function (code, emoji, name, hint) {
+    var methodRow = function (code, emoji, name, hint) {
       var accepted = pm.indexOf(code) !== -1;
       var visible = accepted && pv[code] !== false;
-      return '<div class="pm-opt' + (accepted ? ' accepted' : '') + (visible ? ' visible' : '') + '">' +
-        '<label class="pm-main"><input type="checkbox" name="pay_' + code + '" value="1"' + (accepted ? ' checked' : '') + '>' +
-        '<span class="pm-emoji">' + emoji + '</span><span class="pm-name">' + name + '</span><span class="pm-hint">' + hint + '</span></label>' +
-        '<label class="pm-visibility"><input type="checkbox" name="show_' + code + '" value="1"' + (visible ? ' checked' : '') + (accepted ? '' : ' disabled') + '> Показывать клиентам</label>' +
-        '</div>';
+      return '<div class="pm-row' + (accepted ? ' accepted' : '') + (visible ? ' visible' : '') + '">' +
+        '<div class="pm-info"><span class="pm-icon">' + emoji + '</span><div class="pm-copy"><strong class="pm-name">' + name + '</strong><span class="pm-hint">' + hint + '</span></div></div>' +
+        '<div class="pm-controls">' +
+        '<label class="pm-toggle pm-toggle-accept"><input type="checkbox" name="pay_' + code + '" value="1"' + (accepted ? ' checked' : '') + '><span class="pm-switch"></span><span class="pm-toggle-label">Разрешён</span></label>' +
+        '<label class="pm-toggle pm-toggle-visible"><input type="checkbox" name="show_' + code + '" value="1"' + (visible ? ' checked' : '') + (accepted ? '' : ' disabled') + '><span class="pm-switch"></span><span class="pm-toggle-label">Виден клиентам</span></label>' +
+        '</div></div>';
     };
     return '<div class="admin-card">' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;" class="store-auth-grid">' +
@@ -609,13 +610,13 @@
             Utils.scheduleFormHtml(store) +
       '<p class="form-note" style="max-width:360px;">🕐 Часы работы — по времени Астаны (UTC+5), общий часовой пояс для всех филиалов. Бронь и выдача проверяются по нему.</p>' +
       '<div class="form-group"><label>Kaspi QR (путь к картинке статичного QR)</label><input name="kaspi_qr" value="' + h(store.kaspi_qr || '') + '" placeholder="assets/images/kaspi-qr.png"></div>' +
-      '<div class="form-group"><label>Методы оплаты</label>' +
+      '<div class="form-group payment-methods-field"><div class="payment-methods-heading"><label>Методы оплаты</label><span>Настройка филиала</span></div>' +
       '<div class="pay-methods-admin">' +
-      methodCard('kaspi', '💳', 'Kaspi', 'Оплата переводом онлайн') +
-      methodCard('cash', '💵', 'Наличные', 'Оплата при получении') +
-      methodCard('kaspi_invoice', '🧾', 'Счёт на оплату Kaspi', 'ID клиента kz12345678, −50%, оплата позже') +
+      methodRow('kaspi', '💳', 'Kaspi', 'Оплата переводом онлайн') +
+      methodRow('cash', '💵', 'Наличные', 'Оплата при получении') +
+      methodRow('kaspi_invoice', '🧾', 'Счёт на оплату Kaspi', 'ID клиента kz12345678, −50%, оплата позже') +
       '</div>' +
-      '<p class="form-note">Отмеченный метод разрешён для филиала. «Показывать клиентам» управляет видимостью в оплате; скрытый метод сервер не принимает.</p></div>' +
+      '<p class="form-note">«Разрешён» включает приём оплаты, «Виден клиентам» — показ способа в checkout.</p></div>' +
       '<div class="form-group"><label>Фото (путь или ссылка)</label><input name="image" value="' + h(store.image || '') + '" placeholder="assets/images/... или https://..."' + (store.image ? '' : '') + '>' + imagePreview + '</div>' +
       '<div class="form-group"><label>Краткое описание филиала</label><textarea name="description">' + h(store.description) + '</textarea></div>' +
       '<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">' +
@@ -677,18 +678,19 @@
         var row = off.closest('.sched-row');
         if (row) row.classList.toggle('has-off', off.checked);
       }
-      var pmOpt = e.target.closest('.pm-opt');
-      if (pmOpt) {
-        var accept = pmOpt.querySelector('.pm-main input');
-        var show = pmOpt.querySelector('.pm-visibility input');
+      var pmRow = e.target.closest('.pm-row');
+      if (pmRow) {
+        var accept = pmRow.querySelector('.pm-toggle-accept input');
+        var show = pmRow.querySelector('.pm-toggle-visible input');
         if (e.target === accept) {
-          pmOpt.classList.toggle('accepted', !!accept.checked);
+          pmRow.classList.toggle('accepted', !!accept.checked);
           if (show) {
             show.disabled = !accept.checked;
             if (!accept.checked) show.checked = false;
           }
+          pmRow.classList.toggle('visible', !!(show && show.checked));
         }
-        if (e.target === show) pmOpt.classList.toggle('visible', !!(show && show.checked));
+        if (e.target === show) pmRow.classList.toggle('visible', !!(show && show.checked));
       }
     });
     form.addEventListener('submit', function (e) {
