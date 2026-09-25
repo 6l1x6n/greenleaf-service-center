@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-24T14:10:59+03:00",
+  "updated": "2026-09-25T08:41:24+03:00",
   "moves": [
     {
       "number": "3533544",
@@ -9,16 +9,10 @@
       "sum": 1008000.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
-      "items": [
-        {
-          "sku": "CBE037",
-          "name": "CARICH Шариковый дезодорант-антиперспирант 40 мл",
-          "qty": 480
-        }
-      ],
-      "itemsParsed": true
+      "status": "Отменен",
+      "statusCode": 9,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3533524",
@@ -28,8 +22,8 @@
       "sum": 516000.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "NWA087",
@@ -57,16 +51,10 @@
       "sum": 504000.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
-      "items": [
-        {
-          "sku": "CBE037",
-          "name": "CARICH Шариковый дезодорант-антиперспирант 40 мл",
-          "qty": 240
-        }
-      ],
-      "itemsParsed": true
+      "status": "Отменен",
+      "statusCode": 9,
+      "items": [],
+      "itemsParsed": false
     },
     {
       "number": "3533504",
@@ -76,8 +64,8 @@
       "sum": 522000.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "CAA039",
