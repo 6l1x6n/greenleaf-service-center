@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-27T09:08:10+03:00",
+  "updated": "2026-09-27T15:39:06+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -98,13 +98,13 @@
       "category": "Уход за телом и косметика",
       "price": 5800,
       "partner_price": 2900,
-      "quantity": 18,
+      "quantity": 17,
       "image": "assets/images/products/KLA083.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 18
+        "s240534": 17
       },
       "description": "",
       "pv": 0.5
@@ -1196,13 +1196,13 @@
       "category": "Уход за телом и косметика",
       "price": 4400,
       "partner_price": 2200,
-      "quantity": 39,
+      "quantity": 38,
       "image": "assets/images/products/SAA065.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 39
+        "s240534": 38
       },
       "description": "",
       "pv": 0.5
@@ -2798,13 +2798,13 @@
       "category": "Уход за телом и косметика",
       "price": 3800,
       "partner_price": 1900,
-      "quantity": 148,
+      "quantity": 147,
       "image": "assets/images/products/DAA108.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 148
+        "s240534": 147
       },
       "description": "",
       "pv": 0.5
@@ -2960,13 +2960,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 107,
+      "quantity": 106,
       "image": "assets/images/products/ASF053.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 107
+        "s240534": 106
       },
       "description": "",
       "pv": 0.5
@@ -2978,13 +2978,13 @@
       "category": "Уход за телом и косметика",
       "price": 3800,
       "partner_price": 1900,
-      "quantity": 138,
+      "quantity": 137,
       "image": "assets/images/products/ASB047.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 138
+        "s240534": 137
       },
       "description": "",
       "pv": 0.5
@@ -3014,13 +3014,13 @@
       "category": "Уход за телом и косметика",
       "price": 4200,
       "partner_price": 2100,
-      "quantity": 82,
+      "quantity": 81,
       "image": "assets/images/products/ASB044.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 82
+        "s240534": 81
       },
       "description": "",
       "pv": 0.7
@@ -3536,13 +3536,13 @@
       "category": "Напитки и БАДы",
       "price": 12600,
       "partner_price": 6300,
-      "quantity": 23,
+      "quantity": 63,
       "image": "assets/images/products/NWA087.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 23
+        "s240534": 63
       },
       "description": "",
       "pv": 5.0
@@ -4094,13 +4094,13 @@
       "category": "Уход за телом и косметика",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 85,
+      "quantity": 84,
       "image": "assets/images/products/KLA081.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 85
+        "s240534": 84
       },
       "description": "",
       "pv": 2.0
@@ -4310,13 +4310,13 @@
       "category": "Уход за телом и косметика",
       "price": 5400,
       "partner_price": 2700,
-      "quantity": 431,
+      "quantity": 531,
       "image": "assets/images/products/CAA039.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 431
+        "s240534": 531
       },
       "description": "",
       "pv": 1.0
@@ -4364,13 +4364,13 @@
       "category": "Уход за телом и косметика",
       "price": 10400,
       "partner_price": 5200,
-      "quantity": 65,
+      "quantity": 64,
       "image": "assets/images/products/CAB026.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 65
+        "s240534": 64
       },
       "description": "",
       "pv": 4.5
@@ -5408,13 +5408,13 @@
       "category": "Бытовая химия",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 14,
+      "quantity": 114,
       "image": "assets/images/products/ASA088.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 14
+        "s240534": 114
       },
       "description": "",
       "pv": 1.0
@@ -5642,13 +5642,13 @@
       "category": "Уход за телом и косметика",
       "price": 4200,
       "partner_price": 2100,
-      "quantity": 44,
+      "quantity": 164,
       "image": "assets/images/products/CBE037.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 44
+        "s240534": 164
       },
       "description": "",
       "pv": 2.0
@@ -89106,15 +89106,17 @@
       "category": "Уход за телом и косметика",
       "price": 0,
       "partner_price": 0,
-      "quantity": 0,
+      "quantity": 20,
       "image": "assets/images/products/CBA041.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
-      "stock": {},
+      "stock": {
+        "s240534": 20
+      },
       "hidden": false,
-      "pv": 0.0
+      "pv": 3.0
     },
     {
       "id": "ASF044",
