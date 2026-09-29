@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-28T18:35:23+03:00",
+  "updated": "2026-09-29T09:38:31+03:00",
   "moves": [
     {
       "number": "3551054",
@@ -9,8 +9,8 @@
       "sum": 1379900.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "ASF036",
@@ -78,8 +78,8 @@
       "sum": 772192.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "YZA212",
