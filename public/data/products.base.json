@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-04T09:32:48+03:00",
+  "updated": "2026-10-04T15:46:37+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -8,13 +8,13 @@
       "category": "Напитки и БАДы",
       "price": 11600,
       "partner_price": 5800,
-      "quantity": 52,
+      "quantity": 0,
       "image": "assets/images/products/NWA110.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 52
+        "s240534": 0
       },
       "description": "",
       "pv": 4.0
@@ -26,13 +26,13 @@
       "category": "Уход за телом и косметика",
       "price": 9000,
       "partner_price": 4500,
-      "quantity": 12,
+      "quantity": 0,
       "image": "assets/images/products/YZA059.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 12
+        "s240534": 0
       },
       "description": "",
       "pv": 3.0
@@ -44,13 +44,13 @@
       "category": "Уход за телом и косметика",
       "price": 11600,
       "partner_price": 5800,
-      "quantity": 206,
+      "quantity": 0,
       "image": "assets/images/products/SBD059.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 206
+        "s240534": 0
       },
       "description": "",
       "pv": 4.0
@@ -62,13 +62,13 @@
       "category": "Уход за телом и косметика",
       "price": 3200,
       "partner_price": 1600,
-      "quantity": 72,
+      "quantity": 0,
       "image": "assets/images/products/ASA082.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 72
+        "s240534": 0
       },
       "description": "",
       "pv": 1.0
@@ -80,13 +80,13 @@
       "category": "Уход за телом и косметика",
       "price": 6600,
       "partner_price": 3300,
-      "quantity": 42,
+      "quantity": 0,
       "image": "assets/images/products/KLA084.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 42
+        "s240534": 0
       },
       "description": "",
       "pv": 0.5
@@ -98,13 +98,13 @@
       "category": "Уход за телом и косметика",
       "price": 5800,
       "partner_price": 2900,
-      "quantity": 14,
+      "quantity": 0,
       "image": "assets/images/products/KLA083.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 14
+        "s240534": 0
       },
       "description": "",
       "pv": 0.5
@@ -116,13 +116,13 @@
       "category": "Уход за телом и косметика",
       "price": 5000,
       "partner_price": 2500,
-      "quantity": 76,
+      "quantity": 75,
       "image": "assets/images/products/KLA088.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 76
+        "s240534": 75
       },
       "description": "",
       "pv": 0.5
@@ -134,13 +134,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 144,
+      "quantity": 143,
       "image": "assets/images/products/LYA072.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 144
+        "s240534": 143
       },
       "description": "",
       "pv": 0.2
@@ -188,13 +188,13 @@
       "category": "Уход за телом и косметика",
       "price": 2400,
       "partner_price": 1200,
-      "quantity": 104,
+      "quantity": 103,
       "image": "assets/images/products/EBB020.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 104
+        "s240534": 103
       },
       "description": "",
       "pv": 0.2
@@ -224,13 +224,13 @@
       "category": "Зубная гигиена",
       "price": 1800,
       "partner_price": 900,
-      "quantity": 309,
+      "quantity": 307,
       "image": "assets/images/products/KLA170.jpeg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 309
+        "s240534": 307
       },
       "description": "",
       "pv": 0.1
@@ -350,13 +350,13 @@
       "category": "Бытовая химия",
       "price": 1200,
       "partner_price": 600,
-      "quantity": 286,
+      "quantity": 285,
       "image": "assets/images/products/ASF066.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 286
+        "s240534": 285
       },
       "description": "",
       "pv": 0.2
@@ -728,13 +728,13 @@
       "category": "Женская и детская гигиена",
       "price": 1800,
       "partner_price": 900,
-      "quantity": 102,
+      "quantity": 101,
       "image": "assets/images/products/DAD001.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 102
+        "s240534": 101
       },
       "description": "",
       "pv": 0.2
@@ -746,13 +746,13 @@
       "category": "Женская и детская гигиена",
       "price": 1800,
       "partner_price": 900,
-      "quantity": 551,
+      "quantity": 550,
       "image": "assets/images/products/DAD192.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 551
+        "s240534": 550
       },
       "description": "",
       "pv": 0.2
@@ -872,13 +872,13 @@
       "category": "Женская и детская гигиена",
       "price": 2200,
       "partner_price": 1100,
-      "quantity": 74,
+      "quantity": 73,
       "image": "assets/images/products/DAD003.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 74
+        "s240534": 73
       },
       "description": "",
       "pv": 0.5
@@ -890,13 +890,13 @@
       "category": "Женская и детская гигиена",
       "price": 2200,
       "partner_price": 1100,
-      "quantity": 348,
+      "quantity": 346,
       "image": "assets/images/products/DAD190.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 348
+        "s240534": 346
       },
       "description": "",
       "pv": 0.5
@@ -998,13 +998,13 @@
       "category": "Женская и детская гигиена",
       "price": 2200,
       "partner_price": 1100,
-      "quantity": 249,
+      "quantity": 247,
       "image": "assets/images/products/DAD004.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 249
+        "s240534": 247
       },
       "description": "",
       "pv": 0.5
@@ -1016,13 +1016,13 @@
       "category": "Уход за телом и косметика",
       "price": 2600,
       "partner_price": 1300,
-      "quantity": 54,
+      "quantity": 53,
       "image": "assets/images/products/KLA091.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 54
+        "s240534": 53
       },
       "description": "",
       "pv": 0.5
@@ -1088,13 +1088,13 @@
       "category": "Уход за телом и косметика",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 23,
+      "quantity": 22,
       "image": "assets/images/products/CIA063.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 23
+        "s240534": 22
       },
       "description": "",
       "pv": 0.1
@@ -1448,13 +1448,13 @@
       "category": "Бытовая химия",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 74,
+      "quantity": 71,
       "image": "assets/images/products/KLA109.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 74
+        "s240534": 71
       },
       "description": "",
       "pv": 0.2
@@ -2132,13 +2132,13 @@
       "category": "Бытовая химия",
       "price": 10200,
       "partner_price": 5100,
-      "quantity": 23,
+      "quantity": 22,
       "image": "assets/images/products/ASA087.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 23
+        "s240534": 22
       },
       "description": "",
       "pv": 1.0
@@ -2798,13 +2798,13 @@
       "category": "Уход за телом и косметика",
       "price": 3800,
       "partner_price": 1900,
-      "quantity": 109,
+      "quantity": 106,
       "image": "assets/images/products/DAA108.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 109
+        "s240534": 106
       },
       "description": "",
       "pv": 0.5
@@ -3608,13 +3608,13 @@
       "category": "Напитки и БАДы",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 167,
+      "quantity": 166,
       "image": "assets/images/products/NWA062.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 167
+        "s240534": 166
       },
       "description": "",
       "pv": 1.5
@@ -4130,13 +4130,13 @@
       "category": "Уход за телом и косметика",
       "price": 11000,
       "partner_price": 5500,
-      "quantity": 85,
+      "quantity": 84,
       "image": "assets/images/products/LGW573.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 85
+        "s240534": 84
       },
       "description": "",
       "pv": 6.0
@@ -4310,13 +4310,13 @@
       "category": "Уход за телом и косметика",
       "price": 5400,
       "partner_price": 2700,
-      "quantity": 472,
+      "quantity": 470,
       "image": "assets/images/products/CAA039.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 472
+        "s240534": 470
       },
       "description": "",
       "pv": 1.0
@@ -5174,13 +5174,13 @@
       "category": "Бытовая химия",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 92,
+      "quantity": 87,
       "image": "assets/images/products/ASF036.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 92
+        "s240534": 87
       },
       "description": "",
       "pv": 1.0
@@ -5192,13 +5192,13 @@
       "category": "Бытовая химия",
       "price": 5400,
       "partner_price": 2700,
-      "quantity": 62,
+      "quantity": 61,
       "image": "assets/images/products/ASF024.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 62
+        "s240534": 61
       },
       "description": "",
       "pv": 1.0
@@ -5822,13 +5822,13 @@
       "category": "Уход за телом и косметика",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 137,
+      "quantity": 136,
       "image": "assets/images/products/LYA068.jpeg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 137
+        "s240534": 136
       },
       "description": "",
       "pv": 1.0
@@ -5840,13 +5840,13 @@
       "category": "Бытовая химия",
       "price": 8800,
       "partner_price": 4400,
-      "quantity": 37,
+      "quantity": 36,
       "image": "assets/images/products/ZBN061.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 37
+        "s240534": 36
       },
       "description": "",
       "pv": 3.0
@@ -6218,13 +6218,13 @@
       "category": "Зубная гигиена",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 407,
+      "quantity": 405,
       "image": "assets/images/products/CCA016.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 407
+        "s240534": 405
       },
       "description": "",
       "pv": 1.0
@@ -6512,14 +6512,14 @@
       "category": "Прочее",
       "price": 2400,
       "partner_price": 1200,
-      "quantity": 179,
+      "quantity": 178,
       "image": "assets/images/products/KLA098.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "Надёжные, экологичные и многофункциональные — идеальные помощники для ежедневного ухода! Наши ватные палочки изготовлены из натуральных бамбуковых палочек и оснащены плотными хлопковыми насадками, которые не осыпаются и не отрываются даже при интенсивном использовании.\nПочему выбирают наши ватные палочки:\nПрочная фиксация ваты — головки надёжно закреплены, не скручиваются и не оставляют волокон.\nВысококачественный обезжиренный хлопок — мягкий, гипоаллергенный и безопасный даже для чувствительной кожи.\nЭкологичный бамбуковый стержень — прочный, биоразлагаемый и устойчивый к изгибу.\nУниверсальное применение — подходят для гигиены ушей, снятия макияжа, ухода за ногтями, нанесения средств локально и многого другого.\nКак использовать:\nПеред применением слегка потяните за ватную насадку, чтобы убедиться в её надёжной фиксации.\nПри очистке ушных каналов не вводите палочку глубже 1,5 см от входа в слуховой проход — это обеспечит безопасность и предотвратит травмы.\nВажные рекомендации:\nДетям использовать только под присмотром взрослых.\nХраните в сухом, прохладном месте, вдали от прямых солнечных лучей и источников высокой температуры.\nНе используйте для глубокой чистки слухового прохода — ватные палочки предназначены только для внешней гигиены.\nCARICH Бамбуковые ватные палочки — чистота, безопасность и забота о природе в каждой детали!\nКоличество: 500 шт.",
       "stock": {
-        "s240534": 179
+        "s240534": 178
       },
       "hidden": false,
       "image_src": "/data/files/goods/8281/2507150913f0LNSJMFQa.png",
@@ -65344,14 +65344,14 @@
       "category": "Напитки и БАДы",
       "price": 8800,
       "partner_price": 4400,
-      "quantity": 14,
+      "quantity": 0,
       "image": "assets/images/products/NWA078.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "Ежедневная поддержка организма\nNilrich функциональный молочный напиток на основе натурального козьего молока, обогащенный кальцием, селеном, пробиотиками, витаминами и пищевыми волокнами. Комплекс активных компонентов помогает поддерживать здоровье костей и зубов, нормальную работу пищеварительной и иммунной систем, а также способствует восполнению потребности организма в важных витаминах и минералах.\nБлагодаря удобному формату индивидуальных саше напиток легко приготовить дома, на работе или в поездке.\nСвойства:\nИзготовлен на основе натурального козьего молока\nСодержит кальций для поддержания здоровья костей и зубов*\nОбогащен селеном и комплексом витаминов\nСодержит пробиотик Bifidobacterium animalis subsp. lactis BB-12\nИсточник пребиотиков (изомальтоолигосахариды и инулин)\nСпособствует поддержанию нормальной работы пищеварительной системы\nПоддерживает нормальное функционирование иммунной системы*\nУдобный формат порционных саше\n* Благодаря содержанию кальция, селена и витаминов.\nКоличество:\n14 саше × 20 г\nСостав:\nСухое козье молоко (75%), деминерализованная сухая молочная сыворотка, изомальтоолигосахариды (10%), инулин (0,5%), эмульгатор (фосфолипиды), порошок семян китайского финика (Ziziphus jujuba) (0,05%), пробиотик Bifidobacterium animalis subsp. lactis BB-12 (живые бактерии ≥ 1,0 × 10⁶ КОЕ/г), витамин A (ретинилацетат), витамин D₃ (холекальциферол), витамин E (DL-α-токоферилацетат), витамин B₆ (пиридоксина гидрохлорид), витамин C (L-аскорбиновая кислота), фолиевая кислота, таурин, карбонат кальция, сульфат железа, сульфат цинка, селенит натрия.\nПищевая ценность\nПоказательНа 100 гНа 1 саше (20 г)Энергетическая ценность467 ккал93 ккалБелки21,3 г4,3 гЖиры21,5 г4,3 гУглеводы46,0 г9,2 гСахара36,6 г7,3 гНатрий238 мг47,6 мгКальций1140 мг228 мгСелен50 мкг10 мкг Способ приготовления:\nНалейте 150 мл теплой воды (около 50 °C) в чашку. Добавьте содержимое одного пакетика (20 г) и тщательно размешайте до полного растворения. Напиток готов к употреблению.\nПредупреждение об аллергенах:\nПродукт содержит молоко и молочные продукты (включая лактозу), а также производные сои. Людям с аллергией на данные компоненты следует употреблять продукт с осторожностью.\nОграничения по применению:\nПродукт не предназначен для грудных детей и детей младше 3 лет.\nРекомендуемое суточное потребление инулина — не более 15 г.\nСпособ хранения:\nХранить в сухом прохладном месте, защищенном от прямых солнечных лучей и воздействия высоких температур.\nСрок годности:\n18 месяцев.\nБАД. Не является лекарственным средством. Не заменяет разнообразное и сбалансированное питание. Перед применением рекомендуется проконсультироваться со специалистом при беременности, в период грудного вскармливания, при наличии хронических заболеваний или индивидуальной непереносимости компонентов продукта.",
       "stock": {
-        "s240534": 14
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/275347/260304095369OM4how0z.png",
