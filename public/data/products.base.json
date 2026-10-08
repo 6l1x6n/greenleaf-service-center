@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-07T17:47:41+03:00",
+  "updated": "2026-10-08T10:17:43+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -2132,13 +2132,13 @@
       "category": "Бытовая химия",
       "price": 10200,
       "partner_price": 5100,
-      "quantity": 16,
+      "quantity": 15,
       "image": "assets/images/products/ASA087.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 16
+        "s240534": 15
       },
       "description": "",
       "pv": 1.0
@@ -2150,13 +2150,13 @@
       "category": "Бытовая химия",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 171,
+      "quantity": 170,
       "image": "assets/images/products/ASA086.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 171
+        "s240534": 170
       },
       "description": "",
       "pv": 0.5
@@ -2420,13 +2420,13 @@
       "category": "Бытовая химия",
       "price": 2200,
       "partner_price": 1100,
-      "quantity": 149,
+      "quantity": 148,
       "image": "assets/images/products/KAC298.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 149
+        "s240534": 148
       },
       "description": "",
       "pv": 0.2
@@ -2456,13 +2456,13 @@
       "category": "Бытовая химия",
       "price": 4000,
       "partner_price": 2000,
-      "quantity": 109,
+      "quantity": 108,
       "image": "assets/images/products/KLA021.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 109
+        "s240534": 108
       },
       "description": "",
       "pv": 0.5
@@ -2690,13 +2690,13 @@
       "category": "Уход за телом и косметика",
       "price": 5200,
       "partner_price": 2600,
-      "quantity": 122,
+      "quantity": 121,
       "image": "assets/images/products/SBA087.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 122
+        "s240534": 121
       },
       "description": "",
       "pv": 0.5
@@ -2816,13 +2816,13 @@
       "category": "Бытовая химия",
       "price": 3200,
       "partner_price": 1600,
-      "quantity": 65,
+      "quantity": 64,
       "image": "assets/images/products/DAC056.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 65
+        "s240534": 64
       },
       "description": "",
       "pv": 0.2
@@ -3032,13 +3032,13 @@
       "category": "Уход за телом и косметика",
       "price": 2400,
       "partner_price": 1200,
-      "quantity": 544,
+      "quantity": 542,
       "image": "assets/images/products/ASB046.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 544
+        "s240534": 542
       },
       "description": "",
       "pv": 0.7
@@ -3230,13 +3230,13 @@
       "category": "Зубная гигиена",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 177,
+      "quantity": 176,
       "image": "assets/images/products/KLA064.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 177
+        "s240534": 176
       },
       "description": "",
       "pv": 1.0
@@ -3266,13 +3266,13 @@
       "category": "Бытовая химия",
       "price": 6800,
       "partner_price": 3400,
-      "quantity": 65,
+      "quantity": 64,
       "image": "assets/images/products/ASF070.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 65
+        "s240534": 64
       },
       "description": "",
       "pv": 2.0
@@ -3392,13 +3392,13 @@
       "category": "Зубная гигиена",
       "price": 3200,
       "partner_price": 1600,
-      "quantity": 100,
+      "quantity": 99,
       "image": "assets/images/products/KLA132.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 100
+        "s240534": 99
       },
       "description": "",
       "pv": 1.0
@@ -5066,13 +5066,13 @@
       "category": "Уход за телом и косметика",
       "price": 13800,
       "partner_price": 6900,
-      "quantity": 44,
+      "quantity": 43,
       "image": "assets/images/products/XNA028.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 44
+        "s240534": 43
       },
       "description": "",
       "pv": 6.0
@@ -5822,13 +5822,13 @@
       "category": "Уход за телом и косметика",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 132,
+      "quantity": 131,
       "image": "assets/images/products/LYA068.jpeg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 132
+        "s240534": 131
       },
       "description": "",
       "pv": 1.0
@@ -5948,13 +5948,13 @@
       "category": "Напитки и БАДы",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 96,
+      "quantity": 95,
       "image": "assets/images/products/NAZ469.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 96
+        "s240534": 95
       },
       "description": "",
       "pv": 0.5
@@ -6572,14 +6572,14 @@
       "category": "Напитки и БАДы",
       "price": 4000,
       "partner_price": 2000,
-      "quantity": 332,
+      "quantity": 331,
       "image": "assets/images/products/NAZ468.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "Особенности продукта: Натуральный сироп на основе груши, листьев локвы и растительных экстрактов помогает смягчить горло, уменьшить раздражение слизистых и поддержать комфортное дыхание. Обладает приятным фруктовым вкусом и подходит для использования в сезон простуд и повышенных нагрузок на голосовые связки.\nОбъем: 130 г\nСвойства:\n• Сок груши — смягчает горло, помогает уменьшить ощущение сухости и раздражения. • Листья локвы (Eriobotrya japonica) — традиционно используются для поддержки здоровья дыхательных путей и облегчения кашля. • Плакатодон (Platycodon grandiflorus) — способствует смягчению слизистой оболочки горла и поддержанию комфортного дыхания. • Корень солодки — помогает уменьшить першение в горле и способствует естественному очищению дыхательных путей. • Листья мяты — дарят ощущение свежести, помогают облегчить дыхание и успокаивают слизистую. • Мангостин — содержит природные антиоксиданты, способствующие поддержанию иммунной системы. • Ягоды лимонника — помогают поддерживать общий тонус организма и естественные защитные функции. • Семена стеркулии — традиционно применяются для смягчения горла и уменьшения дискомфорта при разговоре. • Трава эльшольции (Xiang Ru) — используется в восточной фитотерапии для поддержки организма в сезон простуд. • Комплекс растительных компонентов — способствует уменьшению сухости, смягчению горла и поддержанию здоровья дыхательных путей.\nСостав: Сок груши, мальтозный сироп, листья локвы (Eriobotrya japonica), мангостин (Garcinia mangostana), ягоды лимонника (Lonicera edulis), семена стеркулии (Sterculia), плакатодон (Platycodon grandiflorus), листья мяты, трава эльшольции (Herba Elsholtziae, Xiang Ru), корень солодки (Glycyrrhiza), лимонный сок.\nПищевая ценность на 100 г: • Энергетическая ценность — 1350 кДж (16% NRV) • Белки — 0 г (0% NRV) • Жиры — 0 г (0% NRV) • Углеводы — 79,4 г (26% NRV) • Натрий — 148 мг (7% NRV)\nСпособ применения: По 1 столовой ложке 2–3 раза в день после еды. Перед употреблением взболтать.\nПротивопоказания: Индивидуальная непереносимость компонентов, беременность, период грудного вскармливания, детский возраст до 3 лет.\nСпособ хранения: Хранить в сухом, прохладном месте, вдали от солнечного света и высоких температур.\nСрок годности: 18 месяцев.",
       "stock": {
-        "s240534": 332
+        "s240534": 331
       },
       "hidden": false,
       "image_src": "/data/files/goods/9627/2506181441AxHjbrPTUs.jpg",
@@ -65504,14 +65504,14 @@
       "category": "Уход за телом и косметика",
       "price": 1800,
       "partner_price": 900,
-      "quantity": 83,
+      "quantity": 82,
       "image": "assets/images/products/KLA056.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "Интенсивное увлажнение, питание и восстановление сухой кожи\nВосстанавливающий крем для рук и ног с конским жиром предназначен для ухода за сухой, грубой и склонной к шелушению кожей. Формула сочетает мочевину, глицерин, вазелин, жидкий парафин и диметикон, которые помогают интенсивно увлажнять кожу, уменьшать ощущение сухости и поддерживать её защитный барьер.\nКонский жир дополняет формулу, обеспечивая питательный и смягчающий уход. Крем помогает сделать кожу рук и ног более мягкой, гладкой и эластичной.\nСвойства:\nИнтенсивно увлажняет сухую кожу\nПомогает уменьшить сухость и шероховатость\nПитает и смягчает кожу\nПомогает удерживать влагу\nПоддерживает защитный барьер кожи\nСпособствует восстановлению кожи\nДелает кожу более гладкой и мягкой\nПодходит для ухода за руками и ногами\nМасса нетто:\n80 г\nАктивные компоненты:\nМочевина, глицерин, конский жир, вазелин, жидкий парафин, диметикон, цетеариловый спирт.\nСпособ применения:\nНанесите необходимое количество крема на кожу рук и ног. Мягко помассируйте до полного впитывания. Особое внимание уделите участкам с повышенной сухостью и шероховатостью.\nУсловия хранения:\nПосле использования плотно закрывать упаковку. Хранить в сухом, хорошо проветриваемом месте, защищенном от прямых солнечных лучей.",
       "stock": {
-        "s240534": 83
+        "s240534": 82
       },
       "hidden": false,
       "image_src": "/data/files/goods/275347/2505221444PEAbR5zOLt.png",
@@ -65704,14 +65704,14 @@
       "category": "Бытовая химия",
       "price": 7800,
       "partner_price": 3900,
-      "quantity": 15,
+      "quantity": 14,
       "image": "assets/images/products/XNA074.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 15
+        "s240534": 14
       },
       "hidden": false,
       "image_src": "/data/files/goods/685565/2606251145MQf55zOhmJ.jpg",
@@ -92471,6 +92471,23 @@
       },
       "hidden": false,
       "image_src": "/data/files/goods/685565/2609240839NM168t0A6z.jpeg"
+    },
+    {
+      "id": "JDA182",
+      "sku": "JDA182",
+      "name": "(Кол-во в коробке 3 шт)Kardli Противоударный PP чемодан/24 дюйма/розовый",
+      "category": "Прочее",
+      "price": 0,
+      "partner_price": 0,
+      "pv": 0,
+      "quantity": 0,
+      "image": "assets/images/products/JDA182.png",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
     }
   ]
 }
