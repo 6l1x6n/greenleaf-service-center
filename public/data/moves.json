@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-12T10:31:44+03:00",
+  "updated": "2026-10-12T20:14:52+03:00",
   "moves": [
     {
       "number": "3611668",
@@ -11,8 +11,14 @@
       "recipient": "S240534",
       "status": "Новый",
       "statusCode": 0,
-      "items": [],
-      "itemsParsed": false
+      "items": [
+        {
+          "sku": "DAD004",
+          "name": "iLiFE Дневные гигиенические прокладки",
+          "qty": 500
+        }
+      ],
+      "itemsParsed": true
     },
     {
       "number": "3587196",
