@@ -1,6 +1,58 @@
 {
-  "updated": "2026-10-12T20:14:52+03:00",
+  "updated": "2026-10-13T10:21:24+03:00",
   "moves": [
+    {
+      "number": "3621068",
+      "who": "s240534",
+      "time": "2026-10-13 10:07:43",
+      "date": "2026-10-13",
+      "sum": 39840.0,
+      "source": "Астана поставщик",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [],
+      "itemsParsed": false
+    },
+    {
+      "number": "3621049",
+      "who": "s240534",
+      "time": "2026-10-13 10:06:46",
+      "date": "2026-10-13",
+      "sum": 67728.0,
+      "source": "Астана поставщик",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [],
+      "itemsParsed": false
+    },
+    {
+      "number": "3620802",
+      "who": "s240534",
+      "time": "2026-10-13 10:00:39",
+      "date": "2026-10-13",
+      "sum": 237000.0,
+      "source": "Астана поставщик",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [],
+      "itemsParsed": false
+    },
+    {
+      "number": "3620621",
+      "who": "s240534",
+      "time": "2026-10-13 09:54:17",
+      "date": "2026-10-13",
+      "sum": 2460000.0,
+      "source": "Астана поставщик",
+      "recipient": "S240534",
+      "status": "Новый",
+      "statusCode": 0,
+      "items": [],
+      "itemsParsed": false
+    },
     {
       "number": "3611668",
       "who": "s240534",
@@ -9,8 +61,8 @@
       "sum": 456500.0,
       "source": "Алматы поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "DAD004",
@@ -203,19 +255,6 @@
       "itemsParsed": false
     },
     {
-      "number": "3487727",
-      "who": "s240534",
-      "time": "2026-09-14 15:05:27",
-      "date": "2026-09-14",
-      "sum": 162000.0,
-      "source": "Алматы поставщик",
-      "recipient": "S240534",
-      "status": "Отменен",
-      "statusCode": 9,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
       "number": "3487706",
       "who": "s240534",
       "time": "2026-09-14 15:04:48",
@@ -255,19 +294,6 @@
       "itemsParsed": false
     },
     {
-      "number": "3485270",
-      "who": "s240534",
-      "time": "2026-09-14 13:39:00",
-      "date": "2026-09-14",
-      "sum": 149177.0,
-      "source": "Астана поставщик \"новый\"",
-      "recipient": "S240534",
-      "status": "Отменен",
-      "statusCode": 9,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
       "number": "3485060",
       "who": "s240534",
       "time": "2026-09-14 13:34:57",
@@ -286,32 +312,6 @@
       "time": "2026-09-11 11:04:36",
       "date": "2026-09-11",
       "sum": 623000.0,
-      "source": "Астана поставщик \"новый\"",
-      "recipient": "S240534",
-      "status": "Принят СЦ",
-      "statusCode": 7,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
-      "number": "3463551",
-      "who": "s240534",
-      "time": "2026-09-10 11:22:06",
-      "date": "2026-09-10",
-      "sum": 2234340.0,
-      "source": "Астана поставщик \"новый\"",
-      "recipient": "S240534",
-      "status": "Принят СЦ",
-      "statusCode": 7,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
-      "number": "3454829",
-      "who": "s240534",
-      "time": "2026-09-08 10:22:34",
-      "date": "2026-09-08",
-      "sum": 2025800.0,
       "source": "Астана поставщик \"новый\"",
       "recipient": "S240534",
       "status": "Принят СЦ",
