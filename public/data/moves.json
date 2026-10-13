@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-13T10:21:24+03:00",
+  "updated": "2026-10-13T18:07:58+03:00",
   "moves": [
     {
       "number": "3621068",
@@ -11,8 +11,14 @@
       "recipient": "S240534",
       "status": "Новый",
       "statusCode": 0,
-      "items": [],
-      "itemsParsed": false
+      "items": [
+        {
+          "sku": "ASA056",
+          "name": "iLiFE Чистящее средство для унитаза \"Бело-голубая пена\" (4 шт.)",
+          "qty": 48
+        }
+      ],
+      "itemsParsed": true
     },
     {
       "number": "3621049",
@@ -24,8 +30,14 @@
       "recipient": "S240534",
       "status": "Новый",
       "statusCode": 0,
-      "items": [],
-      "itemsParsed": false
+      "items": [
+        {
+          "sku": "KLA129",
+          "name": "CARICH Освежающий антибактериальный спрей 30 мл",
+          "qty": 48
+        }
+      ],
+      "itemsParsed": true
     },
     {
       "number": "3620802",
@@ -37,8 +49,14 @@
       "recipient": "S240534",
       "status": "Новый",
       "statusCode": 0,
-      "items": [],
-      "itemsParsed": false
+      "items": [
+        {
+          "sku": "WJA035",
+          "name": "Shouxizi Конфеты из белой фасоли в форме таблеток/120г",
+          "qty": 30
+        }
+      ],
+      "itemsParsed": true
     },
     {
       "number": "3620621",
@@ -50,8 +68,39 @@
       "recipient": "S240534",
       "status": "Новый",
       "statusCode": 0,
-      "items": [],
-      "itemsParsed": false
+      "items": [
+        {
+          "sku": "KLA125",
+          "name": "CARICH Ополаскиватель для полости рта антигликационный, устраняет запах / 10 мл × 20 пакетиков",
+          "qty": 80
+        },
+        {
+          "sku": "CBG004",
+          "name": "CARICH ватные палочки двусторонние с бумажным стиком (белые)",
+          "qty": 120
+        },
+        {
+          "sku": "NWA123",
+          "name": "Эпимедиум марки Nilrich Fujioka и капсулы Ganoderma/22,4 г",
+          "qty": 80
+        },
+        {
+          "sku": "NWA048",
+          "name": "Nilrich коллагеновый напиток красный апельсин с витамином C",
+          "qty": 90
+        },
+        {
+          "sku": "NWA045",
+          "name": "Nilrich Таблетки с различными витаминами группы B",
+          "qty": 240
+        },
+        {
+          "sku": "DAC054",
+          "name": "iLiFE Эффективная ароматизированная активная минеральная соль для стирки",
+          "qty": 120
+        }
+      ],
+      "itemsParsed": true
     },
     {
       "number": "3611668",
