@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-13T18:07:58+03:00",
+  "updated": "2026-10-14T08:33:14+03:00",
   "moves": [
     {
       "number": "3621068",
@@ -9,8 +9,8 @@
       "sum": 39840.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "ASA056",
@@ -28,8 +28,8 @@
       "sum": 67728.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA129",
@@ -47,8 +47,8 @@
       "sum": 237000.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "WJA035",
@@ -66,8 +66,8 @@
       "sum": 2460000.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "KLA125",
