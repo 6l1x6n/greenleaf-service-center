@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-15T14:06:18+03:00",
+  "updated": "2026-10-16T13:59:22+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -224,13 +224,13 @@
       "category": "Зубная гигиена",
       "price": 1800,
       "partner_price": 900,
-      "quantity": 267,
+      "quantity": 268,
       "image": "assets/images/products/KLA170.jpeg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 267
+        "s240534": 268
       },
       "description": "",
       "pv": 0.1
@@ -278,13 +278,13 @@
       "category": "Зубная гигиена",
       "price": 1600,
       "partner_price": 800,
-      "quantity": 63,
+      "quantity": 64,
       "image": "assets/images/products/EAA023.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 63
+        "s240534": 64
       },
       "description": "",
       "pv": 0.5
@@ -638,13 +638,13 @@
       "category": "Зубная гигиена",
       "price": 1600,
       "partner_price": 800,
-      "quantity": 81,
+      "quantity": 82,
       "image": "assets/images/products/EAA022.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 81
+        "s240534": 82
       },
       "description": "",
       "pv": 0.2
@@ -854,13 +854,13 @@
       "category": "Женская и детская гигиена",
       "price": 2000,
       "partner_price": 1000,
-      "quantity": 155,
+      "quantity": 156,
       "image": "assets/images/products/DAD193.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 155
+        "s240534": 156
       },
       "description": "",
       "pv": 0.5
@@ -998,13 +998,13 @@
       "category": "Женская и детская гигиена",
       "price": 2200,
       "partner_price": 1100,
-      "quantity": 160,
+      "quantity": 660,
       "image": "assets/images/products/DAD004.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 160
+        "s240534": 660
       },
       "description": "",
       "pv": 0.5
@@ -1448,13 +1448,13 @@
       "category": "Бытовая химия",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 26,
+      "quantity": 117,
       "image": "assets/images/products/KLA109.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 26
+        "s240534": 117
       },
       "description": "",
       "pv": 0.2
@@ -1862,13 +1862,13 @@
       "category": "Уход за телом и косметика",
       "price": 2000,
       "partner_price": 1000,
-      "quantity": 46,
+      "quantity": 166,
       "image": "assets/images/products/SAA069.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 46
+        "s240534": 166
       },
       "description": "",
       "pv": 0.2
@@ -2042,13 +2042,13 @@
       "category": "Бытовая химия",
       "price": 2000,
       "partner_price": 1000,
-      "quantity": 9,
+      "quantity": 57,
       "image": "assets/images/products/ASA056.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 9
+        "s240534": 57
       },
       "description": "",
       "pv": 0.2
@@ -2132,13 +2132,13 @@
       "category": "Бытовая химия",
       "price": 10200,
       "partner_price": 5100,
-      "quantity": 65,
+      "quantity": 66,
       "image": "assets/images/products/ASA087.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 65
+        "s240534": 66
       },
       "description": "",
       "pv": 1.0
@@ -2294,13 +2294,13 @@
       "category": "Бытовая химия",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 87,
+      "quantity": 89,
       "image": "assets/images/products/ASF026.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 87
+        "s240534": 89
       },
       "description": "",
       "pv": 0.5
@@ -2384,13 +2384,13 @@
       "category": "Бытовая химия",
       "price": 5000,
       "partner_price": 2500,
-      "quantity": 14,
+      "quantity": 134,
       "image": "assets/images/products/DAC054.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 14
+        "s240534": 134
       },
       "description": "",
       "pv": 0.5
@@ -2456,13 +2456,13 @@
       "category": "Бытовая химия",
       "price": 4000,
       "partner_price": 2000,
-      "quantity": 228,
+      "quantity": 229,
       "image": "assets/images/products/KLA021.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 228
+        "s240534": 229
       },
       "description": "",
       "pv": 0.5
@@ -2744,13 +2744,13 @@
       "category": "Бытовая химия",
       "price": 5800,
       "partner_price": 2900,
-      "quantity": 77,
+      "quantity": 78,
       "image": "assets/images/products/ASF049.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 77
+        "s240534": 78
       },
       "description": "",
       "pv": 0.5
@@ -3158,13 +3158,13 @@
       "category": "Зубная гигиена",
       "price": 3200,
       "partner_price": 1600,
-      "quantity": 21,
+      "quantity": 22,
       "image": "assets/images/products/KLA131.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 21
+        "s240534": 22
       },
       "description": "",
       "pv": 1.0
@@ -3212,13 +3212,13 @@
       "category": "Бытовая химия",
       "price": 2200,
       "partner_price": 1100,
-      "quantity": 2,
+      "quantity": 122,
       "image": "assets/images/products/CBG004.jpg",
-      "status": "low",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 2
+        "s240534": 122
       },
       "description": "",
       "pv": 0.5
@@ -3284,13 +3284,13 @@
       "category": "Зубная гигиена",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 89,
+      "quantity": 90,
       "image": "assets/images/products/CCC030.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 89
+        "s240534": 90
       },
       "description": "",
       "pv": 1.5
@@ -3626,13 +3626,13 @@
       "category": "Напитки и БАДы",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 8,
+      "quantity": 98,
       "image": "assets/images/products/NWA048.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 8
+        "s240534": 98
       },
       "description": "",
       "pv": 1.0
@@ -3842,13 +3842,13 @@
       "category": "Напитки и БАДы",
       "price": 4400,
       "partner_price": 2200,
-      "quantity": 2,
+      "quantity": 242,
       "image": "assets/images/products/NWA045.jpeg",
-      "status": "low",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 2
+        "s240534": 242
       },
       "description": "",
       "pv": 1.5
@@ -4310,13 +4310,13 @@
       "category": "Уход за телом и косметика",
       "price": 5400,
       "partner_price": 2700,
-      "quantity": 384,
+      "quantity": 484,
       "image": "assets/images/products/CAA039.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 384
+        "s240534": 484
       },
       "description": "",
       "pv": 1.0
@@ -5138,13 +5138,13 @@
       "category": "Бытовая химия",
       "price": 2400,
       "partner_price": 1200,
-      "quantity": 22,
+      "quantity": 23,
       "image": "assets/images/products/DAA105.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 22
+        "s240534": 23
       },
       "description": "",
       "pv": 1.0
@@ -5228,13 +5228,13 @@
       "category": "Бытовая химия",
       "price": 3200,
       "partner_price": 1600,
-      "quantity": 359,
+      "quantity": 759,
       "image": "assets/images/products/MSA001.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 359
+        "s240534": 759
       },
       "description": "",
       "pv": 1.0
@@ -5282,13 +5282,13 @@
       "category": "Бытовая химия",
       "price": 2600,
       "partner_price": 1300,
-      "quantity": 7,
+      "quantity": 127,
       "image": "assets/images/products/KLA265.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 7
+        "s240534": 127
       },
       "description": "",
       "pv": 0.5
@@ -5642,13 +5642,13 @@
       "category": "Уход за телом и косметика",
       "price": 4200,
       "partner_price": 2100,
-      "quantity": 41,
+      "quantity": 281,
       "image": "assets/images/products/CBE037.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 41
+        "s240534": 281
       },
       "description": "",
       "pv": 2.0
@@ -6372,14 +6372,14 @@
       "category": "Зубная гигиена",
       "price": 3800,
       "partner_price": 1900,
-      "quantity": 15,
+      "quantity": 96,
       "image": "assets/images/products/KLA125.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "Эффективно нейтрализует запах чеснока и другие неприятные запахи изо рта благодаря антигликирующему действию и расщеплению пахучих соединений.\nФормула продукта включает фтор для профилактики кариеса и способствует поддержанию здоровой полости рта. Благодаря гидролизу сахаров он также помогает устранить причины появления неприятного запаха.",
       "stock": {
-        "s240534": 15
+        "s240534": 96
       },
       "hidden": false,
       "image_src": "/data/files/goods/8281/2511180927K7q8tnDF46.png",
@@ -6412,14 +6412,14 @@
       "category": "Прочее",
       "price": 29800,
       "partner_price": 14900,
-      "quantity": 15,
+      "quantity": 95,
       "image": "assets/images/products/NWA123.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 15
+        "s240534": 95
       },
       "hidden": false,
       "image_src": "/data/files/goods/202001/2602250707yn6cQJ8FvS.png",
@@ -35961,15 +35961,17 @@
       "category": "Прочее",
       "price": 0,
       "partner_price": 0,
-      "quantity": 0,
+      "quantity": 20,
       "image": "assets/images/products/MNA001.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
-      "stock": {},
+      "stock": {
+        "s240534": 20
+      },
       "hidden": false,
-      "pv": 0.0
+      "pv": 5.0
     },
     {
       "id": "SCB071",
@@ -36012,15 +36014,17 @@
       "category": "Прочее",
       "price": 0,
       "partner_price": 0,
-      "quantity": 0,
+      "quantity": 60,
       "image": "assets/images/products/MQA001.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
-      "stock": {},
+      "stock": {
+        "s240534": 60
+      },
       "hidden": false,
-      "pv": 0.0
+      "pv": 2.0
     },
     {
       "id": "PAC02",
@@ -65564,14 +65568,14 @@
       "category": "Уход за телом и косметика",
       "price": 8200,
       "partner_price": 4100,
-      "quantity": 16,
+      "quantity": 17,
       "image": "assets/images/products/KLA116.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "Обновите свой ежедневный уход за волосами с инновационным шампунем с морской солью\nПогрузитесь в атмосферу настоящего СПА-ритуала прямо у себя дома! Наш шампунь с мелкозернистой солью из Средиземного моря бережно, но эффективно очищает кожу головы, удаляя излишки себума, остатки укладочных средств и загрязнения, накопившиеся за день.\nУникальная текстура в виде нежного «смузи» легко вспенивается и буквально тает при контакте с водой, даря ощущение комфорта и глубокого очищения.\nБогатая формула для здоровых, сияющих волос:\nТрегалоза и масло семян камелии интенсивно питают и смягчают волосы, возвращая им естественный блеск.\nГриб тримелла и корень имбиря обеспечивают глубокое увлажнение и тонизируют кожу головы.\nЭкстракты мяты и масла чайного дерева освежают, охлаждают и стимулируют микроциркуляцию.\nЭкстракт красного граната, богатый антиоксидантами, надёжно защищает волосы от агрессивного воздействия окружающей среды.\nСпособ применения:\nТщательно смочите волосы тёплой водой.\nНанесите небольшое количество шампуня на ладонь.\nРавномерно распределите по волосам и коже головы, мягко помассировав до образования пены.\nОставьте пену на 3–5 минуты, чтобы активные компоненты раскрыли свой потенциал.\nСмойте теплой водой до полного удаления средства.\nПодарите своим волосам уход, достойный люксового СПА!\nОбъем: 300 г.",
       "stock": {
-        "s240534": 16
+        "s240534": 17
       },
       "hidden": false,
       "image_src": "/data/files/goods/8003/2604102047zAWS6N79MU.png",
@@ -71626,15 +71630,17 @@
       "category": "Напитки и БАДы",
       "price": 0,
       "partner_price": 0,
-      "quantity": 0,
+      "quantity": 30,
       "image": "assets/images/products/WJA035.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
-      "stock": {},
+      "stock": {
+        "s240534": 30
+      },
       "hidden": false,
-      "pv": 0.0
+      "pv": 5.0
     },
     {
       "id": "SCF027/К",
@@ -92579,18 +92585,19 @@
       "sku": "KLA129",
       "name": "CARICH Освежающий антибактериальный спрей 30 мл",
       "category": "Прочее",
-      "price": 0,
-      "partner_price": 0,
-      "pv": 0,
-      "quantity": 0,
+      "price": 3400,
+      "partner_price": 1700,
+      "pv": 0.2,
+      "quantity": 48,
       "image": "assets/images/products/KLA129.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
-      "stock": {},
+      "stock": {
+        "s240534": 48
+      },
       "hidden": false,
-      "pending": true,
       "image_src": "/data/files/goods/2/2605071226JldCM9jPUz.png"
     },
     {
@@ -92711,6 +92718,77 @@
       "description": "",
       "stock": {},
       "hidden": false
+    },
+    {
+      "id": "MAA115",
+      "sku": "MAA115",
+      "name": "(Кол-во коробке 5 шт) MAIWEIS  комплект постельного белья из 100% хлопка, 4 предмета / серия «Платиновый хлопок» / «Элегантная цветочная мелодия» 5099 / англо-русская версия / 150×200 см.",
+      "category": "Бытовая химия",
+      "price": 0,
+      "partner_price": 0,
+      "pv": 0,
+      "quantity": 0,
+      "image": "assets/images/products/MAA115.jpg",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false
+    },
+    {
+      "id": "XNA054",
+      "sku": "XNA054",
+      "name": "SEALUXE Ночная осветляющая маска для лица с ниацинамидом",
+      "category": "Уход за телом и косметика",
+      "price": 5600,
+      "partner_price": 2800,
+      "pv": 0.5,
+      "quantity": 240,
+      "image": "assets/images/products/XNA054.jpeg",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null,
+      "description": "Откройте для себя ночное восстановление и сияние кожи\nНочная осветляющая маска - это интенсивный ночной уход, созданный для восстановления кожи во время сна, когда процессы обновления работают максимально активно. Лёгкая, насыщенная формула обеспечивает глубокое увлажнение, питание и заметное улучшение внешнего вида кожи уже с первых применений.\nБлагодаря сочетанию ниацинамида, гиалуроновой кислоты и пептидного комплекса маска помогает улучшить тон кожи, придать ей более ровный и сияющий вид, а также уменьшить проявления усталости. Во время ночного отдыха активные компоненты работают над восстановлением упругости и гладкости кожи, делая её более мягкой и эластичной к утру.\nУход дополнен растительными экстрактами и ферментированными компонентами, которые усиливают эффект увлажнения и поддерживают естественный баланс кожи, помогая ей выглядеть свежей, отдохнувшей и ухоженной каждый день.\nСвойства:\nИнтенсивное ночное увлажнение и восстановление\nОсветление и выравнивание тона кожи\nУлучшение упругости и эластичности\nРазглаживание мелких линий и морщин\nУменьшение следов усталости\nПоддержка естественного водного баланса кожи\nЭффект «отдохнувшей кожи» с утра\nПовышение гладкости и мягкости\nПодходит для регулярного ночного ухода\nСпособ применения:\nОчистите кожу лица перед сном.\nНанесите небольшое количество маски равномерным слоем на кожу лица.\nАккуратно распределите по коже, избегая области вокруг глаз и губ.\nОставьте на ночь — маска не требует смывания.\nУтром умойтесь привычным способом.\nСостав:\nВода, гликоль, сополимер акриловой кислоты и акрилата натрия, ниацинамид, лецитин, экстракт чайного листа, пантенол, бутиленгликоль, экстракт Magnolia Sieboldii, фосфат аскорбила магния, гиалуроновая кислота, гиалуронат натрия, ферментированный фильтрат Lactobacillus/соевого молока, дикалий глицирризат, пептиды, 1,2-пентандиол и другие ухаживающие компоненты.\n​Количество:\n20 саше × 4 мл",
+      "stock": {
+        "s240534": 240
+      }
+    },
+    {
+      "id": "DDA002",
+      "sku": "DDA002",
+      "name": "Электрический блендер",
+      "category": "Прочее",
+      "price": 30400,
+      "partner_price": 15200,
+      "pv": 5.0,
+      "quantity": 12,
+      "image": "assets/images/products/DDA002.png",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {
+        "s240534": 12
+      }
+    },
+    {
+      "id": "DDA001",
+      "sku": "DDA001",
+      "name": "Электробритва",
+      "category": "Прочее",
+      "price": 27000,
+      "partner_price": 13500,
+      "pv": 5.0,
+      "quantity": 40,
+      "image": "assets/images/products/DDA001.png",
+      "status": "in_stock",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {
+        "s240534": 40
+      }
     }
   ]
 }
