@@ -507,7 +507,7 @@
   function bindStore(s) {
     document.title = 'Сервис-центры Greenleaf — каталог продукции и эко-товаров';
 
-    var waButtons = document.querySelectorAll('#waHero, #waContacts, #waFooter');
+    var waButtons = document.querySelectorAll('#waHero, #waContacts, #waFooter, #waHeader');
     waButtons.forEach(function (b) {
       b.href = waLink('Здравствуйте!\nПишу из сайта mygreenleaf.\nИнтересует наличие эко-продукции');
     });
@@ -659,9 +659,22 @@
     return src + (src.indexOf('?') === -1 ? '?' : '&') + 'v=' + encodeURIComponent(v);
   }
 
+  // События воронки. Cloudflare Web Analytics считает только просмотры страниц,
+  // кастомных событий у него нет, поэтому событие уходит в документ, а счётчик
+  // ловит его сам: document.addEventListener('gl:event', function (e) { ... }).
+  // Плюс сразу отдаём его Plausible/Umami, если они когда-нибудь появятся на странице.
+  function track(name, data) {
+    try {
+      document.dispatchEvent(new CustomEvent('gl:event', { detail: { name: name, data: data || {} } }));
+    } catch (e) { /* старый браузер — работе сайта не мешаем */ }
+    if (window.plausible) window.plausible(name, data ? { props: data } : undefined);
+    if (window.umami) window.umami.track(name, data);
+  }
+
   window.Utils = {
     openModal: openModal,
     closeModal: closeModal,
+    track: track,
     showToast: showToast,
     fmtPrice: fmtPrice,
     fmtDate: fmtDate,

@@ -18,13 +18,13 @@
   var isCatalogPage = document.body && document.body.dataset.catalogPage === '1';
   var MAIN_PAGE_LIMIT = 10;
   var CATALOG_PAGE_SIZE = 100;
-  var FILTERS_KEY = 'greenleaf_catalog_filters_v1';
 
   var grid = document.getElementById('grid');
   var chips = document.getElementById('chips');
   var search = document.getElementById('search');
   var stockOnly = document.getElementById('stockOnly');
   var scActiveBannerContainer = document.getElementById('scActiveBannerContainer');
+  var catalogStoreSelect = document.getElementById('catalogStoreSelect');
 
   // Оверрайды из Worker: глобальные правки товаров и правки по Сервис-Центрам.
   // Устанавливаются в init() из /api/products.
@@ -170,36 +170,13 @@
     var st = statusInfo(p);
     var outCls = st.meta === STATUS.out ? ' product-row-out' : '';
     var img = p.thumb || imgUrl(p);
-    var stockInSelectedStore = '';
-    if (state.selectedStoreId && state.selectedStoreId !== 'all') {
-      // Бейдж уже отражает наличие выбранного СЦ; отдельная пометка нужна только
-      // для редкого статуса «Ожидается» в филиале, иначе поставка потеряется
-      var storeStock = StoreStock.statusText ? StoreStock.statusText(state.selectedStoreId, p.id) : StoreStock.text(state.selectedStoreId, p.id);
-      if (storeStock !== undefined && String(storeStock).indexOf('Ожидается') === 0) {
-        stockInSelectedStore = '<span class="meta-note sc-wait">📍 В выбранном СЦ: ' + Utils.esc(storeStock) + '</span>';
-      }
-    }
 
-    // Скидочные цены: оверрайды СЦ/глобальные уже учтены в effectivePrices
+    // Одна розничная цена для всех. Партнёрские цены, PV и «−50%» показываем
+    // только на странице «Подписка». Карточки портала без цены — «Цена по запросу»
     var prices = effectivePrices(p);
-    // Карточки портала без цены (созданы парсером заранее) — «Цена по запросу»
-    var priceHtml = '';
-    if (!(prices.price > 0)) {
-      priceHtml = '<span class="price-ask">Цена по запросу</span>';
-    } else {
-      var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
-      if (disc) {
-        priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
-          '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>' +
-          '<span class="badge-sale">−' + Math.round((1 - prices.discount / prices.price) * 100) + '%</span>';
-      } else {
-        priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
-          '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
-          '<span class="badge-sale">-50%</span>';
-      }
-      // PV-баллы — справа от цен, в том же ряду (без цены не показываем)
-      if (prices.price > 0) priceHtml += pvBadge(p);
-    }
+    var priceHtml = (prices.price > 0)
+      ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
+      : '<span class="price-ask">Цена по запросу</span>';
 
     return '' +
       '<article class="product-row' + outCls + '" data-product-id="' + Utils.esc(p.id) + '" tabindex="0">' +
@@ -213,7 +190,6 @@
       '<h3 class="row-title">' + Utils.esc(p.name) + '</h3>' +
       '<div class="row-meta">' +
       '<span class="stock-pill ' + st.meta.pill + '">' + Utils.esc(st.meta.label) + '</span>' +
-      stockInSelectedStore +
       (moveSkuMap[p.id] ? '<span class="meta-note">🚚 В пути · ' + Utils.fmtDate(moveSkuMap[p.id].eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>' : '') +
       (st.note ? '<span class="meta-note">' + Utils.esc(st.note) + '</span>' : '') +
       '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
@@ -224,27 +200,12 @@
       '<div class="card-prices">' +
       priceHtml +
       '</div>' +
-      '<a class="partner-link" href="podpiska.html">Как стать партнёром →</a>' +
       '</div>' +
       '<div class="row-actions">' +
       rowCartControl(p, true) +
       '</div>' +
       '</div>' +
       '</article>';
-  }
-
-  function partnerPrice(p) {
-    var v = p.partner_price;
-    if (typeof v !== 'number' || isNaN(v)) v = Math.round(p.price / 2);
-    return v;
-  }
-
-  // PV-баллы товара (партнёрская выгода из базы парсера). 0/пусто — не показываем.
-  function pvBadge(p) {
-    var v = p && p.pv != null ? Number(p.pv) : 0;
-    if (!isFinite(v) || v <= 0) return '';
-    var txt = (Math.round(v * 100) / 100).toString();
-    return '<span class="pv-badge" title="PV-баллы: начисляются партнёру за покупку">PV ' + Utils.esc(txt) + '</span>';
   }
 
   function selectedStore() {
@@ -374,6 +335,39 @@
       '</div>';
   }
 
+  // Каталог: вместо баннера выбранного СЦ — один компактный селект
+  // «Наличие в: …». Выбор задаёт state.selectedStoreId, как клик по карточке СЦ.
+  function renderCatalogStoreSelect() {
+    if (!catalogStoreSelect) return;
+    catalogStoreSelect.innerHTML = '<option value="all">Наличие в: вся сеть</option>' +
+      stores.map(function (s) {
+        return '<option value="' + Utils.esc(s.id) + '"' + (state.selectedStoreId === s.id ? ' selected' : '') + '>' +
+          Utils.esc(s.name) + '</option>';
+      }).join('');
+  }
+
+  function applyStoreSelection(storeId) {
+    state.selectedStoreId = storeId || 'all';
+    state.showAllCatalog = false;
+    state.page = 0;
+    try {
+      var selStore = stores.find(function (s) { return s.id === state.selectedStoreId; }) || null;
+      if (selStore) {
+        localStorage.setItem('greenleaf_sc_selected_v1', JSON.stringify({ id: selStore.id, name: selStore.name, address: selStore.address || '' }));
+      } else {
+        localStorage.removeItem('greenleaf_sc_selected_v1');
+      }
+    } catch (err) { }
+    syncStockToggle();
+    renderStoresSection();
+    renderActiveStoreBanner();
+    renderCatalogStoreSelect();
+    renderContacts();
+    render();
+    renderChips();
+    renderDeliveries(lastDeliveries);
+  }
+
   // ---------------- Контакты следуют за выбранным СЦ ----------------
 
   function renderContacts() {
@@ -435,23 +429,12 @@
   // ---------------- Товар: модалка, корзина ----------------
 
   function openProductDetailModal(p) {
+    Utils.track('card_open', { id: p.id, sku: p.sku });
     var st = statusInfo(p);
     var prices = effectivePrices(p);
-    var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
-    var priceHtml = '';
-    if (!(prices.price > 0)) {
-      priceHtml = '<span class="price-ask">Цена по запросу</span>';
-    } else if (disc) {
-      priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
-        '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>' +
-        '<span class="badge-sale">−' + Math.round((1 - prices.discount / prices.price) * 100) + '%</span>';
-    } else {
-      priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span>' +
-        '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>' +
-        '<span class="badge-sale">-50%</span>';
-    }
-    // PV-баллы — справа от цен, в том же ряду
-    if (prices.price > 0) priceHtml += pvBadge(p);
+    var priceHtml = (prices.price > 0)
+      ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
+      : '<span class="price-ask">Цена по запросу</span>';
     var sel = selectedStore();
     var stockRows = '';
     var storeStockLines = [];
@@ -479,7 +462,6 @@
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 style="margin:2px 0 0;">' + Utils.esc(p.name) + '</h3>' +
       '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      '<a class="partner-link" href="podpiska.html">Партнёрам −50% · Подробнее →</a>' +
       '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
       '<div class="product-stock-list">' + stockRows + '</div>' +
       '<div class="pdetail-buy">' +
@@ -747,24 +729,8 @@
     var storeChip = e.target.closest('[data-select-store]');
     if (storeChip) {
       var storeId = storeChip.getAttribute('data-select-store');
-      state.selectedStoreId = (state.selectedStoreId === storeId && storeId !== 'all') ? 'all' : storeId;
-      state.showAllCatalog = false;
-      state.page = 0;
-      try {
-        var selStore = stores.find(function (s) { return s.id === state.selectedStoreId; }) || null;
-        if (selStore) {
-          localStorage.setItem('greenleaf_sc_selected_v1', JSON.stringify({ id: selStore.id, name: selStore.name, address: selStore.address || '' }));
-        } else {
-          localStorage.removeItem('greenleaf_sc_selected_v1');
-        }
-      } catch (err) { }
-      syncStockToggle();
-      renderStoresSection();
-      renderActiveStoreBanner();
-      renderContacts();
-      render();
-      renderChips();
-      renderDeliveries(lastDeliveries);
+      // Повторный клик по уже выбранному СЦ снимает выбор
+      applyStoreSelection((state.selectedStoreId === storeId && storeId !== 'all') ? 'all' : storeId);
       return;
     }
 
@@ -842,14 +808,12 @@
     state.page = 0;
     renderChips();
     render();
-    saveFilters();
   });
 
   search.addEventListener('input', function () {
     state.query = search.value;
     state.page = 0;
     render();
-    saveFilters();
   });
 
   function syncStockToggle() {
@@ -862,8 +826,13 @@
     state.page = 0;
     render();
     renderChips();
-    saveFilters();
   });
+
+  if (catalogStoreSelect) {
+    catalogStoreSelect.addEventListener('change', function () {
+      applyStoreSelection(catalogStoreSelect.value);
+    });
+  }
 
   ['catalogPager', 'catalogPagerTop'].forEach(function (id) {
     var catalogPager = document.getElementById(id);
@@ -893,29 +862,15 @@
     }
   });
 
-  function saveFilters() {
-    try {
-      localStorage.setItem(FILTERS_KEY, JSON.stringify({ q: state.query, cat: state.category, stock: state.stockOnly }));
-    } catch (e) { }
-  }
-
-  function restoreFilters() {
-    try {
-      var saved = JSON.parse(localStorage.getItem(FILTERS_KEY) || 'null');
-      if (saved) {
-        state.query = saved.q || '';
-        state.category = saved.cat || 'all';
-        state.stockOnly = !!saved.stock;
-        state.showAllCatalog = !state.stockOnly;
-        if (search) search.value = state.query;
-        if (stockOnly) stockOnly.checked = state.stockOnly;
-      } else {
-        // Галочка «Только в наличии» автовыбрана по умолчанию
-        state.stockOnly = true;
-        state.showAllCatalog = false;
-        if (stockOnly) stockOnly.checked = true;
-      }
-    } catch (e) { }
+  // Фильтры не запоминаем между заходами: каждый визит начинается с чистого
+  // состояния — категория «Все», пустой поиск, включённое «Только в наличии».
+  function resetFilters() {
+    state.query = '';
+    state.category = 'all';
+    state.stockOnly = true;
+    state.showAllCatalog = false;
+    if (search) search.value = '';
+    if (stockOnly) stockOnly.checked = true;
   }
 
   Cart.onChange(function () {
@@ -1272,19 +1227,9 @@
       var p = it.p;
       var prices = effectivePrices(p);
       var st = statusInfo(p);
-      var priceHtml = '';
-      if (!(prices.price > 0)) {
-        priceHtml = '<span class="price-ask">Цена по запросу</span>';
-      } else {
-        var disc = prices.discount != null && prices.discount > 0 && prices.discount < prices.price && p.showDiscount !== false;
-        if (disc) {
-          priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span> ' +
-            '<span class="price-partner" style="color:var(--green-dark); font-weight:800;">' + Utils.fmtPrice(prices.discount) + '</span>';
-        } else {
-          priceHtml = '<span class="price-old">' + Utils.fmtPrice(prices.price) + '</span> ' +
-            '<span class="price-partner">' + Utils.fmtPrice(partnerPrice(p)) + '</span>';
-        }
-      }
+      var priceHtml = (prices.price > 0)
+        ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
+        : '<span class="price-ask">Цена по запросу</span>';
       var stockLine = '';
       if (state.selectedStoreId && state.selectedStoreId !== 'all') {
         var txt = StoreStock.statusText ? StoreStock.statusText(state.selectedStoreId, p.id) : StoreStock.text(state.selectedStoreId, p.id);
@@ -1658,7 +1603,7 @@ fetch('/api/event-bookings')
 
     applyLocalOverrides();
     updateHeroMeta();
-    restoreFilters();
+    resetFilters();
 
     // Прямая ссылка на страницу каталога (#page=N, нумерация с 1)
     if (isCatalogPage) {
@@ -1683,6 +1628,7 @@ fetch('/api/event-bookings')
     window.CatalogProducts = products;
 
     renderStoresSection();
+    renderCatalogStoreSelect();
     renderChips();
     render();
     renderContacts();
@@ -1727,6 +1673,7 @@ fetch('/api/event-bookings')
     window.CatalogProducts = products;
     renderStoresSection();
     renderActiveStoreBanner();
+    renderCatalogStoreSelect();
     renderContacts();
     render();
   };

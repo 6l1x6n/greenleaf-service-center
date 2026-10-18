@@ -87,8 +87,7 @@ a:hover { text-decoration: none; }
 .btn[disabled] { opacity: 0.6; cursor: not-allowed; transform: none; }
 
 /* ---------- Шапка ---------- */
-/* Шапке нужно больше места, чем контенту: при 1160px меню из 6 пунктов +
-   кнопки «Корзина/Мои заказы/Аккаунт» не помещались — «Подписка» обрезалась */
+/* Шапка шире контента: лого + меню + WhatsApp + корзина должны стоять в одну строку */
 .header .container { max-width: 1280px; }
 .header {
   position: sticky;
@@ -158,8 +157,6 @@ a:hover { text-decoration: none; }
 
 #scAuthBtn { font-size: 13.5px; transition: all 0.2s ease; max-width: 180px; overflow: hidden; white-space: nowrap; }
 #scAuthBtn.btn-primary { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
-/* Имя в кнопке аккаунта: ужимается с многоточием, а не обрезается */
-.sc-auth-btn .sc-auth-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .burger {
   display: none;
@@ -223,10 +220,12 @@ a:hover { text-decoration: none; }
   .nav .nav-btn:hover { background: var(--green-dark); color: #fff; border-color: transparent; }
 }
 
-/* «Мои заказы»/«Войти» остаются в шапке до 570px — в бургер уходят только на очень узких */
+/* WhatsApp в шапке: на узких экранах — только иконка, чтобы влезали лого, корзина и бургер */
+.wa-header { padding-left: 14px; padding-right: 14px; }
+.wa-header svg { flex: none; }
 @media (max-width: 570px) {
-  .header-actions .my-orders-link,
-  .header-actions #scAuthBtn { display: none; }
+  .wa-header { padding-left: 10px; padding-right: 10px; }
+  .wa-header .wa-label { display: none; }
 }
 /* ---------- Hero ---------- */
 .hero {
@@ -512,6 +511,25 @@ a:hover { text-decoration: none; }
   white-space: nowrap;
 }
 .stock-only input { width: 18px; height: 18px; accent-color: var(--green); cursor: pointer; }
+/* Единственный фильтр по филиалу на странице каталога: «Наличие в: …» */
+.store-select {
+  max-width: 300px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: border 0.15s, box-shadow 0.15s;
+}
+.store-select:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(27, 107, 63, 0.1); }
+@media (max-width: 640px) {
+  .store-select { flex: 1 0 100%; max-width: 100%; }
+}
 .search {
   width: 100%;
   padding: 13px 18px;
@@ -757,19 +775,28 @@ a:hover { text-decoration: none; }
 .pay-panel { margin-top: 6px; }
 .kaspi-amount { font-size: 15px; margin-bottom: 8px; }
 .kaspi-amount b { font-size: 22px; color: var(--green-dark); }
-.kaspi-paid {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 9px 10px;
-  border-radius: 10px;
-  background: var(--green-soft);
-  font-size: 13px;
-  line-height: 1.4;
-  cursor: pointer;
+/* Необязательные поля заказа (ID клиента, время приезда) — свёрнуты, чтобы
+   форма оставалась «телефон → оформить». */
+.cart-extra {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
 }
-.kaspi-paid input { margin-top: 2px; accent-color: var(--green); width: 16px; height: 16px; }
+.cart-extra > summary {
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--green-dark);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+.cart-extra > summary::-webkit-details-marker { display: none; }
+.cart-extra > summary::before { content: '＋'; font-weight: 800; }
+.cart-extra[open] > summary::before { content: '−'; }
+.cart-extra > summary small { font-weight: 600; color: var(--muted); }
+.cart-extra > label, .cart-extra > input { margin-top: 8px; }
 .reserve-timer {
   margin-top: 8px;
   padding: 10px 12px;
@@ -815,7 +842,7 @@ a:hover { text-decoration: none; }
   .list .product-row { --ctrl-w: 100px; }
   .list .row-foot { flex-wrap: nowrap; gap: 8px; }
   .list .card-prices { gap: 6px; }
-  .list .price-partner { font-size: 19px; }
+  .list .price-partner, .list .price-now { font-size: 19px; }
   .list .price-old { font-size: 12px; }
   .list .badge-sale { font-size: 11px; padding: 2px 7px; }
   .list .pv-badge { font-size: 10px; padding: 1px 6px; }
@@ -1120,7 +1147,7 @@ a:hover { text-decoration: none; }
 @media (max-width: 420px) {
   .row-foot { grid-template-columns: minmax(0, 1fr) 104px; gap: 6px; }
   .row-prices .card-prices, .pdetail-price { gap: 6px; }
-  .row-prices .price-partner, .pdetail-price .price-partner { font-size: 18px; }
+  .row-prices .price-partner, .row-prices .price-now, .pdetail-price .price-partner, .pdetail-price .price-now { font-size: 18px; }
   .row-prices .price-old, .pdetail-price .price-old { font-size: 12px; }
   .row-prices .badge-sale, .pdetail-price .badge-sale { font-size: 11px; padding: 2px 7px; }
   .row-prices .pv-badge, .pdetail-price .pv-badge { font-size: 10px; padding: 1px 7px; }
@@ -1180,6 +1207,7 @@ a:hover { text-decoration: none; }
 .pdetail-price { flex-wrap: nowrap; white-space: nowrap; }
 .price-old { font-size: 14px; color: var(--muted); text-decoration: line-through; font-weight: 600; white-space: nowrap; }
 .price-partner { font-size: 22px; font-weight: 800; color: var(--green-dark); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.price-now { font-size: 22px; font-weight: 800; color: var(--green-dark); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .price-ask { font-size: 15px; font-weight: 700; color: var(--muted); }
 .badge-sale {
   display: inline-flex;
@@ -2566,18 +2594,13 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
   .logo img { width: 34px; height: 34px; }
   .logo-text { font-size: 17px; }
   .admin-user-badge { display: none; }
-  /* «Мои заказы» есть в бургер-меню — в шапке прячем, чтобы кнопка
-     аккаунта не ужималась и имя («СЦ Greenleaf Астана») было видно целиком */
-  .header-actions .my-orders-link { display: none; }
-  #scAuthBtn { flex-shrink: 0; }
   .delivery { flex-direction: column; }
   .delivery-date { width: 100%; min-width: 0; flex-direction: row; justify-content: center; gap: 8px; }
   .modal { padding: 24px 18px; }
   .product-detail-media { aspect-ratio: 4 / 3; }
   .product-detail-grid { gap: 14px; }
   .sc-banner-img { width: 64px; height: 64px; }
-  #scAuthBtn { font-size: 12px; padding: 0 12px; }
-  /* Корзина и Войти — одна высота (иначе Войти сплющивается) */
+  /* Кнопки в шапке (WhatsApp, корзина) — одной высоты */
   .header-actions .btn { height: 38px; padding-top: 0; padding-bottom: 0; }
   .partner-form-card { position: static; }
 }

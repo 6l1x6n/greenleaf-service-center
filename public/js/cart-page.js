@@ -19,8 +19,6 @@
   var RESERVE_TTL = 600;
   var RESERVE_KEY = 'greenleaf_order_reservation_v1';
   var reserve = { orderId: '', expiresAt: 0, interval: null, signature: '', expired: false, state: 'idle', requestSeq: 0, storeId: null, staleOrderIds: [] };
-  var kaspiPaid = false;
-  var paymentStarted = false;
   var submitBtn = document.getElementById('orderSubmitBtn');
   var reserveTimerEl = document.getElementById('reserveTimer');
 
@@ -288,15 +286,19 @@
 
   function updateSubmitGate() {
     if (!submitBtn) return;
-    var needPay = state.payment === 'kaspi';
     var submitting = orderForm && orderForm.getAttribute('data-submitting') === '1';
     var reserveReady = reserve.state === 'ready' && !reserve.expired &&
       reserve.expiresAt > Date.now() && reserve.storeId === state.storeId;
-    var ok = !!state.payment && reserveReady && !submitting && (!needPay || (paymentStarted && kaspiPaid));
+    // Оформление не требует предоплаты: кнопка активна, как только выбрано,
+    // где забирать товар и бронь готова. Оплату уточняет менеджер.
+    var ok = !!state.payment && reserveReady && !submitting;
     submitBtn.disabled = !ok;
     var note = document.getElementById('submitGateNote');
     if (!note) return;
-    if (reserve.state === 'pending' || reserve.state === 'idle') {
+    if (!state.storeId) {
+      note.textContent = 'Выберите Сервис-Центр, где заберёте товары, чтобы оформить заказ.';
+      note.style.display = '';
+    } else if (reserve.state === 'pending' || reserve.state === 'idle') {
       note.textContent = 'Подготавливаем бронь товаров…';
       note.style.display = '';
     } else if (reserve.state === 'failed') {
@@ -304,9 +306,6 @@
       note.style.display = '';
     } else if (reserve.state === 'expired') {
       note.textContent = 'Время брони истекло. Соберите корзину заново.';
-      note.style.display = '';
-    } else if (needPay && !ok) {
-      note.textContent = 'Для Kaspi: нажмите «Оплатить через Kaspi» и отметьте оплату, чтобы оформить заказ.';
       note.style.display = '';
     } else {
       note.style.display = 'none';
@@ -441,21 +440,14 @@
     if (el) el.value = value;
   }
 
-  function pvText(p) {
-    var v = p && p.pv != null ? Number(p.pv) : 0;
-    if (!isFinite(v) || v <= 0) return '';
-    return 'PV ' + (Math.round(v * 100) / 100).toString();
-  }
-
   function itemHtml(l, unavailable) {
-    var pv = pvText(l.p);
     return '<div class="cart-item' + (unavailable ? ' cart-item-unavailable' : '') + '">' +
       '<button class="cart-item-x" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Удалить из корзины">' + Utils.iconX(13) + '</button>' +
       '<div class="cart-item-media"><img src="' + Utils.esc(Utils.img(l.p.image || 'assets/images/products/placeholder.svg')) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
       '<div class="cart-item-body">' +
       '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
       '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + '</div>' +
-      '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + (pv ? ' <span class="pv-badge">' + Utils.esc(pv) + '</span>' : '') + '</div>' +
+      '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + '</div>' +
       (unavailable ? '<div class="cart-item-unavailable-note">Нет в выбранном филиале — не войдёт в заказ</div>' : '') +
       '</div>' +
       '<div class="cart-item-ctrl">' +
@@ -744,14 +736,6 @@
     var time = document.getElementById('pickupTime');
     if (date) date.required = false;
     if (time) time.required = false;
-    if (method !== 'kaspi') {
-      kaspiPaid = false;
-      paymentStarted = false;
-      var paidWrap = document.getElementById('kaspiPaidWrap');
-      if (paidWrap) paidWrap.classList.add('hidden');
-      var paidEl = document.getElementById('kaspiPaid');
-      if (paidEl) paidEl.checked = false;
-    }
     updateSubmitGate();
   }
 
@@ -843,9 +827,6 @@
         var win = window.open('https://kaspi.kz', '_blank', 'noopener');
         if (!win) Utils.showToast('Откройте приложение Kaspi и вставьте сумму');
       }
-      paymentStarted = true;
-      var paidWrap = document.getElementById('kaspiPaidWrap');
-      if (paidWrap) paidWrap.classList.remove('hidden');
       updateSubmitGate();
       return;
     }
@@ -923,14 +904,6 @@
     }
   });
 
-  var kaspiPaidEl = document.getElementById('kaspiPaid');
-  if (kaspiPaidEl) {
-    kaspiPaidEl.addEventListener('change', function () {
-      kaspiPaid = kaspiPaidEl.checked;
-      updateSubmitGate();
-    });
-  }
-
   // Валидация перед отправкой (forms.js уже проверит defaultPrevented)
   if (orderForm) {
     orderForm.addEventListener('submit', function (e) {
@@ -954,13 +927,6 @@
       }
       if (partnerInput) partnerInput.value = partnerId;
       state.partnerMode = !!partnerId && partnerModeValid(partnerId);
-      if (state.payment === 'kaspi' && !(paymentStarted && kaspiPaid)) {
-        e.preventDefault();
-        Utils.showToast('⚠️ Сначала оплатите через Kaspi и отметьте «Я оплатил(а) заказ»');
-        var payBtn = document.getElementById('kaspiPayBtn');
-        if (payBtn) blink(payBtn);
-        return;
-      }
       // Дата и время приезда (для самовывоза): только рабочие часы филиала,
       // дата не раньше сегодня, время — не раньше чем через 30 минут (по Астане)
       var pDate = orderForm.pickup_date ? orderForm.pickup_date.value : '';
@@ -1045,6 +1011,7 @@
   }
 
   window.addEventListener('order:sent', function (e) {
+    Utils.track('order_sent');
     reserve.signature = '';
     reserve.expiresAt = 0;
     reserve.expired = false;
@@ -1130,6 +1097,7 @@
   window.addEventListener('pageshow', refreshStoreSettings);
 
   async function init() {
+    Utils.track('cart_open');
     try {
       var res = await fetch('data/products.json');
       var data = await res.json();
@@ -1184,6 +1152,15 @@
   orderForm.querySelectorAll('input, select').forEach(function (el) {
     el.addEventListener('input', function () { el.classList.remove('field-blink'); });
     el.addEventListener('change', function () { el.classList.remove('field-blink'); });
+  });
+  // Воронка: «начал оформление» — первое касание полей формы (один раз за визит)
+  var checkoutStarted = false;
+  ['focusin', 'input', 'change'].forEach(function (evt) {
+    orderForm.addEventListener(evt, function () {
+      if (checkoutStarted) return;
+      checkoutStarted = true;
+      Utils.track('checkout_start');
+    });
   });
   init();
 })();

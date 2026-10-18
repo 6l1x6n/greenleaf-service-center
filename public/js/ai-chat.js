@@ -83,7 +83,7 @@
     try { localStorage.setItem(FAB_KEY, '1'); } catch (e) { }
     closePanel();
     applyFabVisibility();
-    toast('Скрыто. Вернуть: меню → «Менеджер Иса»');
+    toast('Скрыто. Вернуть: ссылка «спросите Ису» внизу страницы');
   }
 
   function showFab() {
@@ -529,7 +529,6 @@
 
   function prodCard(p) {
     var price = Number(p.price) > 0 ? fmtPrice(p.price) : 'Цена по запросу';
-    var pv = Number(p.pv) > 0 ? '<span class="pv-badge">PV ' + esc(Math.round(Number(p.pv) * 100) / 100) + '</span>' : '';
     var st = p.stockState || (p.inStock ? 'in' : 'out');
     var stock = st === 'in'
       ? '<span class="ai-prod-stock ok">В наличии</span>'
@@ -544,7 +543,7 @@
       '</span>' +
       '<div class="ai-prod-info">' +
       '<div class="ai-prod-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>' +
-      '<div class="ai-prod-meta"><span class="ai-prod-price">' + esc(price) + '</span>' + stock + pv + '</div>' +
+      '<div class="ai-prod-meta"><span class="ai-prod-price">' + esc(price) + '</span>' + stock + '</div>' +
       '</div>' +
       '<div class="ai-prod-side">' + cartControlHtml(p.id) + '</div>' +
       '</div>';

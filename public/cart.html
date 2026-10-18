@@ -22,7 +22,7 @@
   <meta property="og:image:alt" content="Greenleaf — Сервис-центр">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png">
-  <link rel="stylesheet" href="css/style.css?v=20260924d">
+  <link rel="stylesheet" href="css/style.css?v=20261018a">
 </head>
 
 <body>
@@ -34,22 +34,15 @@
         <span class="logo-text">Greenleaf<small>Сервис-центр</small></span>
       </a>
       <nav class="nav" id="nav">
+        <a href="catalog.html">Каталог</a>
         <a href="index.html#sc">Сервис-центры</a>
-        <a href="index.html#catalog">Каталог</a>
-        <a href="index.html#deliveries">Поставки</a>
-        <a href="index.html#events">Презентации</a>
         <a href="index.html#contacts">Контакты</a>
-        <a href="podpiska.html">Подписка</a>
-        <a href="#" class="ai-chat-link">👨‍💼 Менеджер Иса</a>
-        <button class="btn btn-outline btn-sm nav-btn my-orders-link" type="button">📦 Мои заказы</button>
-        <button class="btn btn-outline btn-sm nav-btn sc-auth-btn" type="button">Войти</button>
       </nav>
       <div class="header-actions">
+        <a class="btn btn-whatsapp btn-sm wa-header" id="waHeader" href="#" target="_blank" rel="noopener" aria-label="Написать в WhatsApp"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg><span class="wa-label">WhatsApp</span></a>
         <a class="btn btn-outline btn-sm cart-link" href="cart.html" aria-label="Корзина">
           🛒 <span class="cart-badge" id="cartCount"></span>
         </a>
-        <button class="btn btn-outline btn-sm my-orders-link" type="button" aria-label="Мои заказы">📦 Мои заказы</button>
-        <button class="btn btn-outline btn-sm sc-auth-btn" id="scAuthBtn">Войти</button>
         <button class="burger" id="burger" aria-label="Открыть меню"><span></span><span></span><span></span></button>
       </div>
     </div>
@@ -65,6 +58,9 @@
         <div id="cartEmpty" class="empty hidden">
           Корзина пуста.<br>
           <a href="index.html#catalog">Перейти к каталогу →</a>
+          <div style="margin-top:16px;">
+            <button class="btn btn-outline btn-sm my-orders-link" type="button">📦 Мои заказы</button>
+          </div>
         </div>
 
         <div id="cartSuccess" class="cart-success hidden">
@@ -105,7 +101,7 @@
 
             <div class="cart-summary-rows">
               <div class="cart-sum-row"><span>Товары</span><span class="sum-goods">—</span></div>
-              <div class="cart-sum-row"><span>Пакет-упаковка</span><span class="sum-package">—</span></div>
+              <div class="cart-sum-row"><span>Упаковка</span><span class="sum-package">—</span></div>
               <div class="cart-sum-row cart-sum-total"><span>Итого</span><span class="sum-total" data-total="0">—</span></div>
               <div class="cart-sum-row cart-sum-qty">Позиций: <span class="sum-qty">0</span></div>
             </div>
@@ -120,11 +116,7 @@
              <div class="pay-panel" data-pay-panel="kaspi">
               <div class="kaspi-amount">К оплате: <b class="sum-total" data-total="0">—</b></div>
               <button class="btn btn-primary btn-lg" type="button" id="kaspiPayBtn">💳 Оплатить через Kaspi</button>
-              <p class="form-note">Сумма скопируется автоматически. Откройте приложение Kaspi → «Перевод» → вставьте сумму. Оплаченную сумму мы проверим по оповещению и включим в заказ.</p>
-              <label class="kaspi-paid hidden" id="kaspiPaidWrap">
-                <input type="checkbox" id="kaspiPaid" name="kaspi_paid" value="1">
-                <span>Я оплатил(а) заказ через Kaspi — можно оформлять</span>
-              </label>
+              <p class="form-note">Сумма скопируется автоматически. Откройте приложение Kaspi → «Перевод» → вставьте сумму. Оплаченную сумму мы проверим по оповещению и включим в заказ. <b>Оформить заказ можно и без оплаты</b> — тогда оплатите при получении.</p>
             </div>
 
              <div class="pay-panel hidden" data-pay-panel="cash">
@@ -147,19 +139,22 @@
                <input type="hidden" name="order_qty" id="orderQtyTotal">
                <input type="hidden" name="order_store" id="orderStore">
               <input type="hidden" name="clientToken" id="orderClientToken">
-              <label class="cart-partner-label" for="partnerId">ID клиента Greenleaf <small>(необязательно)</small></label>
-               <input id="partnerId" name="partner_id" placeholder="kz12345678" autocomplete="off" inputmode="text">
-               <input name="phone" type="tel" placeholder="+7 (___) ___-__-__ *" required>
-               <div class="cash-fields" data-pickup-fields>
-                 <label for="pickupDate">Дата приезда <small>(по желанию)</small></label>
-                 <select id="pickupDate" name="pickup_date"></select>
-                 <label for="pickupTime">Время приезда <small>(по желанию)</small></label>
-                 <select id="pickupTime" name="pickup_time"></select>
-                 <p class="form-note" id="pickupHint" style="margin-top:6px;"></p>
-               </div>
+              <input name="phone" type="tel" placeholder="+7 (___) ___-__-__ *" required>
+              <details class="cart-extra">
+                <summary>ID клиента и время приезда <small>(необязательно)</small></summary>
+                <label class="cart-partner-label" for="partnerId">ID клиента Greenleaf</label>
+                <input id="partnerId" name="partner_id" placeholder="kz12345678" autocomplete="off" inputmode="text">
+                <div class="cash-fields" data-pickup-fields>
+                  <label for="pickupDate">Дата приезда</label>
+                  <select id="pickupDate" name="pickup_date"></select>
+                  <label for="pickupTime">Время приезда</label>
+                  <select id="pickupTime" name="pickup_time"></select>
+                  <p class="form-note" id="pickupHint" style="margin-top:6px;"></p>
+                </div>
+              </details>
               <input class="hp" name="company" tabindex="-1" autocomplete="off">
               <button class="btn btn-primary btn-lg" type="submit" id="orderSubmitBtn" disabled>Оформить заказ</button>
-              <p class="form-note" id="submitGateNote" style="color:var(--orange,#b26a00);">Для Kaspi: нажмите «Оплатить через Kaspi» и отметьте оплату, чтобы оформить заказ.</p>
+              <p class="form-note" id="submitGateNote">Подготавливаем бронь товаров…</p>
               <p class="form-success">Заказ отправлен!</p>
                <p class="form-error">Не удалось отправить форму. Попробуйте ещё раз.</p>
             </form>
@@ -174,7 +169,8 @@
   <footer class="footer">
     <div class="container footer-inner">
       <span>© <span id="year"></span> Сервис-центр Greenleaf</span>
-      <span>Есть вопросы? <a href="#" id="waFooter">Напишите в WhatsApp</a></span>
+      <span><a href="podpiska.html">Подписка и партнёрство</a></span>
+      <span>Есть вопросы? <a href="#" id="waFooter">Напишите в WhatsApp</a> или <a href="#" class="ai-chat-link">спросите Ису</a></span>
     </div>
   </footer>
 
@@ -203,12 +199,12 @@
     </div>
   </section>
 
-  <script src="js/ui.js?v=20260924d"></script>
+  <script src="js/ui.js?v=20261018b"></script>
   <script src="js/auth.js?v=20260924a"></script>
   <script src="js/cart.js?v=20260924h"></script>
-  <script src="js/cart-page.js?v=20260924d"></script>
+  <script src="js/cart-page.js?v=20261018b"></script>
   <script src="js/forms.js?v=20260924d"></script>
-  <script src="js/ai-chat.js?v=20260924a"></script>
+  <script src="js/ai-chat.js?v=20261018a"></script>
 </body>
 
 </html>
