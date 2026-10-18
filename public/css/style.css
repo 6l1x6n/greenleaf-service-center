@@ -777,39 +777,39 @@ a:hover { text-decoration: none; }
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
-@media (min-width: 700px) {
+@media (min-width: 768px) {
   .list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-  /* Карточка на ПК и планшете: фото слева и заполненный правый столбец —
+  /* Карточка на планшете и ПК: фото слева и заполненный правый столбец —
      категория, название, наличие, внизу цена и кнопка с подписью. Иконка без
      слова и пустая полоса посередине убраны: из-за них карточка выглядела
-     недоделанной. Резерв 122 px = ширина степпера, чтобы при добавлении в
-     корзину строка не прыгала. */
+     недоделанной. Резерв 104 px = ширина компактного степпера, чтобы при
+     добавлении в корзину строка не прыгала. */
   .list .product-row {
-    --ctrl-w: 122px;
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: 6px 14px;
-    padding: 12px;
+    --ctrl-w: 104px;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 6px 12px;
+    padding: 10px;
   }
-  .list .row-media img { width: 112px; height: 112px; }
+  .list .row-media img { width: 92px; height: 92px; }
   .list .row-foot { flex-wrap: nowrap; gap: 8px; }
   .list .card-prices { gap: 6px; }
-  .list .price-partner, .list .price-now { font-size: 20px; }
+  .list .price-partner, .list .price-now { font-size: 19px; }
   .list .price-old { font-size: 12px; }
   .list .badge-sale { font-size: 11px; padding: 2px 7px; }
   .list .pv-badge { font-size: 10px; padding: 1px 6px; }
-  .list .row-add { width: 100%; padding: 9px 10px; font-size: 13px; }
-  .list .row-add-txt { display: inline-flex; }
+  .list .row-add { width: 100%; padding: 9px 6px; font-size: 12.5px; }
+  .list .row-add-txt { display: inline-flex; gap: 5px; }
   .list .row-add-ico { display: none; }
   /* Крестик не нужен: минус на «1» убирает товар (как на телефонах) */
   .list .row-remove { display: none; }
-  .list .qty-stepper .qty-btn { width: 28px; height: 30px; font-size: 15px; }
-  .list .qty-stepper .qty-input { width: 40px; font-size: 13.5px; }
+  .list .qty-stepper .qty-btn { width: 26px; height: 30px; font-size: 15px; }
+  .list .qty-stepper .qty-input { width: 34px; font-size: 13.5px; }
 }
 @media (min-width: 1100px) {
   .list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-  /* В трёх колонках карточка уже: фото мельче */
-  .list .product-row { grid-template-columns: 104px minmax(0, 1fr); }
-  .list .row-media img { width: 104px; height: 104px; }
+  /* В трёх колонках карточка чуть уже — фото 100 px */
+  .list .product-row { grid-template-columns: 100px minmax(0, 1fr); }
+  .list .row-media img { width: 100px; height: 100px; }
   .list .row-title { font-size: 14.5px; }
 }
 .product-row {
@@ -1181,9 +1181,9 @@ a:hover { text-decoration: none; }
 .price-partner { font-size: 22px; font-weight: 800; color: var(--green-dark); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .price-now { font-size: 22px; font-weight: 800; color: var(--green-dark); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .price-ask { font-size: 15px; font-weight: 700; color: var(--muted); }
-/* «Цена по запросу» в карточке — в одну строку, иначе в узкой колонке
-   рядом с кнопкой текст переносится */
-.row-prices .price-ask { font-size: 13.5px; white-space: nowrap; }
+/* «Цена по запросу» в карточке: в узкой колонке рядом с кнопкой строка
+   переносится на две, но под кнопку не заходит */
+.row-prices .price-ask { font-size: 13.5px; white-space: normal; line-height: 1.15; }
 .badge-sale {
   display: inline-flex;
   align-items: center;
