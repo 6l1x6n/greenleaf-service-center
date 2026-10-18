@@ -13,25 +13,19 @@
   // Один оверлей на всех страницах: повторный openModal (перерендер поставки,
   // dsplit) не должен дублировать лок, а closeModal — снимать его раньше времени.
   var modalLockCount = 0;
-  var modalSavedY = 0;
 
+  // Страницу не сдвигаем. Раньше body получал position:fixed и top:-<сдвиг>,
+  // и если карточку открывали внизу списка, за окном оказывалась пустая нижняя
+  // часть страницы: фон выглядел ровным белым вместо размытого каталога, а после
+  // закрытия страница плавно уезжала сверху вниз к прежнему месту. Прокрутку
+  // гасим только overflow, а касания вне окна не проходят (перехват touchmove ниже).
   function lockScroll() {
     if (modalLockCount > 0) return;
     modalLockCount = 1;
     try {
-      modalSavedY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-    } catch (e) { modalSavedY = 0; }
-    try {
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
-      // position:fixed убирает прыжок и лочит фон даже на iOS Safari,
-      // где одного overflow:hidden на body недостаточно
-      document.body.style.position = 'fixed';
-      document.body.style.top = (-modalSavedY) + 'px';
-      document.body.style.left = '0';
-      document.body.style.right = '0';
-      document.body.style.width = '100%';
-    } catch (e) { /* старый браузер — остаётся overflow:hidden */ }
+    } catch (e) { /* старый браузер */ }
   }
 
   function unlockScroll() {
@@ -40,12 +34,6 @@
     try {
       document.documentElement.style.overflow = '';
       document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
-      window.scrollTo(0, modalSavedY);
     } catch (e) { /* ignore */ }
   }
 
@@ -53,8 +41,8 @@
     return !!overlay && !overlay.classList.contains('hidden');
   }
 
-  // Тач за пределами .modal при открытой модалке — гасим (фон зафиксирован,
-  // но iOS тянет жестом и модалку, и фон; колесо мыши лочится самим fixed).
+  // Тач за пределами .modal при открытой модалке — гасим: на iOS Safari одного
+  // overflow:hidden мало, и жест тянет за собой фон вместе с окном.
   document.addEventListener('touchmove', function (e) {
     if (!isModalOpen()) return;
     if (e.target && e.target.closest && e.target.closest('.modal')) return;

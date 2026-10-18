@@ -410,7 +410,6 @@
       '<div class="cart-item-media"><img src="' + Utils.esc(Utils.img(l.p.image || 'assets/images/products/placeholder.svg')) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
       '<div class="cart-item-body">' +
       '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
-      '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + '</div>' +
       '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + '</div>' +
       (availableCount(l) === 0 ? '<div class="cart-item-unavailable-note">Закончился — менеджер уточнит сроки</div>' : '') +
       '</div>' +

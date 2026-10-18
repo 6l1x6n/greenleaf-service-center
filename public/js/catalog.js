@@ -201,9 +201,24 @@
     return Utils.img(img);
   }
 
+  // Одна метка статуса — и только когда товара нет на полке: «Под заказ» или
+  // «в пути». «В наличии» не подписываем: для товара в магазине это норма,
+  // а лишняя строка растягивает карточку. Фото/название/цена/кнопка — всё,
+  // что клиенту нужно, чтобы выбрать и заказать.
+  function cardStatusPill(p, st) {
+    var mv = moveSkuMap[p.id];
+    if (mv) {
+      return '<span class="stock-pill sp-exp">🚚 В пути · ' +
+        Utils.fmtDate(mv.eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>';
+    }
+    if (!availableNow(p)) {
+      return '<span class="stock-pill ' + st.meta.pill + '">' + Utils.esc(st.meta.label) + '</span>';
+    }
+    return '';
+  }
+
   function rowHtml(p) {
     var st = statusInfo(p);
-    var outCls = st.meta === STATUS.out ? ' product-row-out' : '';
     var img = p.thumb || imgUrl(p);
 
     // Одна розничная цена для всех. Партнёрские цены, PV и «−50%» показываем
@@ -212,23 +227,18 @@
     var priceHtml = (prices.price > 0)
       ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
       : '<span class="price-ask">Цена по запросу</span>';
+    var pill = cardStatusPill(p, st);
 
     return '' +
-      '<article class="product-row' + outCls + '" data-product-id="' + Utils.esc(p.id) + '" tabindex="0">' +
+      '<article class="product-row" data-product-id="' + Utils.esc(p.id) + '" tabindex="0">' +
       '<div class="row-media zoom-zone" data-zoom="2.4" data-lens="150">' +
       priorityBadge(p) +
       '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
-      (st.meta === STATUS.out ? '' : Utils.lensHtml()) +
+      Utils.lensHtml() +
       '</div>' +
       '<div class="row-body">' +
-      '<span class="row-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 class="row-title">' + Utils.esc(p.name) + '</h3>' +
-      '<div class="row-meta">' +
-      '<span class="stock-pill ' + st.meta.pill + '">' + Utils.esc(st.meta.label) + '</span>' +
-      (moveSkuMap[p.id] ? '<span class="meta-note">🚚 В пути · ' + Utils.fmtDate(moveSkuMap[p.id].eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>' : '') +
-      (st.note ? '<span class="meta-note">' + Utils.esc(st.note) + '</span>' : '') +
-      '<span class="row-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      '</div>' +
+      (pill ? '<div class="row-meta">' + pill + '</div>' : '') +
       '</div>' +
       '<div class="row-foot">' +
       '<div class="row-prices">' +
@@ -325,6 +335,11 @@
 
   // ---------------- Товар: модалка, корзина ----------------
 
+  // Компактное окно товара: фото, категория, название, цена, кнопка.
+  // Артикул клиенту не нужен (он остаётся в кабинете и в тексте заказа для
+  // менеджера), список «Наличие в Сервис-Центрах» тоже лишний — магазин один.
+  // Служебное описание-заглушку не показываем: у 5 392 товаров из 5 426
+  // своего описания нет, и блок был просто пустым местом.
   function openProductDetailModal(p) {
     Utils.track('card_open', { id: p.id, sku: p.sku });
     var st = statusInfo(p);
@@ -332,22 +347,9 @@
     var priceHtml = (prices.price > 0)
       ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
       : '<span class="price-ask">Цена по запросу</span>';
-    var sel = selectedStore();
-    var stockRows = '';
-    var storeStockLines = [];
-    stores.forEach(function (s) {
-      // Для клиентов — только статус наличия по СЦ, без количества
-      var txt = StoreStock.statusText ? StoreStock.statusText(s.id, p.id) : StoreStock.text(s.id, p.id);
-      if (txt === undefined || String(txt).trim() === '') return;
-      storeStockLines.push('<div class="product-stock-item"><span>📍 <strong>' + Utils.esc(s.name) + ':</strong></span> <span>' + Utils.esc(txt) + '</span></div>');
-    });
-    if (storeStockLines.length) {
-      stockRows = storeStockLines.join('');
-    } else if (sel) {
-      stockRows = '<div class="product-stock-item"><span>📍 <strong>' + Utils.esc(sel.name) + ':</strong></span> <span>Каталог пока не подключён — товары появятся после подключения филиала</span></div>';
-    } else {
-      stockRows = '<div class="product-stock-item"><span>📍 Наличие:</span> <span>В наличии — данные обновляются автоматически</span></div>';
-    }
+    var pill = cardStatusPill(p, st);
+    var desc = (p.description || '').trim();
+
     Utils.openModal(
       '<div class="modal-product-detail">' +
       '<div class="product-detail-grid">' +
@@ -357,21 +359,18 @@
       '</div>' +
       '<div class="product-detail-body">' +
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
-      '<h3 style="margin:2px 0 0;">' + Utils.esc(p.name) + '</h3>' +
-      '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
-      '<h4 style="margin-top:8px; font-size:14.5px; color:var(--green-darker);">Наличие в Сервис-Центрах:</h4>' +
-      '<div class="product-stock-list">' + stockRows + '</div>' +
+      '<h3 class="pdetail-name">' + Utils.esc(p.name) + '</h3>' +
+      (pill ? '<div class="pdetail-meta">' + pill + '</div>' : '') +
       '<div class="pdetail-buy">' +
       '<div class="card-prices pdetail-price">' +
       priceHtml +
       '</div>' +
       '<div class="modal-cart-ctrl" data-modal-cart="' + Utils.esc(p.id) + '">' + rowCartControl(p) + '</div>' +
       '</div>' +
+      (desc ? '<div class="product-detail-desc">' + Utils.esc(desc) + '</div>' : '') +
       '</div>' +
       '</div>' +
-      '<div class="product-detail-desc">' + Utils.esc(p.description || 'Высококачественная экологичная продукция Greenleaf.') + '</div>' +
-      '</div>',
-      true
+      '</div>'
     );
   }
 
@@ -430,6 +429,14 @@
       if (location.hash !== wantHash) history.replaceState(null, '', wantHash);
     }
     grid.innerHTML = sliced.map(rowHtml).join('');
+    // Анимация появления — только у первой отрисовки страницы. При смене фильтра
+    // или добавлении товара в корзину список не должен заново «всплывать»
+    // сверху вниз: от этого казалось, что страница сама прокручивается.
+    if (grid.dataset.rendered) {
+      grid.classList.add('no-anim');
+    } else {
+      grid.dataset.rendered = '1';
+    }
     var countEl = document.getElementById('catalogCount');
     if (countEl && isCatalogPage) {
       countEl.textContent = pageInfo.total ? (pageInfo.start + 1) + '–' + pageInfo.end + ' из ' + pageInfo.total : '0 из 0';
