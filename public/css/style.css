@@ -779,24 +779,26 @@ a:hover { text-decoration: none; }
 }
 @media (min-width: 768px) {
   .list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-  /* Карточка на планшете и ПК: фото слева и заполненный правый столбец —
-     категория, название, наличие, внизу цена и кнопка с подписью. Иконка без
-     слова и пустая полоса посередине убраны: из-за них карточка выглядела
-     недоделанной. Резерв 104 px = ширина компактного степпера, чтобы при
+  /* Карточка на планшете и ПК: фото слева на всю высоту карточки, справа
+     категория, название, наличие и PV, внизу цена и кнопка с подписью. Иконка
+     без слова и пустая полоса посередине убраны: из-за них карточка выглядела
+     недоделанной. Цена с кнопкой прижаты к низу карточки — в ряду они стоят на
+     одной линии. Резерв 104 px = ширина компактного степпера, чтобы при
      добавлении в корзину строка не прыгала. */
   .list .product-row {
     --ctrl-w: 104px;
-    grid-template-columns: 92px minmax(0, 1fr);
-    gap: 6px 12px;
-    padding: 10px;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 6px 14px;
+    padding: 12px;
   }
-  .list .row-media img { width: 92px; height: 92px; }
-  .list .row-foot { flex-wrap: nowrap; gap: 8px; }
+  .list .row-media { align-self: stretch; }
+  .list .row-media img { width: 108px; height: 100%; min-height: 108px; }
+  .list .row-foot { align-self: end; flex-wrap: nowrap; gap: 8px; }
   .list .card-prices { gap: 6px; }
   .list .price-partner, .list .price-now { font-size: 19px; }
   .list .price-old { font-size: 12px; }
   .list .badge-sale { font-size: 11px; padding: 2px 7px; }
-  .list .pv-badge { font-size: 10px; padding: 1px 6px; }
+  .list .pv-badge { font-size: 10.5px; padding: 1px 7px; }
   .list .row-add { width: 100%; padding: 9px 6px; font-size: 12.5px; }
   .list .row-add-txt { display: inline-flex; gap: 5px; }
   .list .row-add-ico { display: none; }
@@ -807,10 +809,10 @@ a:hover { text-decoration: none; }
 }
 @media (min-width: 1100px) {
   .list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-  /* В трёх колонках карточка чуть уже — фото 100 px */
+  /* В трёх колонках карточка чуть уже — фото 100 px, название 15 px */
   .list .product-row { grid-template-columns: 100px minmax(0, 1fr); }
-  .list .row-media img { width: 100px; height: 100px; }
-  .list .row-title { font-size: 14.5px; }
+  .list .row-media img { width: 100px; min-height: 100px; }
+  .list .row-title { font-size: 15px; }
 }
 .product-row {
   --ctrl-w: 104px;
@@ -928,6 +930,11 @@ a:hover { text-decoration: none; }
 .row-add { width: 100%; min-width: 0; }
 .row-actions .row-add { gap: 4px; padding-left: 7px; padding-right: 7px; font-size: 12.5px; }
 .row-actions .qty-stepper { width: 100%; min-width: 0; justify-content: space-between; }
+/* Кнопка и степпер ровно одной высоты: при добавлении товара строка не меняет
+   высоту, и список под ней не сдвигается (раньше прыгало на 3–5 px). */
+.row-actions > .row-add,
+.row-actions > .qty-stepper { height: 36px; }
+.row-actions > .row-add svg { flex: none; }
 .row-add svg { flex: none; }
 /* Двухрежимная кнопка списка: иконка (мультиколонки) / текст (одна колонка, модалка) */
 .row-add-ico { display: none; }
@@ -1041,7 +1048,7 @@ a:hover { text-decoration: none; }
 
 /* Плавное появление кнопки «В корзину» (степпер не анимируем,
    чтобы быстрые клики «+/−» не дёргали ряд) */
-.row-actions > .row-add { animation: rowCtrlIn 0.18s ease both; }
+.row-actions > .row-add { animation: rowCtrlIn 0.14s ease both; }
 @keyframes rowCtrlIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
 
 .qty-stepper {

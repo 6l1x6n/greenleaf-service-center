@@ -19,7 +19,9 @@
   var state = { category: 'all', query: '', selectedStoreId: 'all', page: 0 };
 
   var isCatalogPage = document.body && document.body.dataset.catalogPage === '1';
-  var MAIN_PAGE_LIMIT = 10;
+  // На главной показываем не «десять штук», а ровно три полных ряда: при трёх
+  // колонках десятый товар оставался один в четвёртом ряду и выглядел сиротой.
+  var HOME_ROWS = 3;
   var CATALOG_PAGE_SIZE = 100;
 
   var grid = document.getElementById('grid');
@@ -96,12 +98,25 @@
     return availableNow(p) || effectivePrices(p).price > 0;
   }
 
+  // Товар кончился именно у нас: в остатке филиала «Нет в наличии» (0).
+  // Постоянные поправки кабинета уже учтены в /api/stock, поэтому 0 — это факт.
+  // Товары «Ожидается» (в пути) не считаем распроданными: их привезут.
+  function soldOutHere(p) {
+    var sid = activeStoreId();
+    if (!sid || !StoreStock.hasData(sid)) return false;
+    var t = StoreStock.text ? StoreStock.text(sid, p.id) : undefined;
+    if (t === undefined || t === null) return false;
+    return StoreStock.count(sid, p.id) === 0;
+  }
+
   // Что показываем в каталоге: только то, что можно купить. Служебные карточки
   // портала (ни цены, ни остатка) остаются в базе, но в выдачу не попадают —
-  // именно они делали каталог нечитаемым.
+  // именно они делали каталог нечитаемым. Распроданное (остаток 0) убираем,
+  // пока остаток не появится снова.
   function sellable(p) {
     if (p.hidden) return false;
     if (activeStoreId() && scHidden(p)) return false;
+    if (soldOutHere(p)) return false;
     return buyable(p);
   }
 
@@ -214,19 +229,28 @@
     return '<span class="stock-pill ' + meta.pill + '">' + Utils.esc(meta.label) + '</span>';
   }
 
+  // PV-баллы товара (партнёрская выгода из базы парсера). 0/пусто — не показываем.
+  function pvBadge(p) {
+    var v = p && p.pv != null ? Number(p.pv) : 0;
+    if (!isFinite(v) || v <= 0) return '';
+    var txt = (Math.round(v * 100) / 100).toString();
+    return '<span class="pv-badge" title="PV-баллы: начисляются партнёру за покупку">PV ' + Utils.esc(txt) + '</span>';
+  }
+
   function rowHtml(p) {
     var st = statusInfo(p);
     var img = p.thumb || imgUrl(p);
 
-    // Одна розничная цена для всех. Партнёрские цены, PV и «−50%» показываем
-    // только на странице «Подписка». Карточки портала без цены — «Цена по запросу»
+    // Одна розничная цена для всех. Партнёрские цены и «−50%» показываем только
+    // на странице «Подписка»; PV-баллы — в карточке, как просил владелец.
+    // Карточки портала без цены — «Цена по запросу»
     var prices = effectivePrices(p);
     var priceHtml = (prices.price > 0)
       ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
       : '<span class="price-ask">Цена по запросу</span>';
 
     return '' +
-      '<article class="product-row" data-product-id="' + Utils.esc(p.id) + '" tabindex="0">' +
+      '<article class="product-row" data-product-id="' + Utils.esc(p.id) + '" data-cart-qty="' + cartQtyOf(p.id) + '" tabindex="0">' +
       '<div class="row-media zoom-zone" data-zoom="2.4" data-lens="150">' +
       priorityBadge(p) +
       '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
@@ -235,7 +259,7 @@
       '<div class="row-body">' +
       '<span class="row-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 class="row-title">' + Utils.esc(p.name) + '</h3>' +
-      '<div class="row-meta">' + cardStatusPill(p, st) + '</div>' +
+      '<div class="row-meta">' + cardStatusPill(p, st) + pvBadge(p) + '</div>' +
       '</div>' +
       '<div class="row-foot">' +
       '<div class="row-prices">' +
@@ -357,12 +381,12 @@
       '<div class="product-detail-body">' +
       '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 class="pdetail-name">' + Utils.esc(p.name) + '</h3>' +
-      (pill ? '<div class="pdetail-meta">' + pill + '</div>' : '') +
+      (pill || pvBadge(p) ? '<div class="pdetail-meta">' + pill + pvBadge(p) + '</div>' : '') +
       '<div class="pdetail-buy">' +
       '<div class="card-prices pdetail-price">' +
       priceHtml +
       '</div>' +
-      '<div class="modal-cart-ctrl" data-modal-cart="' + Utils.esc(p.id) + '">' + rowCartControl(p) + '</div>' +
+      '<div class="modal-cart-ctrl" data-modal-cart="' + Utils.esc(p.id) + '" data-cart-qty="' + cartQtyOf(p.id) + '">' + rowCartControl(p) + '</div>' +
       '</div>' +
       (desc ? '<div class="product-detail-desc">' + Utils.esc(desc) + '</div>' : '') +
       '</div>' +
@@ -396,6 +420,15 @@
     return html;
   }
 
+  // Сколько карточек показать на главной: ровно три полных ряда под текущее
+  // число колонок (3 на широком экране, 2 на планшете, 1 на телефоне), чтобы
+  // внизу не оставалась одна карточка в неполном ряду.
+  function homeLimit() {
+    var w = (grid && grid.clientWidth) || 1120;
+    var cols = (w >= 1050) ? 3 : (w >= 720 ? 2 : 1);
+    return cols === 1 ? 6 : cols * HOME_ROWS;
+  }
+
   function render() {
     var list = products.filter(function (p) {
       // В выдаче — только то, что можно купить (в наличии или под заказ)
@@ -413,8 +446,9 @@
     var total = list.length;
     var sliced = list;
     var pageInfo = null;
+    var limit = isCatalogPage ? 0 : homeLimit();
     if (!isCatalogPage) {
-      if (total > MAIN_PAGE_LIMIT) sliced = list.slice(0, MAIN_PAGE_LIMIT);
+      if (total > limit) sliced = list.slice(0, limit);
     } else {
       var pages = Math.max(1, Math.ceil(total / CATALOG_PAGE_SIZE));
       if (state.page < 0) state.page = 0;
@@ -445,7 +479,7 @@
     });
     var allLink = document.getElementById('catalogAllLink');
     if (allLink) {
-      allLink.classList.toggle('hidden', list.length < MAIN_PAGE_LIMIT);
+      allLink.classList.toggle('hidden', list.length < limit);
     }
     var emptyEl = document.getElementById('empty');
     if (emptyEl) {
@@ -702,10 +736,23 @@
     if (search) search.value = '';
   }
 
+  function cartQtyOf(id) {
+    var item = Cart.get().find(function (i) { return i.id === id; });
+    return item ? (Number(item.qty) || 0) : 0;
+  }
+
+  // Перерисовываем кнопку/степпер только у той карточки, где количество
+  // изменилось. Раньше при каждом добавлении перерисовывались кнопки во всех
+  // карточках страницы — вместе с анимацией появления это выглядело так, будто
+  // страница обновилась: мигала вся витрина. В сеть при этом ничего не уходит,
+  // корзина живёт в localStorage.
   Cart.onChange(function () {
     Cart.updateBadge();
     grid.querySelectorAll('.product-row').forEach(function (row) {
       var id = row.getAttribute('data-product-id');
+      var qty = cartQtyOf(id);
+      if (row.getAttribute('data-cart-qty') === String(qty)) return;
+      row.setAttribute('data-cart-qty', String(qty));
       var p = products.find(function (x) { return x.id === id; });
       if (!p) return;
       var actions = row.querySelector('.row-actions');
@@ -715,9 +762,22 @@
     });
     // Степпер в открытой модалке товара — туда же
     document.querySelectorAll('[data-modal-cart]').forEach(function (box) {
-      var mp = products.find(function (x) { return x.id === box.getAttribute('data-modal-cart'); });
+      var id = box.getAttribute('data-modal-cart');
+      var qty = cartQtyOf(id);
+      if (box.getAttribute('data-cart-qty') === String(qty)) return;
+      box.setAttribute('data-cart-qty', String(qty));
+      var mp = products.find(function (x) { return x.id === id; });
       if (mp) box.innerHTML = rowCartControl(mp);
     });
+  });
+
+  // Ширина окна изменилась — число колонок на главной могло стать другим,
+  // значит и число карточек пересчитываем (список перерисовываем без анимации).
+  var homeResizeTimer = null;
+  window.addEventListener('resize', function () {
+    if (isCatalogPage) return;
+    clearTimeout(homeResizeTimer);
+    homeResizeTimer = setTimeout(function () { render(); }, 250);
   });
 
   // ---------------- Поставки (общие + по филиалам) ----------------
