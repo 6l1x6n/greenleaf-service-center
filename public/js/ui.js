@@ -14,6 +14,11 @@
   // dsplit) не должен дублировать лок, а closeModal — снимать его раньше времени.
   var modalLockCount = 0;
 
+  // Класс-модификатор прошлой модалки (передаётся третьим аргументом в
+  // openModal). Один общий .modal на всех страницах, поэтому класс нужно
+  // снимать при следующем открытии — иначе он «протечёт» в другую модалку.
+  var lastExtraCls = null;
+
   // Страницу не сдвигаем. Раньше body получал position:fixed и top:-<сдвиг>,
   // и если карточку открывали внизу списка, за окном оказывалась пустая нижняя
   // часть страницы: фон выглядел ровным белым вместо размытого каталога, а после
@@ -59,7 +64,9 @@
         modalEl.classList.remove('modal-wide');
       }
       modalEl.classList.remove('modal-delivery');
+      if (lastExtraCls && lastExtraCls !== extraCls) modalEl.classList.remove(lastExtraCls);
       if (extraCls) modalEl.classList.add(extraCls);
+      lastExtraCls = extraCls || null;
     }
     overlay.classList.remove('hidden');
     lockScroll();

@@ -391,7 +391,8 @@
       (desc ? '<div class="product-detail-desc">' + Utils.esc(desc) + '</div>' : '') +
       '</div>' +
       '</div>' +
-      '</div>'
+      '</div>',
+      false, 'modal-product-fixed'
     );
   }
 
