@@ -23,7 +23,7 @@
   <meta property="og:image:alt" content="Greenleaf — Сервис-центр">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png">
-  <link rel="stylesheet" href="css/style.css?v=20261018a">
+  <link rel="stylesheet" href="css/style.css?v=20261018c">
 </head>
 
 <body>
@@ -36,7 +36,6 @@
       </a>
       <nav class="nav" id="nav">
         <a href="catalog.html">Каталог</a>
-        <a href="#sc">Сервис-центры</a>
         <a href="#contacts">Контакты</a>
       </nav>
       <div class="header-actions">
@@ -53,15 +52,14 @@
 
     <section class="hero">
       <div class="container">
-        <span class="hero-badge">Сервис-Центры и Магазины Greenleaf</span>
-        <h1 data-edit-key="hero_title">Продукция Greenleaf в наличии — выберите ближайший СЦ</h1>
+        <span class="hero-badge">Сервис-центр Greenleaf</span>
+        <h1 data-edit-key="hero_title">Продукция Greenleaf в наличии в Астане</h1>
         <p class="hero-sub" data-edit-key="hero_sub">Бытовая химия iLife, уходовая косметика SEALUXE, личная гигиена CARICH — актуальное наличие.</p>
         <div class="hero-cta">
           <a href="catalog.html" class="btn btn-accent">Открыть каталог →</a>
           <a href="#" class="btn btn-whatsapp" id="waHero" target="_blank" rel="noopener">Написать в WhatsApp</a>
           <span class="hero-cta-meta">
-            <span class="hero-meta-pill" id="heroStoresMeta">🏬 Загружаем филиалы…</span>
-            <span class="hero-cities" id="heroCities"></span>
+            <span class="hero-meta-pill" id="heroStoresMeta">📍 Загружаем адрес…</span>
           </span>
         </div>
       </div>
@@ -69,15 +67,15 @@
 
     <section id="catalog" class="section alt">
       <div class="container">
-        <div id="scActiveBannerContainer"></div>
         <h2 data-edit-key="catalog_title">Каталог продукции и наличие</h2>
         <p class="section-sub" id="catalogUpdated">Загружаем данные…</p>
         <div class="toolbar">
           <input class="search" id="search" type="search"
             placeholder="Поиск: эко-порошок, крем SEALUXE, шампунь, артикул…" autocomplete="off">
           <div class="toolbar-row">
-            <label class="stock-only"><input type="checkbox" id="stockOnly"> Только в наличии</label>
-            <div class="chips" id="chips"></div>
+            <select class="cat-select" id="catSelect" aria-label="Категория товара">
+              <option value="all">Все товары</option>
+            </select>
           </div>
         </div>
         <div class="list" id="grid"></div>
@@ -90,25 +88,6 @@
         </div>
         <p class="catalog-note" data-edit-key="catalog_note">Не нашли нужную позицию? Напишите в WhatsApp — подскажем дату поставки и предложим
           альтернативу.</p>
-      </div>
-    </section>
-
-    <section id="sc" class="sc-row-section">
-      <div class="container">
-        <div class="sc-row-header">
-          <div>
-            <h2 data-edit-key="scrow_title">Сервис-Центры Greenleaf в Казахстане</h2>
-            <p data-edit-key="scrow_sub">Выберите СЦ для просмотра контактов, фото и остатков продукции в этом филиале</p>
-          </div>
-        </div>
-        <div class="sc-toolbar">
-          <div class="sc-city-chips" id="scCityChips"></div>
-          <input class="search sc-search" id="scSearch" type="search"
-            placeholder="Поиск филиала по названию или адресу…" autocomplete="off">
-        </div>
-        <div class="sc-grid" id="scGrid">
-          <!-- Карточки СЦ -->
-        </div>
       </div>
     </section>
 
@@ -193,7 +172,7 @@
   <script src="js/cities.js"></script>
   <script src="js/auth.js?v=20260924a"></script>
   <script src="js/cart.js?v=20260924h"></script>
-  <script src="js/catalog.js?v=20261018b"></script>
+  <script src="js/catalog.js?v=20261018c"></script>
   <script src="js/forms.js?v=20260924d"></script>
   <script src="js/ai-chat.js?v=20261018a"></script>
 </body>

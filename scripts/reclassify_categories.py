@@ -8,6 +8,12 @@
   python3 scripts/reclassify_categories.py --dry-run   # только отчёт, файл не трогает
   python3 scripts/reclassify_categories.py             # переклассифицировать и записать
 
+Объединённые категории переносятся отдельно: --merge "Старое=Новое" (можно
+несколько раз). Такие товары тоже пересобираются по словарю, а не считаются
+ручной правкой:
+
+  python3 scripts/reclassify_categories.py --merge "Обувь и тапочки=Одежда, обувь и аксессуары"
+
 Остаток «Прочее» выгружается в scripts/parser/diag/uncertain_categories.json —
 это позиции, где ключевых слов не хватило; их правят вручную в кабинете.
 """
@@ -72,7 +78,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="только отчёт, файл не меняется")
     ap.add_argument("--tokens", type=int, default=40, help="сколько частых слов показать у остатка")
+    ap.add_argument("--merge", action="append", default=[],
+                    help="перенести категорию: Старое=Новое (повторяемый)")
     args = ap.parse_args()
+
+    renames = {}
+    for pair in args.merge:
+        old, _, new = pair.partition("=")
+        old, new = old.strip(), new.strip()
+        if not old or not new:
+            sys.exit(f"Не разобрал --merge {pair!r}: нужно «Старое=Новое»")
+        renames[old] = new
 
     categories, cfg_path = load_categories()
     known = {c["name"] for c in categories}
@@ -89,12 +105,17 @@ def main():
 
     for p in products:
         current = p.get("category", "Прочее")
+        # Категория-источник объединения: пересобираем по словарю, а не считаем
+        # ручной правкой (после слияния её имени в словаре уже нет)
+        merged = renames.get(current)
         # Категория, которой нет в словаре, поставлена вручную — не переписываем
-        if current != "Прочее" and current not in known:
+        if current != "Прочее" and current not in known and merged is None:
             after[current] += 1
             untouched.append(p)
             continue
         new = classify_category(p.get("name", ""), categories)
+        if merged is not None and new == "Прочее":
+            new = merged
         after[new] += 1
         if new == "Прочее":
             uncertain.append({"id": p.get("id"), "sku": p.get("sku"), "name": p.get("name")})

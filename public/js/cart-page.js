@@ -3,7 +3,7 @@
 
   var products = [];
   var stores = [];
-  var state = { payment: 'kaspi', partnerMode: false, storeId: null, showHiddenItems: false };
+  var state = { payment: 'kaspi', partnerMode: false, storeId: null };
 
   var itemsEl = document.getElementById('cartItems');
   var viewEl = document.getElementById('cartView');
@@ -12,8 +12,6 @@
   var summaryEl = document.querySelector('.cart-summary');
   var orderForm = document.getElementById('orderForm');
   var clearBtn = document.getElementById('cartClearBtn');
-
-  var SELECTED_KEY = 'greenleaf_sc_selected_v1';
 
   // ---- Бронь товаров (10 минут, как места в кинотеатре) ----
   var RESERVE_TTL = 600;
@@ -289,16 +287,13 @@
     var submitting = orderForm && orderForm.getAttribute('data-submitting') === '1';
     var reserveReady = reserve.state === 'ready' && !reserve.expired &&
       reserve.expiresAt > Date.now() && reserve.storeId === state.storeId;
-    // Оформление не требует предоплаты: кнопка активна, как только выбрано,
-    // где забирать товар и бронь готова. Оплату уточняет менеджер.
+    // Оформление не требует предоплаты: кнопка активна, как только бронь готова.
+    // Оплату уточняет менеджер.
     var ok = !!state.payment && reserveReady && !submitting;
     submitBtn.disabled = !ok;
     var note = document.getElementById('submitGateNote');
     if (!note) return;
-    if (!state.storeId) {
-      note.textContent = 'Выберите Сервис-Центр, где заберёте товары, чтобы оформить заказ.';
-      note.style.display = '';
-    } else if (reserve.state === 'pending' || reserve.state === 'idle') {
+    if (reserve.state === 'pending' || reserve.state === 'idle') {
       note.textContent = 'Подготавливаем бронь товаров…';
       note.style.display = '';
     } else if (reserve.state === 'failed') {
@@ -363,28 +358,11 @@
     }).filter(Boolean);
   }
 
-  // Филиалы, где есть данные об остатках и есть хотя бы один товар из корзины
-  function candidateStores() {
-    var lines = cartLines();
-    var good = {};
-    stores.forEach(function (s) {
-      if (!StoreStock.hasData(s.id)) return;
-      if (lines.some(function (l) { return StoreStock.available(l.p, s.id); })) {
-        good[s.id] = true;
-      }
-    });
-    return stores.filter(function (s) { return good[s.id]; });
-  }
-
-  function lineAvailable(l) {
-    if (!state.storeId) return true;
-    return StoreStock.available(l.p, state.storeId);
-  }
-
-  function savedStore() {
-    try {
-      return JSON.parse(localStorage.getItem(SELECTED_KEY) || 'null');
-    } catch (e) { return null; }
+  // Магазин один: заказ всегда оформляется в нём
+  function syncStoreSelection() {
+    var withStock = stores.filter(function (s) { return s && s.id && StoreStock.hasData(s.id); });
+    var live = withStock.length ? withStock : stores.filter(function (s) { return s && s.id; });
+    state.storeId = live.length ? live[0].id : null;
   }
 
   function selectedStoreObj() {
@@ -409,30 +387,16 @@
     }
   }
 
-  function syncStoreSelection() {
-    var cands = candidateStores();
-    if (!cands.length) {
-      var saved = savedStore();
-      state.storeId = (saved && saved.id) || null;
-      return;
-    }
-    if (!state.storeId || !cands.some(function (s) { return s.id === state.storeId; })) {
-      var saved = savedStore();
-      state.storeId = (saved && cands.some(function (s) { return s.id === saved.id; }))
-        ? saved.id
-        : cands[0].id;
-    }
-  }
-
   function totals() {
     var all = cartLines();
     syncStoreSelection();
-    var lines = all.filter(lineAvailable);
-    var hidden = all.length - lines.length;
+    // Позиции «под заказ» (цена есть, на полке пусто) тоже входят в заказ —
+    // менеджер привезёт их; сервер брони такие позиции пропускает.
+    var lines = all;
     var qtyTotal = lines.reduce(function (s, l) { return s + l.qty; }, 0);
     var goodsTotal = lines.reduce(function (s, l) { return s + l.total; }, 0);
     var pkg = lines.length ? packageFee(qtyTotal) : 0;
-    return { lines: lines, all: all, hidden: hidden, qtyTotal: qtyTotal, goodsTotal: goodsTotal, pkg: pkg, total: goodsTotal + pkg };
+    return { lines: lines, qtyTotal: qtyTotal, goodsTotal: goodsTotal, pkg: pkg, total: goodsTotal + pkg };
   }
 
   function setField(id, value) {
@@ -440,15 +404,15 @@
     if (el) el.value = value;
   }
 
-  function itemHtml(l, unavailable) {
-    return '<div class="cart-item' + (unavailable ? ' cart-item-unavailable' : '') + '">' +
+  function itemHtml(l) {
+    return '<div class="cart-item">' +
       '<button class="cart-item-x" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Удалить из корзины">' + Utils.iconX(13) + '</button>' +
       '<div class="cart-item-media"><img src="' + Utils.esc(Utils.img(l.p.image || 'assets/images/products/placeholder.svg')) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
       '<div class="cart-item-body">' +
       '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
       '<div class="cart-item-sku">Артикул: ' + Utils.esc(l.p.sku) + '</div>' +
       '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + '</div>' +
-      (unavailable ? '<div class="cart-item-unavailable-note">Нет в выбранном филиале — не войдёт в заказ</div>' : '') +
+      (availableCount(l) === 0 ? '<div class="cart-item-unavailable-note">Закончился — менеджер уточнит сроки</div>' : '') +
       '</div>' +
       '<div class="cart-item-ctrl">' +
       '<div class="qty-stepper">' +
@@ -458,28 +422,7 @@
       '</div>' +
       '<button class="cart-item-trash" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Убрать из корзины">' + Utils.iconTrash(15) + '</button>' +
       '</div>' +
-      '<div class="cart-item-total">' + (unavailable ? '<span style="color:var(--muted);">—</span>' : Utils.fmtPrice(l.total)) + '</div>' +
-      '</div>';
-  }
-
-  function renderStoreSelect() {
-    var el = document.getElementById('cartStoreSelect');
-    if (!el) return;
-    var cands = candidateStores();
-    if (!cands.length) {
-      el.innerHTML = '';
-      return;
-    }
-    el.innerHTML =
-      '<div class="cart-store-select-title">🏬 Филиал, где заберёте заказ</div>' +
-      '<div class="cart-store-list">' +
-      cands.map(function (s) {
-        var checked = s.id === state.storeId;
-        return '<label class="cart-store-opt' + (checked ? ' checked' : '') + '">' +
-          '<input type="radio" name="cart-store" value="' + Utils.esc(s.id) + '"' + (checked ? ' checked' : '') + '>' +
-          '<span class="cart-store-name">' + Utils.esc(s.name) + '</span>' +
-          '</label>';
-      }).join('') +
+      '<div class="cart-item-total">' + Utils.fmtPrice(l.total) + '</div>' +
       '</div>';
   }
 
@@ -523,7 +466,7 @@
     clampLinesToStock();
     var t = totals();
 
-    if (!t.all.length) {
+    if (!t.lines.length) {
       emptyEl.classList.remove('hidden');
       viewEl.classList.add('hidden');
       successEl.classList.add('hidden');
@@ -533,25 +476,11 @@
     successEl.classList.add('hidden');
     viewEl.classList.remove('hidden');
 
-    renderStoreSelect();
     updatePayTabs();
 
     var storeObj = selectedStoreObj();
-    var saved = savedStore();
-    var showUnavailable = state.showHiddenItems && t.hidden > 0;
-    var displayLines = showUnavailable ? t.all : t.lines;
 
-    var hideNote = '';
-    if (t.hidden > 0) {
-      var storeName = storeObj ? Utils.esc(storeObj.name) : 'выбранный филиал';
-      hideNote = showUnavailable
-        ? '<div class="cart-hide-note">Эти позиции недоступны в филиале <b>' + storeName + '</b> — они не войдут в заказ. <button class="btn btn-outline btn-sm" data-cart-hide-hidden="1">Скрыть</button></div>'
-        : '<div class="cart-hide-note">Скрыто <b>' + t.hidden + ' ' + (t.hidden === 1 ? 'позиция' : (t.hidden >= 2 && t.hidden <= 4 ? 'позиции' : 'позиций')) + '</b> — их нет в филиале <b>' + storeName + '</b>. <button class="btn btn-outline btn-sm" data-cart-show-hidden="1">Показать</button></div>';
-    }
-
-    itemsEl.innerHTML = hideNote + displayLines.map(function (l) {
-      return itemHtml(l, showUnavailable && !lineAvailable(l));
-    }).join('');
+    itemsEl.innerHTML = t.lines.map(itemHtml).join('');
 
     summaryEl.querySelector('.sum-goods').textContent = Utils.fmtPrice(t.goodsTotal);
     summaryEl.querySelector('.sum-package').textContent = Utils.fmtPrice(t.pkg);
@@ -561,14 +490,11 @@
       el.setAttribute('data-total', t.total);
     });
 
-    var orderStoreTxt = 'Не выбран';
-    var pickupTxt = '🏬 Получение уточните у менеджера — подскажем ближайший Сервис-Центр.';
+    var orderStoreTxt = 'Greenleaf';
+    var pickupTxt = '🏬 Заберите заказ в нашем Сервис-Центре или уточните доставку у менеджера.';
     if (storeObj) {
       orderStoreTxt = storeObj.name;
       pickupTxt = '🏬 Получение: ' + storeObj.name + (storeObj.address ? ' — ' + storeObj.address : '');
-    } else if (saved && saved.name) {
-      orderStoreTxt = saved.name;
-      pickupTxt = '🏬 Получение: ' + saved.name + (saved.address ? ' — ' + saved.address : '') + ' — проверим наличие в этом филиале.';
     }
     var pickupEl = document.getElementById('cartPickup');
     if (pickupEl) pickupEl.textContent = pickupTxt;
@@ -577,11 +503,6 @@
     var orderItemsTxt = t.lines.map(function (l) {
       return l.p.name + ' (' + l.p.sku + ') × ' + l.qty + ' = ' + Utils.fmtPrice(l.total);
     }).join('\n');
-    if (t.hidden > 0) {
-      var hiddenNames = t.all.filter(function (l) { return !lineAvailable(l); })
-        .map(function (l) { return l.p.name + ' (' + l.p.sku + ')'; });
-      orderItemsTxt += '\n—\nНе вошло в заказ (нет в филиале): ' + hiddenNames.join(', ');
-    }
     setField('orderItems', orderItemsTxt);
     setField('orderTotal', t.total);
     setField('orderPackage', t.pkg);
@@ -830,25 +751,6 @@
       updateSubmitGate();
       return;
     }
-    var storeOpt = e.target.closest('[name="cart-store"]');
-    if (storeOpt) {
-      state.storeId = storeOpt.value;
-      state.showHiddenItems = false;
-      var so = stores.find(function (s) { return s.id === state.storeId; });
-      if (so) {
-        try {
-          localStorage.setItem(SELECTED_KEY, JSON.stringify({ id: so.id, name: so.name, address: so.address || '' }));
-        } catch (err) { }
-      }
-      render();
-      initPickupSelectors();
-      scheduleReserve();
-      return;
-    }
-    var showHidden = e.target.closest('[data-cart-show-hidden]');
-    if (showHidden) { state.showHiddenItems = true; render(); return; }
-    var hideHidden = e.target.closest('[data-cart-hide-hidden]');
-    if (hideHidden) { state.showHiddenItems = false; render(); return; }
     var add = e.target.closest('[data-cart-add]');
     if (add) {
       var addId = add.getAttribute('data-cart-add');
@@ -1137,8 +1039,8 @@
     } catch (e) { }
     await StoreStock.load();
 
-    var saved = savedStore();
-    if (saved && saved.id) state.storeId = saved.id;
+    // Магазин один — заказ всегда в нём
+    syncStoreSelection();
 
     render();
     // Селекторы даты/времени строим ПОСЛЕ выбора филиала (иначе расписание

@@ -23,7 +23,7 @@
   <meta property="og:image:alt" content="Greenleaf — Каталог продукции">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png">
-  <link rel="stylesheet" href="css/style.css?v=20261018a">
+  <link rel="stylesheet" href="css/style.css?v=20261018c">
 </head>
 
 <body data-catalog-page="1">
@@ -36,7 +36,6 @@
       </a>
       <nav class="nav" id="nav">
         <a href="catalog.html" class="active">Каталог</a>
-        <a href="index.html#sc">Сервис-центры</a>
         <a href="index.html#contacts">Контакты</a>
       </nav>
       <div class="header-actions">
@@ -56,16 +55,14 @@
         <nav class="breadcrumbs"><a href="index.html">На главную</a> <span>→</span> <span>Каталог</span></nav>
         <h1 data-edit-key="catalog_title">Каталог продукции и наличие</h1>
         <p class="section-sub" id="catalogUpdated">Загружаем данные…</p>
-        <p class="section-sub">Полный каталог: поиск по названию или артикулу, фильтр по категориям и наличию.</p>
+        <p class="section-sub">Полный каталог: поиск по названию или артикулу и фильтр по категориям.</p>
         <div class="toolbar">
           <input class="search" id="search" type="search"
             placeholder="Поиск: эко-порошок, крем SEALUXE, шампунь, артикул…" autocomplete="off">
           <div class="toolbar-row">
-            <select class="store-select" id="catalogStoreSelect" aria-label="Наличие в сервис-центре">
-              <option value="all">Наличие в: вся сеть</option>
+            <select class="cat-select" id="catSelect" aria-label="Категория товара">
+              <option value="all">Все товары</option>
             </select>
-            <label class="stock-only"><input type="checkbox" id="stockOnly"> Только в наличии</label>
-            <div class="chips" id="chips"></div>
           </div>
         </div>
         <div class="catalog-all-note">Показано <span id="catalogCount">загружаем…</span> позиций</div>
@@ -123,7 +120,7 @@
   <script src="js/cities.js"></script>
   <script src="js/auth.js?v=20260924a"></script>
   <script src="js/cart.js?v=20260924h"></script>
-  <script src="js/catalog.js?v=20261018b"></script>
+  <script src="js/catalog.js?v=20261018c"></script>
   <script src="js/forms.js?v=20260924d"></script>
   <script src="js/ai-chat.js?v=20261018a"></script>
 </body>

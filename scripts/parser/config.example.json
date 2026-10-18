@@ -225,7 +225,7 @@
       "image": "assets/images/products/placeholder.svg"
     },
     {
-      "name": "Носки и одежда",
+      "name": "Одежда, обувь и аксессуары",
       "keywords": [
         "носк",
         "подследник",
@@ -275,13 +275,7 @@
         "мужская",
         "tummy",
         "комбинезон",
-        "дождевик"
-      ],
-      "image": "assets/images/products/placeholder.svg"
-    },
-    {
-      "name": "Обувь и тапочки",
-      "keywords": [
+        "дождевик",
         "тапочк",
         "тапк",
         "сандал",
@@ -300,13 +294,7 @@
         "калош",
         "босоножк",
         "sandals",
-        "shoes"
-      ],
-      "image": "assets/images/products/placeholder.svg"
-    },
-    {
-      "name": "Сумки и аксессуары",
-      "keywords": [
+        "shoes",
         "сумк",
         "рюкзак",
         "чемодан",

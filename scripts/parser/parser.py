@@ -43,6 +43,11 @@ BOX_PREFIX_RE = re.compile(
         \s*[:\.]?\s*\d+\s*шт\.?\s*[\)\.:,]?\s*""",
     re.IGNORECASE | re.VERBOSE,
 )
+# Приставка целиком в скобках, включая опечатки портала: «(Корбока 20 шт)»,
+# «(24 шт коробка)», «(Кол-во в коробке 24)». Внутри обязательно слово про
+# коробку — поэтому «(Целый 1 шт)» остаётся как есть.
+BOX_GROUP_RE = re.compile(r"^\s*\(([^)]{1,45})\)\s*")
+BOX_WORD_RE = re.compile(r"короб|корб|кароб|карб", re.IGNORECASE)
 AVAILABLE_QTY_RE = re.compile(r"Доступно для продажи:\s*(\d+)")
 IMG_SRC_RE = re.compile(r'<img[^>]+src="([^"]+)"', re.IGNORECASE)
 IMG_ATTR_RE = re.compile(
@@ -68,10 +73,32 @@ def clean_product_name(raw_name):
     name = re.sub(r"&nbsp;", " ", raw_name)
     name = re.sub(r"\s+", " ", name).strip()
     name = BOX_PREFIX_RE.sub("", name).strip()
+    lead = BOX_GROUP_RE.match(name)
+    if lead and BOX_WORD_RE.search(lead.group(1)):
+        name = name[lead.end():].strip()
     name = re.sub(r"\s*Доступно\s+для\s+продажи:\s*\d+\s*$", "", name, flags=re.IGNORECASE).strip()
     name = re.sub(r"\s*Доступно:\s*\d+\s*$", "", name, flags=re.IGNORECASE).strip()
     name = re.sub(r"^[\s)]+", "", name).strip()
     return name
+
+
+def extract_pack(raw_name):
+    """Сколько штук в коробке — из служебной приставки названия (0 — приставки нет).
+
+    Сама приставка в название на сайте не попадает (её срезает
+    clean_product_name), но её значение полезно складу и кабинету, поэтому
+    сохраняем его отдельным полем `pack`.
+    """
+    raw = str(raw_name or "")
+    m = BOX_PREFIX_RE.match(raw)
+    if m:
+        num = re.search(r"\d+", m.group(0))
+        return int(num.group(0)) if num else 0
+    lead = BOX_GROUP_RE.match(raw)
+    if lead and BOX_WORD_RE.search(lead.group(1)):
+        num = re.search(r"\d+", lead.group(1))
+        return int(num.group(0)) if num else 0
+    return 0
 
 
 def load_config():
@@ -1510,7 +1537,11 @@ def ensure_full_catalog(base_products, goods, config):
         title = (g.get("title") or {}).get("ru") or g.get("name") or ""
         if not title:
             continue
-        name = title
+        # Складская приставка «(Кол-во в коробке N шт)» — служебная: в названии
+        # на сайте её быть не должно (та же чистка, что и в каталоге продажи),
+        # а число штук в коробке сохраняем полем pack
+        name = clean_product_name(title)
+        pack = extract_pack(title)
         category = classify_category(name, categories)
         photo = (g.get("photo") or "").strip()
         image = ""
@@ -1540,6 +1571,8 @@ def ensure_full_catalog(base_products, goods, config):
             "stock": {},
             "hidden": False,
         }
+        if pack:
+            card["pack"] = pack
         base_products.append(card)
         by_code[code] = card
         created += 1

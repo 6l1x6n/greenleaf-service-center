@@ -13,18 +13,18 @@
   var products = [];
   var stores = [];
   var categories = [];
-  var state = { category: 'all', query: '', stockOnly: true, selectedStoreId: 'all', cityFilter: 'all', storeQuery: '', showAllCatalog: false, page: 0 };
+  // Один магазин на сайт: selectedStoreId — единственный СЦ (или 'all',
+  // если СЦ ещё не известен, например в локальном предпросмотре без KV).
+  // Фильтров «филиал/город/только в наличии» больше нет.
+  var state = { category: 'all', query: '', selectedStoreId: 'all', page: 0 };
 
   var isCatalogPage = document.body && document.body.dataset.catalogPage === '1';
   var MAIN_PAGE_LIMIT = 10;
   var CATALOG_PAGE_SIZE = 100;
 
   var grid = document.getElementById('grid');
-  var chips = document.getElementById('chips');
+  var catSelect = document.getElementById('catSelect');
   var search = document.getElementById('search');
-  var stockOnly = document.getElementById('stockOnly');
-  var scActiveBannerContainer = document.getElementById('scActiveBannerContainer');
-  var catalogStoreSelect = document.getElementById('catalogStoreSelect');
 
   // Оверрайды из Worker: глобальные правки товаров и правки по Сервис-Центрам.
   // Устанавливаются в init() из /api/products.
@@ -80,23 +80,58 @@
     return st;
   }
 
+  // «Под заказ»: цена есть, а на полке пусто — привезём
+  var ORDER_STATUS = { label: 'Под заказ', cls: 'st-order', pill: 'sp-order', icon: '🕒' };
+
+  // Есть прямо сейчас: факт остатков нашего СЦ важнее статуса карточки
+  function availableNow(p) {
+    var sid = activeStoreId();
+    if (sid && StoreStock.hasData(sid)) return StoreStock.available(p, sid);
+    var st = effectiveStatus(p);
+    return st === 'in_stock' || st === 'low';
+  }
+
+  // Можно купить: товар на полке или его привезут под заказ (есть цена)
+  function buyable(p) {
+    return availableNow(p) || effectivePrices(p).price > 0;
+  }
+
+  // Что показываем в каталоге: только то, что можно купить. Служебные карточки
+  // портала (ни цены, ни остатка) остаются в базе, но в выдачу не попадают —
+  // именно они делали каталог нечитаемым.
+  function sellable(p) {
+    if (p.hidden) return false;
+    if (activeStoreId() && scHidden(p)) return false;
+    return buyable(p);
+  }
+
   function statusInfo(p) {
-    var st = STATUS[effectiveStatus(p)] || STATUS.out;
+    var eff = effectiveStatus(p);
+    var meta;
+    if (availableNow(p)) {
+      meta = (eff === 'in_stock' || eff === 'low') ? STATUS[eff] : STATUS.in_stock;
+    } else if (effectivePrices(p).price > 0) {
+      meta = ORDER_STATUS;
+    } else {
+      meta = STATUS[eff] || STATUS.out;
+    }
     var so = scOverrideFor(p);
     var eta = so.eta || p.eta;
     var incoming = so.incoming || p.incoming;
     // Короткая пометка к статусу для мета-строки карточки (без HTML)
     var note = '';
-    if (st === STATUS.low) {
+    if (meta === ORDER_STATUS) {
+      note = incoming ? 'Завоз: ' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' }) : 'Привезём под заказ — напишите нам';
+    } else if (meta === STATUS.low) {
       note = incoming ? 'Завоз: ' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' }) : 'Возьмём в работу — напишите нам';
-    } else if (st === STATUS.expected) {
+    } else if (meta === STATUS.expected) {
       note = 'Поставка: ' + Utils.fmtDate(eta, { day: 'numeric', month: 'long' });
-    } else if (st === STATUS.out) {
+    } else if (meta === STATUS.out) {
       note = 'Следующая поставка: ' + Utils.fmtDate(eta, { day: 'numeric', month: 'long' });
     } else if (incoming) {
       note = 'Завоз в пути: ' + Utils.fmtDate(incoming, { day: 'numeric', month: 'short' });
     }
-    return { meta: st, note: note };
+    return { meta: meta, note: note };
   }
 
   // Актуальная цена и скидочная цена: оверрайд СЦ → глобальный оверрайд → базовый товар
@@ -133,7 +168,7 @@
       try { Cart.setQty(p.id, cap); } catch (e) { }
     }
     if (cur <= 0) {
-      if (effectiveStatus(p) === 'out') {
+      if (!buyable(p)) {
         if (compact) {
           return '<button class="btn btn-primary btn-sm row-add is-disabled" type="button" disabled title="Товара нет в наличии" aria-label="Товара нет в наличии"><span class="row-add-ico">' + Utils.icon('cart', 18) + '</span><span class="row-add-txt">' + Utils.icon('cart', 15) + ' В корзину</span></button>';
         }
@@ -215,157 +250,21 @@
     return null;
   }
 
-  // ---------------- Секция Сервис-Центров: города + поиск + сетка карточек ----------------
+  // ---------------- Магазин один: вся выдача — по нему ----------------
+  // Раньше здесь были города, поиск по филиалам, сетка карточек СЦ и селект
+  // «Наличие в: …». Магазин один, а новые магазины получают отдельный сайт,
+  // поэтому выбирать нечего: работаем с единственным СЦ (store_id в данных,
+  // заказе и остатках остаётся — меняется только подача).
 
-  function uniqueCities() {
-    var seen = {};
-    var list = [];
-    stores.forEach(function (s) {
-      var key = s.cityKey || s.city || 'Другое';
-      if (!seen[key]) {
-        seen[key] = true;
-        list.push({ key: key, label: s.city || key, count: 0 });
-      }
-    });
-    stores.forEach(function (s) {
-      var key = s.cityKey || s.city || 'Другое';
-      var c = list.find(function (x) { return x.key === key; });
-      if (c) c.count++;
-    });
-    list.sort(function (a, b) { return a.label.localeCompare(b.label, 'ru'); });
-    return list;
+  function activeStoreId() {
+    return (state.selectedStoreId && state.selectedStoreId !== 'all') ? state.selectedStoreId : null;
   }
 
-  function renderCityChips() {
-    var el = document.getElementById('scCityChips');
-    if (!el) return;
-    var cities = uniqueCities();
-    var total = stores.length;
-    var html = '<button class="chip' + (state.cityFilter === 'all' ? ' active' : '') + '" data-city="all">Все города <span class="cnt">' + total + '</span></button>' +
-      cities.map(function (c) {
-        return '<button class="chip' + (state.cityFilter === c.key ? ' active' : '') + '" data-city="' + Utils.esc(c.key) + '">' + Utils.esc(c.label) + ' <span class="cnt">' + c.count + '</span></button>';
-      }).join('');
-    el.innerHTML = html;
-  }
-
-  function filteredStores() {
-    var q = (state.storeQuery || '').trim().toLowerCase();
-    return stores.filter(function (s) {
-      var okCity = state.cityFilter === 'all' || (s.cityKey || s.city || '') === state.cityFilter;
-      var okQ = !q ||
-        s.name.toLowerCase().indexOf(q) !== -1 ||
-        s.address.toLowerCase().indexOf(q) !== -1 ||
-        (s.city || '').toLowerCase().indexOf(q) !== -1;
-      return okCity && okQ;
-    });
-  }
-
-  function renderStoresGrid() {
-    var el = document.getElementById('scGrid');
-    if (!el) return;
-    var list = filteredStores();
-
-    if (!list.length) {
-      el.innerHTML = '<div class="empty">В этом городе пока нет филиалов — выберите другой город или напишите нам в WhatsApp.</div>';
-      return;
-    }
-
-    el.innerHTML = list.map(function (s) {
-      var isActive = state.selectedStoreId === s.id;
-      return '<article class="sc-card' + (isActive ? ' active' : '') + '" data-select-store="' + Utils.esc(s.id) + '">' +
-        '<div class="sc-card-media">' +
-        '<img src="' + Utils.esc(Utils.img(s.image)) + '" alt="' + Utils.esc(s.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
-        (isActive ? '<span class="sc-card-check">✓ Выбран</span>' : '') +
-        '</div>' +
-        '<div class="sc-card-body">' +
-        '<h3 class="sc-card-title">' + Utils.esc(s.name) + '</h3>' +
-        '<div class="sc-card-line">📍 ' + Utils.esc(s.address) + '</div>' +
-        '<div class="sc-card-line">🕒 ' + Utils.esc(s.hours) + '</div>' +
-        '<div class="sc-card-line">📞 ' + Utils.esc(s.phone) + '</div>' +
-        (isActive ? '<div class="sc-card-hint">Нажмите ещё раз, чтобы снять выбор</div>' : '') +
-        '</div>' +
-        '</article>';
-    }).join('');
-  }
-
-  function renderStoresSection() {
-    if (!document.getElementById('scGrid')) return;
-    renderCityChips();
-    renderStoresGrid();
-  }
-
-  function renderActiveStoreBanner() {
-    if (!scActiveBannerContainer) return;
-    var store = selectedStore();
-    if (!store) {
-      scActiveBannerContainer.innerHTML = '';
-      return;
-    }
-
-    var hasDataHere = StoreStock.hasData(store.id);
-    var inStockHere = hasDataHere ? products.filter(function (p) {
-      return !p.hidden && !scHidden(p) && StoreStock.available(p, store.id);
-    }).length : 0;
-
-    var filtered = !state.showAllCatalog;
-
-    scActiveBannerContainer.innerHTML = '' +
-      '<div class="sc-active-banner">' +
-      '<div class="sc-banner-info">' +
-      '<img class="sc-banner-img" src="' + Utils.esc(Utils.img(store.image)) + '" alt="' + Utils.esc(store.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
-      '<div class="sc-banner-text">' +
-      '<h3>🏬 ' + Utils.esc(store.name) + '</h3>' +
-      '<p>' + Utils.esc(store.description || '') + '</p>' +
-      (hasDataHere ? '' : '<p style="color:var(--muted);">🕓 В этом филиале каталог пока не подключён — товары появятся автоматически после регистрации филиала.</p>') +
-      '<div class="sc-banner-meta">' +
-      '<span>📍 ' + Utils.esc(store.address) + '</span>' +
-      '<span>🕒 ' + Utils.esc(store.hours) + '</span>' +
-      '<span>📞 ' + Utils.esc(store.phone) + '</span>' +
-      (hasDataHere && inStockHere ? '<span>📦 Позиций в наличии: ' + inStockHere + '</span>' : '') +
-      '</div>' +
-      '</div>' +
-      '</div>' +
-      '<div class="sc-banner-actions">' +
-      (filtered && hasDataHere && inStockHere > 0
-        ? '<button class="btn btn-primary btn-sm" data-catalog-all="1">📦 Сейчас показаны только товары в наличии здесь — Показать все</button>'
-        : '') +
-      '<a class="btn btn-whatsapp btn-sm" href="https://wa.me/' + store.whatsapp + '?text=' + encodeURIComponent('Здравствуйте! Интересует наличие в филиале ' + store.name) + '" target="_blank" rel="noopener">📱 Написать в СЦ</a>' +
-      '<button class="btn btn-light-outline btn-sm" data-select-store="all">❌ Сбросить выбор СЦ</button>' +
-      '</div>' +
-      '</div>';
-  }
-
-  // Каталог: вместо баннера выбранного СЦ — один компактный селект
-  // «Наличие в: …». Выбор задаёт state.selectedStoreId, как клик по карточке СЦ.
-  function renderCatalogStoreSelect() {
-    if (!catalogStoreSelect) return;
-    catalogStoreSelect.innerHTML = '<option value="all">Наличие в: вся сеть</option>' +
-      stores.map(function (s) {
-        return '<option value="' + Utils.esc(s.id) + '"' + (state.selectedStoreId === s.id ? ' selected' : '') + '>' +
-          Utils.esc(s.name) + '</option>';
-      }).join('');
-  }
-
-  function applyStoreSelection(storeId) {
-    state.selectedStoreId = storeId || 'all';
-    state.showAllCatalog = false;
-    state.page = 0;
-    try {
-      var selStore = stores.find(function (s) { return s.id === state.selectedStoreId; }) || null;
-      if (selStore) {
-        localStorage.setItem('greenleaf_sc_selected_v1', JSON.stringify({ id: selStore.id, name: selStore.name, address: selStore.address || '' }));
-      } else {
-        localStorage.removeItem('greenleaf_sc_selected_v1');
-      }
-    } catch (err) { }
-    syncStockToggle();
-    renderStoresSection();
-    renderActiveStoreBanner();
-    renderCatalogStoreSelect();
-    renderContacts();
-    render();
-    renderChips();
-    renderDeliveries(lastDeliveries);
+  // Единственный СЦ: предпочитаем тот, по которому есть остатки
+  function resolveSingleStore() {
+    var withStock = stores.filter(function (s) { return s && s.id && StoreStock.hasData(s.id); });
+    var live = withStock.length ? withStock : stores.filter(function (s) { return s && s.id; });
+    state.selectedStoreId = live.length ? live[0].id : 'all';
   }
 
   // ---------------- Контакты следуют за выбранным СЦ ----------------
@@ -373,17 +272,15 @@
   function renderContacts() {
     var contactsEl = document.getElementById('contactsInfo');
     if (!contactsEl) return;
-    var sel = selectedStore();
-    var s = sel || Utils.getStore();
+    var s = selectedStore() || Utils.getStore();
     if (!s) return;
 
     var hoursTxt = Array.isArray(s.hours)
       ? s.hours.map(function (h) { return h.days + ' ' + h.time; }).join('<br>')
       : (s.hours || '');
-    var title = sel ? 'Филиал: ' + s.name : 'Сервис-Центр';
 
     contactsEl.innerHTML =
-      '<div class="row"><span class="lbl">Филиал</span><span><strong>' + Utils.esc(title) + '</strong></span></div>' +
+      '<div class="row"><span class="lbl">Сервис-центр</span><span><strong>' + Utils.esc(s.name || 'Greenleaf') + '</strong></span></div>' +
       '<div class="row"><span class="lbl">Адрес</span><span>' + Utils.esc(s.address || '') + '</span></div>' +
       '<div class="row"><span class="lbl">Часы</span><span>' + hoursTxt + '</span></div>' +
       '<div class="row"><span class="lbl">Телефон</span><span>' + Utils.esc(s.phone || '') + '</span></div>';
@@ -505,22 +402,12 @@
 
   function render() {
     var list = products.filter(function (p) {
-      if (p.hidden) return false;
+      // В выдаче — только то, что можно купить (в наличии или под заказ)
+      if (!sellable(p)) return false;
       var okCat = state.category === 'all' || p.category === state.category;
-      var effSt = effectiveStatus(p);
-      var okStock = !state.stockOnly || effSt === 'in_stock' || effSt === 'low';
       var q = state.query.trim().toLowerCase();
       var okQ = !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1;
-      var okStore = true;
-      if (state.selectedStoreId && state.selectedStoreId !== 'all') {
-        // Скрытые суперадмином товары в этом СЦ не показываем вовсе
-        if (scHidden(p)) return false;
-        // Филиал без данных каталога — в нём нет товаров; с данными — фильтр остатков
-        okStore = StoreStock.hasData(state.selectedStoreId)
-          ? (state.showAllCatalog || StoreStock.available(p, state.selectedStoreId))
-          : false;
-      }
-      return okCat && okStock && okQ && okStore;
+      return okCat && okQ;
     });
     list.sort(function (a, b) {
       var ha = priorityRank(a) || 9;
@@ -559,44 +446,40 @@
     var emptyEl = document.getElementById('empty');
     if (emptyEl) {
       emptyEl.classList.toggle('hidden', list.length > 0);
-      var noData = state.selectedStoreId && state.selectedStoreId !== 'all' && !StoreStock.hasData(state.selectedStoreId);
-      emptyEl.innerHTML = noData
-        ? 'В этом сервис-центре товары пока не подключены.<br>Напишите нам в WhatsApp — поможем оформить заказ в ближайшем филиале.'
-        : 'Ничего не найдено.<br>Оставьте заявку — сообщим, когда товар появится.';
+      emptyEl.innerHTML = 'Ничего не найдено.<br>Оставьте заявку — сообщим, когда товар появится.';
     }
   }
 
-  function renderChips() {
-    var scId = (state.selectedStoreId && state.selectedStoreId !== 'all') ? state.selectedStoreId : null;
-    var scMode = !!scId && !state.showAllCatalog;
-    function countFor(cat) {
-      if (!scMode) {
-        if (cat === 'all') return products.length;
-        var c = null;
-        for (var i = 0; i < categories.length; i++) {
-          if (categories[i].name === cat) { c = categories[i]; break; }
-        }
-        return c ? c.count : 0;
-      }
-      var n = 0;
-      products.forEach(function (p) {
-        if (cat !== 'all' && p.category !== cat) return;
-        if (scHidden(p)) return;
-        if (StoreStock.hasData(scId) && StoreStock.available(p, scId)) n++;
-      });
-      return n;
-    }
-    var html = [chipHtml({ name: 'all', label: 'Все', count: countFor('all') })];
-    categories.forEach(function (c) {
-      html.push(chipHtml({ name: c.name, label: c.label, count: countFor(c.name) }));
+  // Категории, которые реально есть в выдаче. Счётчики считаем по показанным
+  // товарам, поэтому пустых фильтров не бывает: нет товара — нет и категории.
+  function visibleCategories() {
+    var byCat = {};
+    products.forEach(function (p) {
+      if (!sellable(p)) return;
+      byCat[p.category] = (byCat[p.category] || 0) + 1;
     });
-    chips.innerHTML = html.join('');
+    var order = (siteSettings.categories || []).filter(function (c) { return byCat[c]; });
+    var extra = Object.keys(byCat).filter(function (c) { return order.indexOf(c) === -1; })
+      .sort(function (a, b) { return a.localeCompare(b, 'ru'); });
+    return order.concat(extra).map(function (k) { return { name: k, label: k, count: byCat[k] }; });
   }
 
-  function chipHtml(c) {
-    var active = state.category === c.name;
-    return '<button class="chip' + (active ? ' active' : '') + '" data-cat="' + Utils.esc(c.name) + '">' +
-      Utils.esc(c.label) + ' <span class="cnt">' + c.count + '</span></button>';
+  // Категории — один компактный дропдаун вместо ряда кнопок
+  function renderChips() {
+    categories = visibleCategories();
+    if (!catSelect) return;
+    var total = categories.reduce(function (s, c) { return s + c.count; }, 0);
+    // Фильтровать нечего — селект только мешает
+    if (categories.length < 2) {
+      catSelect.classList.add('hidden');
+      return;
+    }
+    catSelect.classList.remove('hidden');
+    catSelect.innerHTML = '<option value="all">Все товары · ' + total + '</option>' +
+      categories.map(function (c) {
+        return '<option value="' + Utils.esc(c.name) + '"' + (state.category === c.name ? ' selected' : '') + '>' +
+          Utils.esc(c.label) + ' · ' + c.count + '</option>';
+      }).join('');
   }
 
   document.addEventListener('click', function (e) {
@@ -725,35 +608,6 @@
         return;
       }
     }
-
-    var storeChip = e.target.closest('[data-select-store]');
-    if (storeChip) {
-      var storeId = storeChip.getAttribute('data-select-store');
-      // Повторный клик по уже выбранному СЦ снимает выбор
-      applyStoreSelection((state.selectedStoreId === storeId && storeId !== 'all') ? 'all' : storeId);
-      return;
-    }
-
-    var catalogAllBtn = e.target.closest('[data-catalog-all]');
-    if (catalogAllBtn) {
-      state.showAllCatalog = true;
-      state.page = 0;
-      syncStockToggle();
-      renderActiveStoreBanner();
-      render();
-      renderChips();
-      return;
-    }
-
-    var cityChip = e.target.closest('[data-city]');
-    if (cityChip) {
-      state.cityFilter = cityChip.getAttribute('data-city');
-      try { localStorage.setItem('greenleaf_city_v1', state.cityFilter); } catch (err) { }
-      Utils.closeModal();
-      renderCityChips();
-      renderStoresGrid();
-      return;
-    }
   });
 
   // Enter/Space по карточке (когда фокус на строке, а не на кнопке) — детали
@@ -793,46 +647,20 @@
     else Cart.add(id, qty);
   });
 
-  var scSearch = document.getElementById('scSearch');
-  if (scSearch) {
-    scSearch.addEventListener('input', function () {
-      state.storeQuery = scSearch.value;
-      renderStoresGrid();
+  // Фильтр категорий — дропдаун
+  if (catSelect) {
+    catSelect.addEventListener('change', function () {
+      state.category = catSelect.value;
+      state.page = 0;
+      render();
     });
   }
-
-  chips.addEventListener('click', function (e) {
-    var chip = e.target.closest('[data-cat]');
-    if (!chip) return;
-    state.category = chip.getAttribute('data-cat');
-    state.page = 0;
-    renderChips();
-    render();
-  });
 
   search.addEventListener('input', function () {
     state.query = search.value;
     state.page = 0;
     render();
   });
-
-  function syncStockToggle() {
-    if (stockOnly) stockOnly.checked = !state.showAllCatalog;
-  }
-
-  stockOnly.addEventListener('change', function () {
-    state.stockOnly = stockOnly.checked;
-    state.showAllCatalog = !stockOnly.checked;
-    state.page = 0;
-    render();
-    renderChips();
-  });
-
-  if (catalogStoreSelect) {
-    catalogStoreSelect.addEventListener('change', function () {
-      applyStoreSelection(catalogStoreSelect.value);
-    });
-  }
 
   ['catalogPager', 'catalogPagerTop'].forEach(function (id) {
     var catalogPager = document.getElementById(id);
@@ -863,14 +691,11 @@
   });
 
   // Фильтры не запоминаем между заходами: каждый визит начинается с чистого
-  // состояния — категория «Все», пустой поиск, включённое «Только в наличии».
+  // состояния — категория «Все» и пустой поиск.
   function resetFilters() {
     state.query = '';
     state.category = 'all';
-    state.stockOnly = true;
-    state.showAllCatalog = false;
     if (search) search.value = '';
-    if (stockOnly) stockOnly.checked = true;
   }
 
   Cart.onChange(function () {
@@ -1480,37 +1305,12 @@ fetch('/api/event-bookings')
     return forms[2];
   }
 
-  function updateHeroMeta() {
+  // Шапка главной: вместо «N филиалов» и списка городов — адрес единственного СЦ
+  function renderHeroAddress() {
     var metaEl = document.getElementById('heroStoresMeta');
-    if (metaEl) {
-      metaEl.textContent = '🏬 ' + stores.length + ' ' + plural(stores.length, ['филиал', 'филиала', 'филиалов']);
-    }
-    var citiesEl = document.getElementById('heroCities');
-    if (citiesEl) {
-      var cities = uniqueCities();
-      citiesEl.innerHTML = cities.map(function (c) {
-        var label = String(c.label || '').replace(/^г\.\s*/i, '');
-        return '<span>' + Utils.esc(label) + ' · ' + c.count + '</span>';
-      }).join('');
-    }
-  }
-
-  function maybeAskCity() {
-    try {
-      if (localStorage.getItem('greenleaf_city_v1')) return;
-    } catch (e) { return; }
-    var cities = uniqueCities();
-    if (!cities.length) return;
-    Utils.openModal(
-      '<h3>🌆 Выберите ваш город</h3>' +
-      '<p class="modal-product">Покажем Сервис-Центры и наличие рядом с вами. Город можно поменять в любой момент на странице.</p>' +
-      '<div class="city-pick-grid">' +
-      cities.map(function (c) {
-        return '<button class="chip city-pick-chip" data-city="' + Utils.esc(c.key) + '">' + Utils.esc(c.label) + ' <span class="cnt">' + c.count + '</span></button>';
-      }).join('') +
-      '<button class="chip city-pick-chip" data-city="all">Все города</button>' +
-      '</div>'
-    );
+    if (!metaEl) return;
+    var s = selectedStore() || Utils.getStore();
+    metaEl.textContent = (s && s.address) ? '📍 ' + s.address : '📍 Greenleaf';
   }
 
   async function init() {
@@ -1575,17 +1375,6 @@ fetch('/api/event-bookings')
         window.__eventBookings = {};
       }
 
-      var byCat = {};
-      products.forEach(function (p) {
-        if (p.hidden) return;
-        byCat[p.category] = (byCat[p.category] || 0) + 1;
-      });
-      categories = Object.keys(byCat).map(function (k) { return { name: k, label: k, count: byCat[k] }; });
-      // Порядок категорий: сначала заданный суперадмином, затем остальные по алфавиту
-      var catOrder = (siteSettings.categories || []).filter(function (c) { return byCat[c]; });
-      var extra = Object.keys(byCat).filter(function (c) { return catOrder.indexOf(c) === -1; }).sort(function (a, b) { return a.localeCompare(b, 'ru'); });
-      categories = catOrder.concat(extra).map(function (k) { return { name: k, label: k, count: byCat[k] }; });
-
       var updatedEl = document.getElementById('catalogUpdated');
       if (updatedEl) {
         updatedEl.textContent = 'Обновлено: ' +
@@ -1602,7 +1391,10 @@ fetch('/api/event-bookings')
     }
 
     applyLocalOverrides();
-    updateHeroMeta();
+    // Магазин один: сразу привязываемся к нему (после загрузки остатков),
+    // чтобы наличие считалось по факту, а не «по всей сети»
+    resolveSingleStore();
+    renderHeroAddress();
     resetFilters();
 
     // Прямая ссылка на страницу каталога (#page=N, нумерация с 1)
@@ -1611,28 +1403,12 @@ fetch('/api/event-bookings')
       if (pageMatch) state.page = Math.max(0, (parseInt(pageMatch[1], 10) || 1) - 1);
     }
 
-    try {
-      var savedCity = localStorage.getItem('greenleaf_city_v1');
-      if (savedCity) state.cityFilter = savedCity;
-    } catch (e) { }
-
-    try {
-      var savedSc = localStorage.getItem('greenleaf_sc_selected_v1');
-      if (savedSc) {
-        var scObj = JSON.parse(savedSc);
-        if (scObj && scObj.id) state.selectedStoreId = scObj.id;
-      }
-    } catch (e) { }
-
     window.CatalogStores = stores;
     window.CatalogProducts = products;
 
-    renderStoresSection();
-    renderCatalogStoreSelect();
     renderChips();
     render();
     renderContacts();
-    if (!isCatalogPage) maybeAskCity();
 
     fetch('data/moves.json')
       .then(function (r) { return r.json(); })
@@ -1671,10 +1447,9 @@ fetch('/api/event-bookings')
     applyLocalOverrides();
     window.CatalogStores = stores;
     window.CatalogProducts = products;
-    renderStoresSection();
-    renderActiveStoreBanner();
-    renderCatalogStoreSelect();
+    renderHeroAddress();
     renderContacts();
+    renderChips();
     render();
   };
 
