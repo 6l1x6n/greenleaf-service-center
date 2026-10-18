@@ -777,37 +777,47 @@ a:hover { text-decoration: none; }
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
-@media (min-width: 840px) {
-  .list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  /* Компактный фут в одну строку: цены + PV + иконка-кнопка.
-     Резерв 100px = ширина компактного степпера: при добавлении ряд не прыгает. */
-  .list .product-row { --ctrl-w: 100px; }
+@media (min-width: 700px) {
+  .list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  /* Карточка на ПК и планшете: фото слева и заполненный правый столбец —
+     категория, название, наличие, внизу цена и кнопка с подписью. Иконка без
+     слова и пустая полоса посередине убраны: из-за них карточка выглядела
+     недоделанной. Резерв 122 px = ширина степпера, чтобы при добавлении в
+     корзину строка не прыгала. */
+  .list .product-row {
+    --ctrl-w: 122px;
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 6px 14px;
+    padding: 12px;
+  }
+  .list .row-media img { width: 112px; height: 112px; }
   .list .row-foot { flex-wrap: nowrap; gap: 8px; }
   .list .card-prices { gap: 6px; }
-  .list .price-partner, .list .price-now { font-size: 19px; }
+  .list .price-partner, .list .price-now { font-size: 20px; }
   .list .price-old { font-size: 12px; }
   .list .badge-sale { font-size: 11px; padding: 2px 7px; }
   .list .pv-badge { font-size: 10px; padding: 1px 6px; }
-  .list .row-add { width: 40px; padding: 8px 0; }
-  .list .row-add-txt { display: none; }
-  .list .row-add-ico { display: inline-flex; }
+  .list .row-add { width: 100%; padding: 9px 10px; font-size: 13px; }
+  .list .row-add-txt { display: inline-flex; }
+  .list .row-add-ico { display: none; }
   /* Крестик не нужен: минус на «1» убирает товар (как на телефонах) */
   .list .row-remove { display: none; }
-  .list .qty-stepper .qty-btn { width: 26px; height: 28px; font-size: 15px; }
-  .list .qty-stepper .qty-input { width: 36px; font-size: 13.5px; }
+  .list .qty-stepper .qty-btn { width: 28px; height: 30px; font-size: 15px; }
+  .list .qty-stepper .qty-input { width: 40px; font-size: 13.5px; }
 }
-@media (min-width: 1280px) {
-  .list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  /* Компактная карточка в трёх колонках: меньше фото и отступы */
-  .list .product-row { grid-template-columns: 88px minmax(0, 1fr); padding: 10px; gap: 8px 12px; }
-  .list .row-title { font-size: 14px; }
+@media (min-width: 1100px) {
+  .list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  /* В трёх колонках карточка уже: фото мельче */
+  .list .product-row { grid-template-columns: 104px minmax(0, 1fr); }
+  .list .row-media img { width: 104px; height: 104px; }
+  .list .row-title { font-size: 14.5px; }
 }
 .product-row {
   --ctrl-w: 104px;
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  grid-template-areas: "media body" "foot foot";
-  gap: 8px 12px;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-areas: "media body" "media foot";
+  gap: 6px 12px;
   align-items: start;
   background: var(--card);
   border: 1px solid var(--line);
@@ -858,8 +868,8 @@ a:hover { text-decoration: none; }
   box-shadow: 0 2px 8px rgba(124, 92, 224, 0.35);
 }
 .row-media img {
-  width: 84px;
-  height: 84px;
+  width: 96px;
+  height: 96px;
   object-fit: contain;
   border-radius: 10px;
   background: var(--green-soft);
@@ -867,7 +877,16 @@ a:hover { text-decoration: none; }
   display: block;
 }
 .row-body { grid-area: body; min-width: 0; }
-.row-cat { font-size: 11px; color: var(--green); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 800; }
+.row-cat {
+  display: none;
+  font-size: 11px;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 800;
+}
+/* Категорию показываем там, где строка карточки шире телефона */
+@media (min-width: 700px) { .row-cat { display: block; } }
 .row-title {
   font-size: 14.5px;
   font-weight: 700;

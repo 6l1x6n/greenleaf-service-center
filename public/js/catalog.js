@@ -201,20 +201,17 @@
     return Utils.img(img);
   }
 
-  // Одна метка статуса — и только когда товара нет на полке: «Под заказ» или
-  // «в пути». «В наличии» не подписываем: для товара в магазине это норма,
-  // а лишняя строка растягивает карточку. Фото/название/цена/кнопка — всё,
-  // что клиенту нужно, чтобы выбрать и заказать.
+  // Метка наличия — одна строка, но она есть всегда: «В наличии», «Под заказ»
+  // или «🚚 В пути · дата». Клиенту важно видеть, что товар есть, а не только
+  // исключения: без этой строки карточка выглядела полупустой.
   function cardStatusPill(p, st) {
     var mv = moveSkuMap[p.id];
     if (mv) {
       return '<span class="stock-pill sp-exp">🚚 В пути · ' +
         Utils.fmtDate(mv.eta + 'T00:00:00', { day: 'numeric', month: 'short' }) + '</span>';
     }
-    if (!availableNow(p)) {
-      return '<span class="stock-pill ' + st.meta.pill + '">' + Utils.esc(st.meta.label) + '</span>';
-    }
-    return '';
+    var meta = availableNow(p) ? STATUS.in_stock : st.meta;
+    return '<span class="stock-pill ' + meta.pill + '">' + Utils.esc(meta.label) + '</span>';
   }
 
   function rowHtml(p) {
@@ -227,7 +224,6 @@
     var priceHtml = (prices.price > 0)
       ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
       : '<span class="price-ask">Цена по запросу</span>';
-    var pill = cardStatusPill(p, st);
 
     return '' +
       '<article class="product-row" data-product-id="' + Utils.esc(p.id) + '" tabindex="0">' +
@@ -237,8 +233,9 @@
       Utils.lensHtml() +
       '</div>' +
       '<div class="row-body">' +
+      '<span class="row-cat">' + Utils.esc(p.category) + '</span>' +
       '<h3 class="row-title">' + Utils.esc(p.name) + '</h3>' +
-      (pill ? '<div class="row-meta">' + pill + '</div>' : '') +
+      '<div class="row-meta">' + cardStatusPill(p, st) + '</div>' +
       '</div>' +
       '<div class="row-foot">' +
       '<div class="row-prices">' +
