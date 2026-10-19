@@ -50,12 +50,19 @@ echo "$CC" | grep -q 'max-age=300' && echo "✅ Кеш каталога: $CC" ||
 
 # 5. Версия на продакшене == git HEAD (защита от деплоя из устаревшей копии)
 LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
-PROD=$(curl -s "$SITE/version.json" | python3 -c "
+# version.json кэшируется на edge: запрашиваем с «меткой времени», иначе
+# проверка успевает прочитать предыдущий билд и ругается на пустом месте
+PROD=""
+for i in 1 2 3 4 5; do
+  PROD=$(curl -s "$SITE/version.json?cb=$(date +%s%N)" | python3 -c "
 import json,sys
 try:
     d=json.load(sys.stdin); print(d.get('commit',''))
 except Exception: print('')
 " 2>/dev/null)
+  [ -n "$PROD" ] && [ "$PROD" = "$LOCAL" ] && break
+  sleep 4
+done
 if [ -n "$LOCAL" ] && [ -n "$PROD" ]; then
   if [ "$LOCAL" = "$PROD" ]; then
     echo "✅ Продакшен = git HEAD ($(echo $LOCAL | cut -c1-8))"
