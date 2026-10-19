@@ -2562,6 +2562,27 @@ option.city-top { font-weight: 800; color: var(--green-dark); }
 }
 .admin-footer { margin-top: 0; }
 
+/* Плашка «● N изменений не сохранено» у кнопки «Сохранить» */
+.save-dirty {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #9a6400;
+  background: #fff6e6;
+  border: 1px solid #f2dcae;
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+/* Меню «Дополнительно» у нижней панели кнопок раскрывается вверх */
+.admin-more-menu.up { top: auto; bottom: calc(100% + 4px); }
+/* На узких экранах панель кнопок переносится и «Дополнительно» оказывается
+   слева — тогда якорь справа уводил бы меню за край. Прижимаем к левому краю. */
+@media (max-width: 560px) {
+  .admin-more-menu.up { left: 0; right: auto; }
+}
+
 /* ---------- Адаптив ---------- */
 @media (max-width: 860px) {
   .admin-layout { flex-direction: column; }
