@@ -155,6 +155,7 @@ Workflow `.github/workflows/parse-catalog.yml`: парсит каталог по
 |---|---|
 | `SC_LOGIN` | логин кабинета СЦ (портал) |
 | `SC_PASSWORD` | пароль кабинета СЦ (портал) |
+| `PARTNER_LOGIN` | логин партнёра для портала (без него парсер не видит каталог) |
 | `CF_API_TOKEN` | токен Cloudflare для деплоя (deploy.yml) |
 
 ### Локальный запуск (по желанию)

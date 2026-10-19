@@ -79,6 +79,9 @@ jobs:
         env:
           SC_LOGIN: ${{ secrets.SC_LOGIN }}
           SC_PASSWORD: ${{ secrets.SC_PASSWORD }}
+          # Логин партнёра для портала: без него каталог поставщика не открывается.
+          # В репозитории его нет — только в секретах (Worker + GitHub).
+          PARTNER_LOGIN: ${{ secrets.PARTNER_LOGIN }}
         run: python scripts/parser/parser.py ${{ github.event.inputs.task == 'deliveries' && '--moves-only' || '' }} ${{ github.event.inputs.full == 'true' && '--full' || '' }} ${{ github.event.inputs.rephotos == 'true' && '--rephotos' || '' }}
 
       - name: Upload diag (если парсер что-то сохранил)
