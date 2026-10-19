@@ -6,6 +6,11 @@ __pycache__/
 .deploy-lock/
 scripts/parser/config.json
 scripts/parser/diag/
+scripts/parser/.catalog_cache.json
+scripts/parser/.goods_cache.json
+scripts/parser/.goods_id_map.json
+scripts/parser/.rephotos_pending
+scripts/parser/.photo_backfill_pending
 public/version.json
 tab_ico.png
 .dev.vars

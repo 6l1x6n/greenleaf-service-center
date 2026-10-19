@@ -122,9 +122,9 @@ jobs:
         run: |
           git config user.name "catalog-bot"
           git config user.email "catalog-bot@users.noreply.github.com"
-          git add public/data/products.base.json public/data/moves.json public/data/store-stock.json public/assets/images/products
-          git add scripts/parser/.rephotos_pending || true
-          git add scripts/parser/.photo_backfill_pending || true
+          # -A: добавляет и удалённые, и новые файлы (превью _card.webp);
+          # служебные файлы парсера (кеш, маркеры) исключены в .gitignore
+          git add -A -- public/data public/assets/images/products scripts/parser
           if git diff --cached --quiet; then
             echo "Каталог не изменился — коммит не нужен"
           else
