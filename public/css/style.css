@@ -3681,3 +3681,11 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
   .list .qty-stepper .qty-btn { width: 44px; height: 44px; }
   .list .qty-stepper .qty-input { width: 42px; }
 }
+
+@media (max-width: 640px) {
+  /* Логотип с длинным подзаголовком (страница подписки) вместе с бейджем
+     корзины выталкивал бургер за край экрана — логотип теперь ужимается. */
+  .logo { flex: 0 1 auto; min-width: 0; }
+  .logo-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .logo-text small { overflow: hidden; text-overflow: ellipsis; }
+}
