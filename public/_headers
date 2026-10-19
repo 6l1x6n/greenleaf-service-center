@@ -1,3 +1,14 @@
+# Заголовки безопасности — для всех страниц.
+# CSP без 'unsafe-inline' для скриптов: inline-обработчики (onerror и т.п.)
+# вынесены в общий делегированный слушатель (public/js/ui.js).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; frame-src https://yandex.ru https://*.yandex.ru; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), interest-cohort=()
+
 /assets/*
   Cache-Control: public, max-age=604800, immutable
 

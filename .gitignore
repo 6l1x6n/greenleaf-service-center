@@ -8,3 +8,4 @@ scripts/parser/config.json
 scripts/parser/diag/
 public/version.json
 tab_ico.png
+.dev.vars

@@ -228,7 +228,6 @@
   // ---------------- Пагинация таблиц и бейдж разницы остатков ----------------
 
   var PAGE_SIZE = 100;
-
   function pageSlice(list, page) {
     var total = list.length;
     var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -457,6 +456,9 @@
       .catch(function () { Utils.showToast('⚠️ Сеть недоступна — мероприятия не сохранены'); });
   }
 
+  // Счётчик параллельных загрузок данных (защита от гонки в loadData)
+  var loadSeq = 0;
+
   function loadData() {
     var p1 = loadJSON('data/stores.json')
       .catch(function () { return []; })
@@ -512,7 +514,12 @@
       .then(function (r) { return r.json(); })
       .then(function (d) { return (d && d.bookings) || {}; })
       .catch(function () { return {}; });
+    // Защита от гонки: loadData вызывается из нескольких мест (сохранения,
+    // сбросы, смена раздела). Побеждает последний ЗАПУЩЕННЫЙ запрос, а не тот,
+    // который ответил последним — иначе в таблице появлялись устаревшие цены.
+    var seq = ++loadSeq;
     return Promise.all([p1, p2, p3, p4, p5, p6, p7, p8, p9]).then(function (res) {
+      if (seq !== loadSeq) return;   // ответ устарел — игнорируем
       state.stores = res[0];
       state.products = res[1];
       state.deliveries = res[2];
@@ -651,6 +658,21 @@
       '<button class="btn btn-outline btn-sm" id="parserRunFull">⏳ Полный прогон товаров</button>' +
       '</div>' +
       '<p class="form-note" id="parserRunMsg" style="margin-top:8px;"></p>' +
+      '</div>' +
+      '<div class="admin-card">' +
+      '<h4 style="margin-bottom:6px;">⚙️ Настройки сайта</h4>' +
+      '<p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Партнёрские ID — только эти коды получают партнёрскую цену (−50%). Список хранится на сервере: в коде сайта его нет, поэтому чужим кодом скидку не получить.</p>' +
+      '<div style="display:flex;flex-direction:column;gap:10px;max-width:640px;">' +
+      '<label style="font-size:13px;font-weight:600;">Партнёрские ID (через запятую)<br>' +
+      '<input class="search" id="sitePartnerIds" type="text" placeholder="kz12345678, kz87654321" autocomplete="off" value="' + h((state.siteSettings && state.siteSettings.partnerIds || []).join(', ')) + '"></label>' +
+      '<label style="font-size:13px;font-weight:600;">Логин партнёра для парсера<br>' +
+      '<input class="search" id="sitePartnerLogin" type="text" placeholder="kz…" autocomplete="off" value="' + h((state.siteSettings && state.siteSettings.partnerLogin) || '') + '"></label>' +
+      '<label style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;">' +
+      '<input id="siteShowDiscounts" type="checkbox"' + (state.siteSettings && state.siteSettings.showDiscountPrices === false ? '' : ' checked') + '>' +
+      'Показывать скидочные цены в каталоге</label>' +
+      '<div class="admin-actions"><button class="btn btn-primary btn-sm" id="siteSettingsSave">💾 Сохранить настройки</button></div>' +
+      '<p class="form-note" id="siteSettingsMsg"></p>' +
+      '</div>' +
       '</div>';
     content.insertAdjacentHTML('beforeend', html);
 
@@ -685,6 +707,42 @@
     bindParserRun('#parserRunProducts', 'products', false, 'обновление товаров');
     bindParserRun('#parserRunDeliveries', 'deliveries', false, 'обновление поступлений');
     bindParserRun('#parserRunFull', 'products', true, 'полный прогон товаров');
+
+    // Сохранение настроек сайта: партнёрские ID, логин парсера, скидочные цены
+    var settingsBtn = content.querySelector('#siteSettingsSave');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', function () {
+        var idsInp = content.querySelector('#sitePartnerIds');
+        var loginInp = content.querySelector('#sitePartnerLogin');
+        var discInp = content.querySelector('#siteShowDiscounts');
+        var msg = content.querySelector('#siteSettingsMsg');
+        var partnerIds = String(idsInp && idsInp.value || '').split(/[,\s]+/).filter(function (v) { return v; });
+        var body = {
+          action: 'settings',
+          showDiscountPrices: !!(discInp && discInp.checked),
+          partnerIds: partnerIds
+        };
+        if (loginInp) body.partnerLogin = String(loginInp.value || '').trim();
+        settingsBtn.disabled = true;
+        Auth.api('/api/admin/products', { method: 'POST', body: JSON.stringify(body) }).then(function (res) {
+          if (res && res.ok) {
+            state.siteSettings = Object.assign({}, state.siteSettings, {
+              showDiscountPrices: body.showDiscountPrices,
+              partnerIds: partnerIds,
+              partnerLogin: body.partnerLogin
+            });
+            if (msg) msg.textContent = '✅ Сохранено';
+            Utils.showToast('✅ Настройки сайта сохранены');
+          } else {
+            if (msg) msg.textContent = '⚠️ ' + ((res && res.error) || 'Не удалось сохранить');
+          }
+          settingsBtn.disabled = false;
+        }).catch(function () {
+          if (msg) msg.textContent = '⚠️ Нет связи — попробуйте ещё раз';
+          settingsBtn.disabled = false;
+        });
+      });
+    }
   }
 
   function statCard(ico, val, lbl) {
@@ -715,8 +773,8 @@
       return '<option value="' + h(c) + '"' + ((store.city || '').indexOf(c) !== -1 ? ' selected' : '') + ' class="' + (top ? 'city-top' : '') + '">' + h(c) + '</option>';
     }).join('');
     var imagePreview = store.image
-      ? '<img id="storeImagePreview" class="store-img-preview" src="' + h(store.image) + '" alt="Превью фото" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
-      : '<img id="storeImagePreview" class="store-img-preview hidden" src="assets/images/products/placeholder.svg" alt="Превью фото" onerror="this.src=\'assets/images/products/placeholder.svg\'">';
+      ? '<img id="storeImagePreview" class="store-img-preview" src="' + h(store.image) + '" alt="Превью фото">'
+      : '<img id="storeImagePreview" class="store-img-preview hidden" src="assets/images/products/placeholder.svg" alt="Превью фото">';
     var pm = Array.isArray(store.payment_methods) && store.payment_methods.length ? store.payment_methods : ['kaspi', 'cash'];
     var pv = store.payment_method_visibility && typeof store.payment_method_visibility === 'object' ? store.payment_method_visibility : {};
     var methodRow = function (code, emoji, name, hint) {
@@ -1300,7 +1358,7 @@
         var priceTxt = Utils.fmtPrice(p.price);
         if (p.discount_price) priceTxt += ' <s class="muted-sku">' + Utils.fmtPrice(p.discount_price) + '</s>';
         return '<tr>' +
-          '<td><img class="admin-thumb" src="' + h(img) + '" alt="" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'"></td>' +
+          '<td><img class="admin-thumb" src="' + h(img) + '" alt="" loading="lazy"></td>' +
           '<td><strong>' + h(p.name) + '</strong><br><span class="muted-sku">' + h(p.sku) + '</span></td>' +
           '<td>' + h(p.category || '') + '</td>' +
           '<td>' + priceTxt + '</td>' +
@@ -1423,13 +1481,15 @@
       Auth.api('/api/stock', { method: 'POST', body: JSON.stringify({ scId: scId, items: items }) }).then(function (res) {
         if (res && res.ok) {
           Utils.showToast('✅ Остатки сохранены — сайт обновлён');
-          // Чистим только отправленные остатки, не трогая прочие правки
+          // Чистим только отправленные значения: правка, сделанная во время
+          // сохранения, остаётся в буфере (иначе она молча пропадала)
           var pend = state.pendingScChanges[scId] || {};
           Object.keys(items).forEach(function (pid) {
-            if (pend[pid]) {
+            if (!pend[pid]) return;
+            if (stockTextFromValue(pend[pid].stock) === items[pid]) {
               delete pend[pid].stock;
-              if (!Object.keys(pend[pid]).length) delete pend[pid];
             }
+            if (!Object.keys(pend[pid]).length) delete pend[pid];
           });
           if (!Object.keys(pend).length) delete state.pendingScChanges[scId];
           if (window.StoreStock && StoreStock.reload) StoreStock.reload();
@@ -1576,7 +1636,7 @@
             var p = state.products.find(function (x) { return x.id === it.sku; });
             var img = p ? adminImgUrl(p) : '';
             return '<span class="delivery-item-chip">' +
-              (img ? '<img class="delivery-item-img" src="' + h(img) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+              (img ? '<img class="delivery-item-img" src="' + h(img) + '" alt="">' : '') +
               h(it.sku) + ' · ' + h(String(it.name || '').slice(0, 40)) + (it.qty ? ' · ' + h(it.qty) + ' шт' : '') +
               '</span>';
           }).join('');
@@ -1628,7 +1688,7 @@
             var chip = '';
             if (p) {
               var img = adminImgUrl(p);
-              chip = '<img class="delivery-item-img" src="' + h(img) + '" alt="' + h(p.name) + '" onerror="this.style.display=\'none\'">';
+              chip = '<img class="delivery-item-img" src="' + h(img) + '" alt="' + h(p.name) + '">';
             } else {
               chip = '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
             }
@@ -2050,7 +2110,7 @@
             var unit = Number(i.price) || 0;
             var subtotal = unit ? (unit * (Number(i.qty) || 1)) : 0;
             return '<span class="delivery-item-row order-receipt-row">' +
-              (img ? '<img class="delivery-item-img order-receipt-img" src="' + h(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' : '') +
+              (img ? '<img class="delivery-item-img order-receipt-img" src="' + h(img) + '" alt="" loading="lazy">' : '') +
               '<span class="order-receipt-name">' + h(name) + '</span>' +
               (unit ? '<span class="order-receipt-price">' + h(String(unit).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) + ' ₸ × ' + h(i.qty) + ' = <b>' + h(String(subtotal).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) + ' ₸</b></span>' : '<span class="order-receipt-price">× ' + h(i.qty) + '</span>') +
               '</span>';
@@ -2298,7 +2358,7 @@
         var prioB = prioBase(p);
         var showDiscBase = p.showDiscount !== false;
         return '<tr' + (isHidden ? ' class="row-hidden"' : '') + changed + '>' +
-          '<td><img class="admin-thumb" src="' + h(img) + '" alt="' + h(p.name) + '" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\';"></td>' +
+          '<td><img class="admin-thumb" src="' + h(img) + '" alt="' + h(p.name) + '"></td>' +
           '<td><strong>' + h(p.name) + '</strong>' + prioBadgeChip(p) + (isCustom ? ' <span class="admin-sc-tag">🖊 ручной</span>' : '') + (isHidden ? ' <span class="badge st-out">скрыт</span>' : '') + '</td>' +
           '<td class="muted-sku">' + h(p.sku) + '</td>' +
           '<td><input class="cat-input" data-cat-prod="' + h(p.id) + '" data-cat-field="description" data-init="' + h(descBase) + '" value="' + h(descVal) + '"></td>' +
@@ -2724,7 +2784,7 @@
         var stockBase = scStockValue(scId, p.id, null);
         var stockShown = scStockValue(scId, p.id, pend);
         return '<tr' + (isHidden ? ' class="row-hidden"' : '') + '>' +
-          '<td class="av-thumb-cell"><img class="admin-thumb" src="' + h(adminImgUrl(p)) + '" alt="' + h(p.name) + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\';"></td>' +
+          '<td class="av-thumb-cell"><img class="admin-thumb" src="' + h(adminImgUrl(p)) + '" alt="' + h(p.name) + '" loading="lazy"></td>' +
           '<td><strong>' + h(p.name) + '</strong>' + (isHidden ? ' <span class="badge st-out">скрыт</span>' : '') + '<br><span class="muted-sku">' + h(p.sku) + '</span></td>' +
           '<td><input class="cat-input" type="number" min="0" data-sc-prod="' + h(p.id) + '" data-sc-field="price" data-init="' + h(bPrice) + '" value="' + h(sPrice) + '"></td>' +
           '<td><input class="cat-input" type="number" min="0" data-sc-prod="' + h(p.id) + '" data-sc-field="discount_price" data-init="' + h(bDisc) + '" value="' + h(sDisc) + '" placeholder="—"></td>' +
@@ -2886,27 +2946,39 @@
       Promise.allSettled([pSettings, pStock]).then(function (results) {
         var settingsOk = results[0].status === 'fulfilled';
         var stockOk = results[1].status === 'fulfilled';
-        // Чистим только реально сохранённые части буфера, остальное — на повтор
+        // Текст ошибки API не теряем: показываем, что именно не сохранилось
+        var settingsErr = settingsOk ? '' : String((results[0].reason && results[0].reason.message) || '');
+        var stockErr = stockOk ? '' : String((results[1].reason && results[1].reason.message) || '');
+        // Чистим только реально сохранённые части буфера, остальное — на повтор.
+        // Поле убираем, только если его текущее значение совпадает с отправленным:
+        // правка, сделанная во время сохранения, не должна теряться.
         var pend = state.pendingScChanges[scId] || {};
         if (settingsOk) {
-          Object.keys(pend).forEach(function (pid) {
-            ['price', 'discount_price', 'status', 'hidden'].forEach(function (f) { delete pend[pid][f]; });
+          parts.overrides.forEach(function (it) {
+            var pid = it.productId;
+            if (!pend[pid]) return;
+            Object.keys(it).forEach(function (f) {
+              if (f === 'productId') return;
+              if (String(pend[pid][f]) === String(it[f])) delete pend[pid][f];
+            });
             if (!Object.keys(pend[pid]).length) delete pend[pid];
           });
         }
         if (stockOk) {
           Object.keys(parts.stock).forEach(function (pid) {
-            if (pend[pid]) {
+            if (!pend[pid]) return;
+            // Отправленное значение — текст остатка; в буфере лежит число
+            if (stockTextFromValue(pend[pid].stock) === parts.stock[pid]) {
               delete pend[pid].stock;
-              if (!Object.keys(pend[pid]).length) delete pend[pid];
             }
+            if (!Object.keys(pend[pid]).length) delete pend[pid];
           });
         }
         if (!Object.keys(pend).length) delete state.pendingScChanges[scId];
         if (settingsOk && stockOk) Utils.showToast('✅ Сохранено — применено на сайте');
-        else if (stockOk) Utils.showToast('⚠️ Настройки филиала не сохранились — попробуйте ещё раз');
-        else if (settingsOk) Utils.showToast('⚠️ Остатки не сохранились — проверьте числа и повторите');
-        else Utils.showToast('⚠️ Не удалось сохранить — проверьте соединение');
+        else if (stockOk) Utils.showToast('⚠️ Настройки филиала не сохранились' + (settingsErr ? ' (' + settingsErr + ')' : '') + ' — попробуйте ещё раз');
+        else if (settingsOk) Utils.showToast('⚠️ Остатки не сохранились' + (stockErr ? ' (' + stockErr + ')' : '') + ' — проверьте числа и повторите');
+        else Utils.showToast('⚠️ Не удалось сохранить' + (settingsErr || stockErr ? ': ' + (settingsErr || stockErr) : ' — проверьте соединение'));
         saving = false;
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = label; }
         if (settingsOk || stockOk) {

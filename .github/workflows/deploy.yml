@@ -9,7 +9,6 @@ on:
   workflow_run:
     workflows: ["Parse catalog"]
     types: [completed]
-
 permissions:
   contents: read
 
@@ -19,6 +18,8 @@ concurrency:
 
 jobs:
   deploy:
+    # После упавшего парсинга не деплоим: каталог мог остаться пустым
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -29,7 +30,7 @@ jobs:
           node-version: "20"
 
       - name: Install wrangler
-        run: npm install -g wrangler
+        run: npm install -g wrangler@4
 
       - name: Write version.json
         run: |
@@ -40,3 +41,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: npx wrangler deploy
+
+      - name: Verify production
+        run: bash scripts/verify.sh

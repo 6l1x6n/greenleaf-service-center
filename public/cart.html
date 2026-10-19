@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Корзина — Сервис-центр Greenleaf</title>
   <meta name="description" content="Корзина сервис-центра Greenleaf: проверьте выбранные товары и оформите заказ.">
+  <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" sizes="64x64" href="assets/images/favicon.png?v=20260822">
   <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png?v=20260822">
   <meta property="og:type" content="website">
@@ -22,7 +23,11 @@
   <meta property="og:image:alt" content="Greenleaf — Сервис-центр">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png">
-  <link rel="stylesheet" href="css/style.css?v=20261018j">
+  <meta name="twitter:title" content="Корзина — Сервис-центр Greenleaf">
+  <meta name="twitter:description" content="Корзина сервис-центра Greenleaf: проверьте выбранные товары и оформите заказ.">
+  <meta name="theme-color" content="#1f7a4d">
+  <link rel="canonical" href="https://mygreenleaf.postalarchive.workers.dev/cart.html">
+  <link rel="stylesheet" href="css/style.css?v=20261019c">
 </head>
 
 <body>
@@ -51,7 +56,7 @@
 
     <section class="section">
       <div class="container">
-        <h2>🛒 Корзина</h2>
+        <h1>🛒 Корзина</h1>
         <p class="section-sub">Проверьте состав заказа, выберите способ оплаты и оформите — менеджер подготовит товары к вашему приезду.</p>
 
         <div id="cartEmpty" class="empty hidden">
@@ -178,7 +183,7 @@
     </div>
   </div>
 
-  <div class="toast hidden" id="toast"></div>
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
 
   <button class="ai-fab" id="aiFab" type="button" aria-label="Открыть чат с Менеджером Исой"><span class="ai-fab-dot"></span><span class="ai-fab-ico">👨‍💼</span><span class="ai-fab-label">Иса</span><span class="ai-fab-hide" role="button" aria-label="Скрыть кнопку" title="Скрыть">✕</span></button>
 
@@ -196,12 +201,12 @@
     </div>
   </section>
 
-  <script src="js/ui.js?v=20261018e"></script>
-  <script src="js/auth.js?v=20260924a"></script>
-  <script src="js/cart.js?v=20260924h"></script>
-  <script src="js/cart-page.js?v=20261018e"></script>
-  <script src="js/forms.js?v=20260924d"></script>
-  <script src="js/ai-chat.js?v=20261018a"></script>
+  <script src="js/ui.js?v=20261019c"></script>
+  <script src="js/auth.js?v=20261019c"></script>
+  <script src="js/cart.js?v=20261019c"></script>
+  <script src="js/cart-page.js?v=20261019c"></script>
+  <script src="js/forms.js?v=20261019c"></script>
+  <script src="js/ai-chat.js?v=20261019c"></script>
 </body>
 
 </html>

@@ -214,7 +214,6 @@
         orderId: reservationOrderId,
         storeId: storeId,
         items: t.lines.map(function (l) { return { productId: l.p.id, qty: l.qty }; }),
-        excludeOrderIds: reserve.staleOrderIds.slice(0, 20),
         ttlSeconds: RESERVE_TTL
       })
     }).then(function (r) {
@@ -244,6 +243,12 @@
             if (window.Utils) Utils.showToast('⚠️ «' + name + '» — осталось ' + avail + ' шт., количество уменьшено');
             try { Cart.setQty(pid, Math.max(1, Math.min(Number(avail), 999))); } catch (err) { }
             return;
+          }
+          // Остатка нет вовсе: убираем позицию, иначе оформление заказа
+          // оставалось бы заблокированным навсегда
+          if (avail !== null && avail !== undefined && Number(avail) <= 0) {
+            try { Cart.remove(pid); } catch (err) { }
+            if (window.Utils) Utils.showToast('⚠️ «' + name + '» — товара нет в наличии, убрали из корзины');
           }
         }
         reserve.state = 'failed';
@@ -343,8 +348,11 @@
     if (state.partnerMode) {
       return p.partner_price != null ? p.partner_price : Math.round(ep.price / 2);
     }
-    // Скидочная цена, если включена и реально ниже обычной
-    if (ep.discount != null && ep.discount > 0 && ep.discount < ep.price) return ep.discount;
+    // Скидочная цена — только если она включена в настройках витрины:
+    // сервер в этом случае тоже считает по розничной цене
+    var settings = window.__siteSettings || {};
+    var showDiscount = settings.showDiscountPrices !== false;
+    if (showDiscount && ep.discount != null && ep.discount > 0 && ep.discount < ep.price) return ep.discount;
     return ep.price;
   }
 
@@ -363,6 +371,11 @@
     var withStock = stores.filter(function (s) { return s && s.id && StoreStock.hasData(s.id); });
     var live = withStock.length ? withStock : stores.filter(function (s) { return s && s.id; });
     state.storeId = live.length ? live[0].id : null;
+    // Сохраняем выбор филиала: по нему каталог и чат ограничивают количество
+    // фактическим остатком (раньше ключ только читался и не писался)
+    if (state.storeId && window.Utils && typeof Utils.setStoreId === 'function') {
+      Utils.setStoreId(state.storeId, (live[0] && live[0].name) || '');
+    }
   }
 
   function selectedStoreObj() {
@@ -407,7 +420,7 @@
   function itemHtml(l) {
     return '<div class="cart-item">' +
       '<button class="cart-item-x" data-cart-remove="' + Utils.esc(l.p.id) + '" aria-label="Удалить из корзины">' + Utils.iconX(13) + '</button>' +
-      '<div class="cart-item-media"><img src="' + Utils.esc(Utils.img(l.p.image || 'assets/images/products/placeholder.svg')) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'" alt=""></div>' +
+      '<div class="cart-item-media"><img src="' + Utils.esc(Utils.img(l.p.image || 'assets/images/products/placeholder.svg')) + '" alt=""></div>' +
       '<div class="cart-item-body">' +
       '<div class="cart-item-name">' + Utils.esc(l.p.name) + '</div>' +
       '<div class="cart-item-price">' + Utils.fmtPrice(l.price) + (state.partnerMode ? ' <span class="badge-sale">-50%</span>' : '') + '</div>' +
@@ -799,6 +812,12 @@
     var qty = parseInt(inp.value, 10);
     if (isNaN(qty) || qty < 1) return;
     var max = state.storeId ? StoreStock.count(state.storeId, id) : null;
+    if (max !== null && max <= 0) {
+      // Товара в филиале нет — убираем позицию, а не оставляем её «на 1 шт»
+      Cart.remove(id);
+      Utils.showToast('⚠️ Товара нет в наличии — убрали из корзины');
+      return;
+    }
     if (max !== null && qty > max) {
       Utils.showToast('⚠️ Количество уменьшено до доступного в филиале');
       Cart.setQty(id, max);

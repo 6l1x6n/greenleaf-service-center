@@ -89,6 +89,32 @@ jobs:
           path: scripts/parser/diag/
           if-no-files-found: ignore
 
+      - name: Validate JSON before commit
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          files = [
+              "public/data/products.base.json",
+              "public/data/store-stock.json",
+              "public/data/moves.json",
+          ]
+          for f in files:
+              try:
+                  with open(f, encoding="utf-8") as fh:
+                      data = json.load(fh)
+              except Exception as e:
+                  print(f"::error::Файл {f} — невалидный JSON: {e}")
+                  sys.exit(1)
+              if f.endswith("products.base.json"):
+                  n = len((data or {}).get("products") or [])
+                  print(f"OK {f}: товаров {n}")
+                  if n < 100:
+                      print(f"::error::В каталоге всего {n} товаров — похоже на обнуление, коммит отменён")
+                      sys.exit(1)
+              else:
+                  print(f"OK {f}")
+          PY
+
       - name: Commit catalog if changed
         run: |
           git config user.name "catalog-bot"
@@ -100,5 +126,9 @@ jobs:
             echo "Каталог не изменился — коммит не нужен"
           else
             git commit -m "Обновление каталога: $(date -u '+%Y-%m-%d %H:%M UTC')"
-            git push
+            # Rebase перед пушем: за время прогона в main могли появиться
+            # чужие коммиты — без rebase push отклонялся и обновление каталога
+            # терялось.
+            git pull --rebase origin main
+            git push origin HEAD:main
           fi

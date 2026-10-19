@@ -890,6 +890,9 @@ def download_images(items, config, session=None):
 
 MAX_IMAGE_BYTES = 400 * 1024
 MAX_IMAGE_EDGE = 800
+# Лёгкое превью для каталога (WebP, 600px) — рядом с оригиналом: <файл>_card.webp
+CARD_THUMB_EDGE = 600
+CARD_THUMB_QUALITY = 74
 
 
 def compress_image_if_needed(path):
@@ -937,6 +940,36 @@ def compress_image_if_needed(path):
     except Exception as e:
         print(f"Сжатие фото {os.path.basename(path)} не удалось ({e}) — оставляю как есть")
         return path
+
+
+def make_card_thumb(path):
+    """Лёгкое превью <файл>_card.webp (600px) для каталога.
+
+    В карточку каталога раньше подставлялся полный файл товара (до 18 МБ PNG),
+    страница на 100 товаров тянула ~35 МБ картинок. Превью — 10–30 КБ.
+    Возвращает путь к превью или ''.
+    """
+    try:
+        from PIL import Image
+        if not os.path.exists(path):
+            return ""
+        out = os.path.splitext(path)[0] + "_card.webp"
+        with Image.open(path) as img:
+            img.load()
+            img.info.clear()
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGB")
+            w, h = img.size
+            scale = min(1.0, CARD_THUMB_EDGE / float(max(w, h)))
+            if scale < 1.0:
+                img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
+            img.save(out, "WEBP", quality=CARD_THUMB_QUALITY, method=4)
+        return out
+    except ImportError:
+        return ""
+    except Exception as e:
+        print(f"Превью {os.path.basename(path)} не создано ({e})")
+        return ""
 
 
 def clean_local_photo_variants(sku):
@@ -991,7 +1024,9 @@ def download_product_photo(sku, photo_url, config, session=None, force=False, co
     if download_best_image(path, attempts, session, force=force):
         if compress:
             final = compress_image_if_needed(path)
+            make_card_thumb(final)
             return os.path.relpath(final, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
+        make_card_thumb(path)
         return os.path.relpath(path, os.path.join(ROOT_DIR, "public")).replace(os.sep, "/")
     return None
 
@@ -1457,8 +1492,7 @@ def write_moves(moves):
         "updated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S+03:00"),
         "moves": moves,
     }
-    with open(MOVES_PATH, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+    write_json_atomic(MOVES_PATH, payload)
     print(f"Сохранено накладных: {len(moves)} -> {MOVES_PATH}")
 
 
@@ -1471,16 +1505,27 @@ def write_moves(moves):
 
 
 def load_base_products():
+    """База товаров с прошлого прогона.
+
+    Битый/усечённый JSON — это авария, а не «пустой каталог»: раньше парсер
+    молча начинал с нуля и перезаписывал файл, из-за чего на сайт попадал
+    пустой каталог (и это уходило в main). Теперь — падение с кодом 1.
+    """
     if not os.path.exists(PRODUCTS_PATH):
         print("База товаров не найдена — начнём с пустой")
         return []
     try:
         with open(PRODUCTS_PATH, encoding="utf-8") as f:
             data = json.load(f)
-        return data.get("products") or []
     except Exception as e:
-        print(f"База товаров: не удалось прочитать ({e}) — начнём с пустой")
-        return []
+        print(f"ОШИБКА: база товаров не читается ({e}) — файл {PRODUCTS_PATH}")
+        print("Прогон остановлен, база не тронута. Почините файл вручную и повторите.")
+        sys.exit(1)
+    products = (data or {}).get("products") or []
+    if not isinstance(products, list):
+        print("ОШИБКА: в базе товаров поле products не является списком — прогон остановлен")
+        sys.exit(1)
+    return products
 
 
 def base_index(products):
@@ -1678,6 +1723,21 @@ def merge_sc_items(base_products, items, sc_id, config, images=None, description
     return list(by_code.values())
 
 
+def write_json_atomic(path, payload):
+    """Записать JSON атомарно: сначала во временный файл, затем rename.
+
+    Обычная запись (open "w") обрезает файл до записи: убитый процесс
+    (таймаут job'а, OOM) оставлял усечённый products.base.json, и сайт
+    отдавал не-JSON. rename в пределах ФС атомарен.
+    """
+    tmp = str(path) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, str(path))
+
+
 def write_products(products, active_ids=None):
     if active_ids:
         for p in products:
@@ -1688,8 +1748,15 @@ def write_products(products, active_ids=None):
         "updated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S+03:00"),
         "products": products,
     }
-    with open(PRODUCTS_PATH, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+    # Страховка от катастрофы: пустой или «сдувшийся» каталог не пишем
+    try:
+        previous = load_base_products()
+    except SystemExit:
+        previous = []
+    if previous and len(products) < len(previous) * 0.8:
+        print(f"ОШИБКА: новый каталог ({len(products)}) заметно меньше прежнего ({len(previous)}) — запись отменена")
+        sys.exit(1)
+    write_json_atomic(PRODUCTS_PATH, payload)
     print(f"Сохранено карточек: {len(products)} -> {PRODUCTS_PATH}")
 
 
@@ -2071,8 +2138,7 @@ def write_store_stock(products, config, active_ids=None):
         "updated": datetime.now().strftime("%Y-%m-%dT%H:%M:%S+03:00"),
         "stock": stock_data,
     }
-    with open(STORE_STOCK_PATH, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+    write_json_atomic(STORE_STOCK_PATH, payload)
     total = sum(len(v) for v in stock_data.values())
     print(f"Остатки по филиалам: {list(stock_data)} ({total} позиций) -> {STORE_STOCK_PATH}")
 

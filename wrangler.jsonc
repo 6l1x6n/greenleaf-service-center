@@ -5,6 +5,11 @@
   "name": "mygreenleaf",
   "main": "worker.js",
   "compatibility_date": "2025-06-01",
+  // Планировщик: раз в сутки архивируем подтверждённые заказы (перенос из
+  // orders в orders_history). Раньше это делал анонимный GET /api/my-orders.
+  "triggers": {
+    "crons": ["23 3 * * *"]
+  },
   "kv_namespaces": [
     {
       "binding": "SC_STORES",

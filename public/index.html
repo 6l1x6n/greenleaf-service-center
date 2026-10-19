@@ -22,8 +22,38 @@
   <meta property="og:image:height" content="512">
   <meta property="og:image:alt" content="Greenleaf — Сервис-центр">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Сервисный центр Greenleaf — каталог экотоваров с наличием">
+  <meta name="twitter:description" content="Каталог экотоваров Greenleaf: актуальное наличие, заказ онлайн, даты поставок, адрес и часы работы.">
   <meta name="twitter:image" content="https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png">
-  <link rel="stylesheet" href="css/style.css?v=20261018j">
+  <meta name="theme-color" content="#1f7a4d">
+  <link rel="canonical" href="https://mygreenleaf.postalarchive.workers.dev/">
+  <link rel="stylesheet" href="css/style.css?v=20261019c">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Store",
+    "name": "Сервисный центр Greenleaf",
+    "description": "Каталог экотоваров Greenleaf с актуальным наличием, заказом онлайн и датами поставок.",
+    "url": "https://mygreenleaf.postalarchive.workers.dev/",
+    "logo": "https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png",
+    "image": "https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png",
+    "telephone": "+77082693609",
+    "priceRange": "₸",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "ул Толе би 55, Greenleaf",
+      "addressLocality": "Астана",
+      "addressCountry": "KZ"
+    },
+    "openingHoursSpecification": [{
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+      "opens": "10:00",
+      "closes": "20:00"
+    }],
+    "sameAs": ["https://go.2gis.com/MMuDb"]
+  }
+  </script>
 </head>
 
 <body>
@@ -104,7 +134,7 @@
         </div>
         <div class="map-wrap map-2gis">
           <div class="map-google" id="mapBox">
-            <iframe id="map" src="https://yandex.ru/map-widget/v1/?ll=71.39452%2C51.125658&z=18&pt=71.39452,51.125658,pm2gnm" width="100%" height="100%" style="border:0;" loading="lazy" allowfullscreen title="Карта: Greenleaf, ул. Толе би 55 (Астана)" onload="this.classList.add('is-loaded')"></iframe>
+            <iframe id="map" src="https://yandex.ru/map-widget/v1/?ll=71.39452%2C51.125658&z=18&pt=71.39452,51.125658,pm2gnm" width="100%" height="100%" style="border:0;" loading="lazy" allowfullscreen title="Карта: Greenleaf, ул. Толе би 55 (Астана)"></iframe>
             <div class="map-links">
               <a class="map-google-overlay" id="mapLink" href="https://go.2gis.com/MMuDb" target="_blank" rel="noopener" title="Открыть в 2ГИС">📍 Открыть в 2ГИС</a>
               <a class="map-google-overlay map-ya" id="mapYa" href="https://yandex.ru/maps/?ll=71.39452%2C51.125658&z=18&pt=71.39452,51.125658,pm2gnm" target="_blank" rel="noopener" title="Открыть в Яндекс Картах">Яндекс Карты</a>
@@ -166,15 +196,15 @@
     </div>
   </section>
 
-  <div class="toast hidden" id="toast"></div>
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="js/ui.js?v=20261018e"></script>
+  <script src="js/ui.js?v=20261019c"></script>
   <script src="js/cities.js"></script>
-  <script src="js/auth.js?v=20260924a"></script>
-  <script src="js/cart.js?v=20260924h"></script>
-  <script src="js/catalog.js?v=20261018h"></script>
-  <script src="js/forms.js?v=20260924d"></script>
-  <script src="js/ai-chat.js?v=20261018a"></script>
+  <script src="js/auth.js?v=20261019c"></script>
+  <script src="js/cart.js?v=20261019c"></script>
+  <script src="js/catalog.js?v=20261019c"></script>
+  <script src="js/forms.js?v=20261019c"></script>
+  <script src="js/ai-chat.js?v=20261019c"></script>
 </body>
 
 </html>

@@ -78,7 +78,7 @@ a:hover { text-decoration: none; }
 .btn-primary:hover { background: var(--green-dark); }
 .btn-accent { background: var(--amber); color: #3d2a00; box-shadow: 0 6px 18px rgba(245, 166, 35, 0.3); }
 .btn-accent:hover { background: #f0b33f; }
-.btn-whatsapp { background: var(--wa); color: #fff; box-shadow: 0 6px 18px rgba(37, 211, 102, 0.3); }
+.btn-whatsapp { background: var(--wa); color: #06331a; box-shadow: 0 6px 18px rgba(37, 211, 102, 0.3); }
 .btn-whatsapp:hover { background: #1eb95a; }
 .btn-outline { background: transparent; border-color: var(--green); color: var(--green); }
 .btn-outline:hover { background: var(--green); color: #fff; }
@@ -1274,7 +1274,7 @@ a:hover { text-decoration: none; }
   opacity: 0.85;
 }
 .stock-pill.sp-in { background: #e5f6ea; color: #1d7a44; }
-.stock-pill.sp-low { background: #fdf0dd; color: #b26a00; }
+.stock-pill.sp-low { background: #fdf0dd; color: #8a5200; }
 .stock-pill.sp-exp { background: #e3efff; color: #1f5fbf; }
 .stock-pill.sp-out { background: #f3e9e9; color: #9c3b3b; }
 .stock-pill.sp-order { background: #eef1f5; color: #4a5568; }
@@ -3064,7 +3064,7 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
   position: absolute;
   top: -4px;
   right: -4px;
-  background: #f5a623;
+  background: #b06e00;
   color: #fff;
   font-size: 12px;
   font-weight: 800;
@@ -3663,4 +3663,21 @@ body.is-bottom .ai-panel { bottom: calc(94px + var(--fab-lift, 56px)); transitio
   .pay-tabs .tooltip-wrap { min-width: calc(50% - 4px); }
   .pay-tab { font-size: 12.5px; padding: 9px 6px; }
   .cart-item-x { display: none; }
+}
+
+/* ---------------- Доступность ---------------- */
+/* Видимый фокус с клавиатуры: без него нельзя пользоваться сайтом с клавиатуры */
+:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+@media (max-width: 640px) {
+  /* Тап-таргеты: «+»/«−» и удаление — основной интерфейс покупки,
+     они были 30×30 — ниже рекомендуемых 44×44 */
+  .qty-btn { width: 44px; height: 44px; font-size: 19px; }
+  .row-remove { width: 44px; height: 44px; font-size: 14px !important; }
+  .cart-fab-clear { width: 32px; height: 32px; }
+  .list .qty-stepper .qty-btn { width: 44px; height: 44px; }
+  .list .qty-stepper .qty-input { width: 42px; }
 }

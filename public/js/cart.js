@@ -43,9 +43,12 @@
     return load().reduce(function (s, i) { return s + (Number(i.qty) || 0); }, 0);
   }
 
-  // Выбранный СЦ (тот же ключ, что в catalog.js / cart-page.js)
+  // Выбранный СЦ (единый источник — Utils.getStoreId; ключ пишется при выборе
+  // филиала в каталоге/корзине). Раньше ключ только читался и никогда не
+  // записывался — остаток не ограничивал количество в корзине.
   function selectedStoreId() {
     try {
+      if (window.Utils && typeof Utils.getStoreId === 'function') return Utils.getStoreId();
       var s = JSON.parse(localStorage.getItem('greenleaf_sc_selected_v1') || 'null');
       return (s && s.id) ? String(s.id) : null;
     } catch (e) { return null; }

@@ -19,6 +19,9 @@
   // снимать при следующем открытии — иначе он «протечёт» в другую модалку.
   var lastExtraCls = null;
 
+  // Элемент, который открыл окно: ему вернётся фокус при закрытии
+  var lastFocused = null;
+
   // Страницу не сдвигаем. Раньше body получал position:fixed и top:-<сдвиг>,
   // и если карточку открывали внизу списка, за окном оказывалась пустая нижняя
   // часть страницы: фон выглядел ровным белым вместо размытого каталога, а после
@@ -67,6 +70,11 @@
       if (lastExtraCls && lastExtraCls !== extraCls) modalEl.classList.remove(lastExtraCls);
       if (extraCls) modalEl.classList.add(extraCls);
       lastExtraCls = extraCls || null;
+      // Имя окна для скринридера: элемента с id modalTitle в разметке нет,
+      // поэтому подставляем aria-label из заголовка содержимого.
+      var heading = modalBody.querySelector('h2, h3, .modal-title');
+      var label = heading ? String(heading.textContent || '').trim().slice(0, 120) : 'Окно';
+      modalEl.setAttribute('aria-label', label || 'Окно');
     }
     overlay.classList.remove('hidden');
     lockScroll();
@@ -75,7 +83,9 @@
       var m = overlay.querySelector('.modal');
       if (m) m.scrollTop = 0;
     } catch (e) { /* ignore */ }
-    var first = modalBody.querySelector('input');
+    // Запоминаем, куда вернуть фокус при закрытии
+    try { lastFocused = document.activeElement; } catch (e) { lastFocused = null; }
+    var first = modalBody.querySelector('input, button, [tabindex]');
     if (first) {
       try { first.focus({ preventScroll: true }); }
       catch (e) { try { first.focus(); } catch (e2) { /* ignore */ } }
@@ -88,7 +98,25 @@
     overlay.classList.add('hidden');
     myOrdersRender = null;
     if (wasOpen) unlockScroll();
+    // Возвращаем фокус на то, что открыло окно
+    try {
+      if (lastFocused && document.contains(lastFocused)) lastFocused.focus({ preventScroll: true });
+    } catch (e) { /* ignore */ }
+    lastFocused = null;
   }
+
+  // ---------------- Битые картинки → заглушка ----------------
+  // Раньше в разметке стоял inline-обработчик onerror="..." — из-за него
+  // нельзя было включить строгий CSP (script-src 'self' без 'unsafe-inline').
+  // Ошибка загрузки изображения не всплывает, но ловится в фазе захвата.
+  document.addEventListener('error', function (e) {
+    var el = e.target;
+    if (!el || el.tagName !== 'IMG') return;
+    var ph = 'assets/images/products/placeholder.svg';
+    var src = el.getAttribute('src') || '';
+    if (!src || src === ph) return;
+    el.setAttribute('src', ph);
+  }, true);
 
   function showToast(text) {
     toastEl.textContent = text;
@@ -97,6 +125,26 @@
     toastTimer = setTimeout(function () {
       toastEl.classList.add('hidden');
     }, 4000);
+  }
+
+  // ---------------- Выбранный Сервис-Центр ----------------
+  var STORE_ID_KEY = 'greenleaf_sc_selected_v1';
+
+  function getStoreId() {
+    try {
+      var raw = localStorage.getItem(STORE_ID_KEY);
+      if (!raw) return null;
+      var val = JSON.parse(raw);
+      var id = val && typeof val === 'object' ? val.id : val;
+      return id ? String(id) : null;
+    } catch (e) { return null; }
+  }
+
+  function setStoreId(id, name) {
+    if (!id) return;
+    try {
+      localStorage.setItem(STORE_ID_KEY, JSON.stringify({ id: String(id), name: String(name || '') }));
+    } catch (e) { /* localStorage недоступен */ }
   }
 
   function waLink(text) {
@@ -206,7 +254,7 @@
       var img = imgVersion(p.thumb || p.image || 'assets/images/products/placeholder.svg');
       cls += ' has-prod';
       dataAttr = ' data-del-open="' + Utils.esc(p.id) + '"';
-      inner = '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">';
+      inner = '<img class="delivery-item-img" src="' + Utils.esc(img) + '" alt="' + txt + '" loading="lazy">';
     } else {
       // Товара ещё нет в каталоге — «часики»: фото появится после парсинга
       inner = '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
@@ -324,7 +372,7 @@
               var unit = Number(i.price) || 0;
               var subtotal = unit ? (unit * (Number(i.qty) || 1)) : 0;
               return '<div class="order-receipt-row">' +
-                (img ? '<img class="order-receipt-img" src="' + esc(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' : '<span class="order-receipt-img delivery-item-clock">' + icon('clock', 18) + '</span>') +
+                (img ? '<img class="order-receipt-img" src="' + esc(img) + '" alt="" loading="lazy">' : '<span class="order-receipt-img delivery-item-clock">' + icon('clock', 18) + '</span>') +
                 '<span class="order-receipt-name" title="' + esc(name) + '">' + esc(name) + '</span>' +
                 '<span class="order-receipt-qty">× ' + esc(i.qty) + '</span>' +
                 (unit ? '<span class="order-receipt-sum">' + fmtPrice(subtotal) + '</span>' : '') +
@@ -488,7 +536,30 @@
   });
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') {
+      // Escape не закрывает окно, если открыт чат Исы (у него свой ввод)
+      if (window.__aiChatOpen && window.__aiChatOpen()) return;
+      closeModal();
+      return;
+    }
+    // Ловушка фокуса: Tab не должен уводить за пределы открытого окна
+    if (e.key === 'Tab' && isModalOpen()) {
+      var modalEl = overlay.querySelector('.modal');
+      if (!modalEl) return;
+      var focusables = modalEl.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      if (!focusables.length) return;
+      var list = Array.prototype.slice.call(focusables).filter(function (el) { return el.offsetParent !== null || el === document.activeElement; });
+      if (!list.length) return;
+      var firstEl = list[0];
+      var lastEl = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    }
   });
 
   async function loadStore() {
@@ -500,7 +571,9 @@
   }
 
   function bindStore(s) {
-    document.title = 'Сервис-центры Greenleaf — каталог продукции и эко-товаров';
+    // Заголовок страницы задаётся разметкой: раньше здесь он перебивался
+    // на всех страницах, и поисковик видел одинаковый title у каталога,
+    // корзины и подписки.
 
     var waButtons = document.querySelectorAll('#waHero, #waContacts, #waFooter, #waHeader');
     waButtons.forEach(function (b) {
@@ -681,6 +754,11 @@
     clientToken: clientToken,
     openMyOrdersModal: openMyOrdersModal,
     getStore: function () { return store; },
+    // Выбранный Сервис-Центр (единый источник для каталога, корзины и чата):
+    // раньше ключ greenleaf_sc_selected_v1 только читался, но не писался —
+    // остаток в корзине и в чате не ограничивал количество.
+    getStoreId: getStoreId,
+    setStoreId: setStoreId,
     waLink: waLink,
     icon: icon,
     iconX: iconX,

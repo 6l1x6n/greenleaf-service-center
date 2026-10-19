@@ -37,7 +37,7 @@
       '</select>' +
       '<textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>' +
       '<input class="hp" name="company" tabindex="-1" autocomplete="off">' +
-      '<label class="form-consent"><input type="checkbox" checked>' +
+      '<label class="form-consent"><input type="checkbox" name="consent" value="1" required>' +
       '<span>Нажимая на кнопку «Отправить», Вы соглашаетесь с обработкой Ваших персональных данных в соответствии с нашей Политикой конфиденциальности</span></label>' +
       '<button class="btn btn-primary btn-lg" type="submit">Отправить</button>' +
       '<p class="form-success">Заявка отправлена! Свяжемся с вами в ближайшее время.</p>' +

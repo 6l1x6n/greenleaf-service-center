@@ -46,6 +46,10 @@
 
   function selectedStore() {
     try {
+      if (window.Utils && typeof Utils.getStoreId === 'function') {
+        var id = Utils.getStoreId();
+        if (id) return { id: String(id), name: '' };
+      }
       var s = JSON.parse(localStorage.getItem('greenleaf_sc_selected_v1') || 'null');
       if (s && s.id) return { id: String(s.id), name: String(s.name || '') };
     } catch (e) { }
@@ -539,7 +543,7 @@
         : '<span class="ai-prod-stock na">Наличие уточняйте</span>';
     return '<div class="ai-prod" data-ai-detail="' + esc(p.id) + '" tabindex="0" role="button" title="Нажмите, чтобы открыть подробности">' +
       '<span class="ai-prod-media">' +
-      '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=\'assets/images/products/placeholder.svg\'">' +
+      '<img src="' + esc(imgUrl(p.image)) + '" alt="" loading="lazy">' +
       '</span>' +
       '<div class="ai-prod-info">' +
       '<div class="ai-prod-name" title="' + esc(p.name) + '">' + esc(p.name) + '</div>' +

@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <title>Аутентификация — Сервис-центр Greenleaf</title>
   <meta name="description" content="Вход в кабинет Сервис-Центра Greenleaf: остатки, заказы, поставки и каталог.">
   <link rel="icon" type="image/png" sizes="64x64" href="assets/images/favicon.png?v=20260822">
@@ -22,7 +23,7 @@
   <meta property="og:image:alt" content="Greenleaf — Сервис-центр">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://mygreenleaf.postalarchive.workers.dev/assets/images/logo.png">
-  <link rel="stylesheet" href="css/style.css?v=20261019b">
+  <link rel="stylesheet" href="css/style.css?v=20261019c">
 </head>
 
 <body>
@@ -149,13 +150,13 @@
     </div>
   </div>
 
-  <div class="toast hidden" id="toast"></div>
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="js/ui.js?v=20261018e"></script>
+  <script src="js/ui.js?v=20261019c"></script>
   <script src="js/cities.js"></script>
-  <script src="js/auth.js?v=20260924a"></script>
+  <script src="js/auth.js?v=20261019c"></script>
   <script src="js/partners.js"></script>
-  <script src="js/admin.js?v=20261019b"></script>
+  <script src="js/admin.js?v=20261019c"></script>
 </body>
 
 </html>

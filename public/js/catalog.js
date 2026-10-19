@@ -11,6 +11,13 @@
   var ORDER = { in_stock: 0, low: 1, expected: 2, out: 3 };
 
   var products = [];
+  // Индекс товаров по id (заполняется при загрузке каталога)
+  var productsById = new Map();
+
+  function productById(id) {
+    if (!id) return null;
+    return productsById.get(String(id)) || null;
+  }
   var stores = [];
   var categories = [];
   // Один магазин на сайт: selectedStoreId — единственный СЦ (или 'all',
@@ -158,6 +165,24 @@
     return { price: price, discount: discount };
   }
 
+  // Единая цена для каталога, карточки товара и корзины.
+  // Раньше каталог показывал только розничную цену, а корзина и сервер
+  // считали скидочную — клиент видел одну сумму, а с него брали другую.
+  function priceBlock(p) {
+    var prices = effectivePrices(p);
+    var price = Number(prices.price) || 0;
+    var discount = Number(prices.discount) || 0;
+    if (price <= 0) return '<span class="price-ask">Цена по запросу</span>';
+    // Скидка показывается только когда она и применяется к заказу
+    // (переключатель «показывать скидочные цены» в настройках сайта)
+    var showDiscount = siteSettings.showDiscountPrices !== false;
+    if (showDiscount && discount > 0 && discount < price) {
+      return '<span class="price-old">' + Utils.fmtPrice(price) + '</span>' +
+        '<span class="price-now">' + Utils.fmtPrice(discount) + '</span>';
+    }
+    return '<span class="price-now">' + Utils.fmtPrice(price) + '</span>';
+  }
+
   function scAppliedTo(storeId) {
     var o = scOverrides[storeId];
     return !!(o && Object.keys(o).length);
@@ -213,7 +238,22 @@
       }
       return img;
     }
+    // Лёгкое превью: парсер кладёт рядом <артикул>_card.webp (600px).
+    // Без него грузился полный файл — до 18 МБ на карточку, страница
+    // каталога тянула ~35 МБ картинок.
+    var thumb = thumbUrl(img);
+    if (thumb) return Utils.img(thumb);
     return Utils.img(img);
+  }
+
+  // Превью рядом с оригиналом: assets/images/products/ABC123.png → ABC123_card.webp
+  function thumbUrl(img) {
+    var path = String(img || '');
+    var dot = path.lastIndexOf('.');
+    if (dot <= 0) return '';
+    var base = path.slice(0, dot);
+    if (/_card$/.test(base)) return '';
+    return base + '_card.webp';
   }
 
   // Метка наличия — одна строка, но она есть всегда: «В наличии», «Под заказ»
@@ -241,19 +281,15 @@
     var st = statusInfo(p);
     var img = p.thumb || imgUrl(p);
 
-    // Одна розничная цена для всех. Партнёрские цены и «−50%» показываем только
-    // на странице «Подписка»; PV-баллы — в карточке, как просил владелец.
-    // Карточки портала без цены — «Цена по запросу»
-    var prices = effectivePrices(p);
-    var priceHtml = (prices.price > 0)
-      ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
-      : '<span class="price-ask">Цена по запросу</span>';
+    // Одна цена для всех: розничная или со скидкой (скидка показывается
+    // зачёркнутой старой ценой — так же, как считает корзина и сервер).
+    var priceHtml = priceBlock(p);
 
     return '' +
       '<article class="product-row" data-product-id="' + Utils.esc(p.id) + '" data-cart-qty="' + cartQtyOf(p.id) + '" tabindex="0">' +
       '<div class="row-media zoom-zone" data-zoom="2.4" data-lens="150">' +
       priorityBadge(p) +
-      '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+      '<img src="' + Utils.esc(img) + '" alt="' + Utils.esc(p.name) + '" loading="lazy">' +
       Utils.lensHtml() +
       '</div>' +
       '<div class="row-body">' +
@@ -296,6 +332,10 @@
     var withStock = stores.filter(function (s) { return s && s.id && StoreStock.hasData(s.id); });
     var live = withStock.length ? withStock : stores.filter(function (s) { return s && s.id; });
     state.selectedStoreId = live.length ? live[0].id : 'all';
+    // Сохраняем выбор: по нему корзина и чат ограничивают количество остатком
+    if (live.length && window.Utils && typeof Utils.setStoreId === 'function') {
+      Utils.setStoreId(live[0].id, live[0].name);
+    }
   }
 
   // ---------------- Контакты следуют за выбранным СЦ ----------------
@@ -364,10 +404,7 @@
   function openProductDetailModal(p) {
     Utils.track('card_open', { id: p.id, sku: p.sku });
     var st = statusInfo(p);
-    var prices = effectivePrices(p);
-    var priceHtml = (prices.price > 0)
-      ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
-      : '<span class="price-ask">Цена по запросу</span>';
+    var priceHtml = priceBlock(p);
     var pill = cardStatusPill(p, st);
     var desc = (p.description || '').trim();
 
@@ -375,7 +412,7 @@
       '<div class="modal-product-detail">' +
       '<div class="product-detail-grid">' +
       '<div class="product-detail-media zoom-zone" data-zoom="1.8" data-lens="180">' +
-      '<img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' +
+      '<img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '">' +
       Utils.lensHtml() +
       '</div>' +
       '<div class="product-detail-body">' +
@@ -423,10 +460,12 @@
 
   // Сколько карточек показать на главной: ровно три полных ряда под текущее
   // число колонок (3 на широком экране, 2 на планшете, 1 на телефоне), чтобы
-  // внизу не оставалась одна карточка в неполном ряду.
+  // внизу не оставалась одна карточка в неполном ряду. Пороги — как в CSS
+  // (768px и 1100px), иначе на 1050–1099px показывалось 3 карточки в ряд
+  // там, где вёрстка даёт 2.
   function homeLimit() {
     var w = (grid && grid.clientWidth) || 1120;
-    var cols = (w >= 1050) ? 3 : (w >= 720 ? 2 : 1);
+    var cols = (w >= 1100) ? 3 : (w >= 768 ? 2 : 1);
     return cols === 1 ? 6 : cols * HOME_ROWS;
   }
 
@@ -695,10 +734,14 @@
     });
   }
 
+  // Поиск с задержкой: раньше на каждый ввод пересобиралась вся выдача
+  // (фильтр по 5+ тыс. товаров + перерисовка сотни карточек).
+  var searchTimer = null;
   search.addEventListener('input', function () {
     state.query = search.value;
     state.page = 0;
-    render();
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () { render(); }, 220);
   });
 
   ['catalogPager', 'catalogPagerTop'].forEach(function (id) {
@@ -749,12 +792,17 @@
   // корзина живёт в localStorage.
   Cart.onChange(function () {
     Cart.updateBadge();
+    // Один снимок корзины и индекс товаров: раньше на каждую строку шло
+    // чтение localStorage и линейный поиск по 5+ тыс. товаров
+    var cartSnapshot = Cart.get();
+    var cartQty = Object.create(null);
+    cartSnapshot.forEach(function (i) { cartQty[i.id] = Number(i.qty) || 0; });
     grid.querySelectorAll('.product-row').forEach(function (row) {
       var id = row.getAttribute('data-product-id');
-      var qty = cartQtyOf(id);
+      var qty = cartQty[id] || 0;
       if (row.getAttribute('data-cart-qty') === String(qty)) return;
       row.setAttribute('data-cart-qty', String(qty));
-      var p = products.find(function (x) { return x.id === id; });
+      var p = productById(id);
       if (!p) return;
       var actions = row.querySelector('.row-actions');
       if (actions) {
@@ -764,10 +812,10 @@
     // Степпер в открытой модалке товара — туда же
     document.querySelectorAll('[data-modal-cart]').forEach(function (box) {
       var id = box.getAttribute('data-modal-cart');
-      var qty = cartQtyOf(id);
+      var qty = cartQty[id] || 0;
       if (box.getAttribute('data-cart-qty') === String(qty)) return;
       box.setAttribute('data-cart-qty', String(qty));
-      var mp = products.find(function (x) { return x.id === id; });
+      var mp = productById(id);
       if (mp) box.innerHTML = rowCartControl(mp);
     });
   });
@@ -1053,7 +1101,7 @@
     }
     var rows = dsplitItems.map(function (l, i) {
       var media = l.p
-        ? '<img class="delivery-item-img" src="' + Utils.esc(Utils.img(l.p.thumb || l.p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy" onerror="this.src=\'assets/images/products/placeholder.svg\'">'
+        ? '<img class="delivery-item-img" src="' + Utils.esc(Utils.img(l.p.thumb || l.p.image || 'assets/images/products/placeholder.svg')) + '" alt="' + Utils.esc(l.label) + '" loading="lazy">'
         : '<span class="delivery-item-img delivery-item-clock" title="Фото появится, когда товар попадёт в каталог">⏳</span>';
       return '<div class="delivery-detail-item dsplit-row" data-dsplit-prod="' + i + '" style="cursor:pointer;" title="Показать детали товара">' +
         media +
@@ -1115,11 +1163,8 @@
         '<p class="modal-product">Товар ещё не в каталоге — фото и цена появятся после парсинга.</p>';
     } else {
       var p = it.p;
-      var prices = effectivePrices(p);
       var st = statusInfo(p);
-      var priceHtml = (prices.price > 0)
-        ? '<span class="price-now">' + Utils.fmtPrice(prices.price) + '</span>'
-        : '<span class="price-ask">Цена по запросу</span>';
+      var priceHtml = priceBlock(p);
       var stockLine = '';
       if (state.selectedStoreId && state.selectedStoreId !== 'all') {
         var txt = StoreStock.statusText ? StoreStock.statusText(state.selectedStoreId, p.id) : StoreStock.text(state.selectedStoreId, p.id);
@@ -1140,7 +1185,7 @@
         buyHtml = '<div class="dsplit-buy"><button class="btn btn-primary btn-sm is-disabled" style="flex:1;" data-dsplit-noavail="1" title="Товара нет в наличии">🛒 В корзину</button></div>';
       }
       body.innerHTML =
-        '<div class="dsplit-media zoom-zone" data-zoom="1.8" data-lens="180"><img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '" onerror="this.src=\'assets/images/products/placeholder.svg\'">' + Utils.lensHtml() + '</div>' +
+        '<div class="dsplit-media zoom-zone" data-zoom="1.8" data-lens="180"><img src="' + Utils.esc(imgUrl(p)) + '" alt="' + Utils.esc(p.name) + '">' + Utils.lensHtml() + '</div>' +
         '<span class="card-cat">' + Utils.esc(p.category) + '</span>' +
         '<h4 class="dsplit-name">' + Utils.esc(p.name) + '</h4>' +
         '<span class="product-detail-sku">Артикул: ' + Utils.esc(p.sku) + '</span>' +
@@ -1379,6 +1424,13 @@ fetch('/api/event-bookings')
   }
 
   async function init() {
+    // Карта: раньше класс is-loaded ставил inline onload, который блокирует
+    // строгий CSP. Теперь — обычный слушатель загрузки.
+    var mapEl = document.getElementById('map');
+    if (mapEl) {
+      mapEl.addEventListener('load', function () { mapEl.classList.add('is-loaded'); });
+      setTimeout(function () { mapEl.classList.add('is-loaded'); }, 2500);
+    }
     try {
       var storesRes = await fetch('data/stores.json');
       stores = await storesRes.json();
@@ -1417,6 +1469,10 @@ fetch('/api/event-bookings')
       var res = await fetch('data/products.json');
       var data = await res.json();
       products = data.products || [];
+      // Индекс товаров по id: поиск по массиву 5+ тыс. элементов на каждый
+      // клик «В корзину» больше не нужен
+      productsById = new Map();
+      products.forEach(function (p) { if (p && p.id) productsById.set(String(p.id), p); });
       // Версия каталога для URL картинок (?v=) — кэш браузера/edge сбрасывается
       // при каждом обновлении каталога, а не раз в неделю (immutable)
       window.SITE_VER = data.updated || '';

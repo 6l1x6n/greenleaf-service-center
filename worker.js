@@ -62,8 +62,42 @@ function normalizePartnerId(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function isPartnerId(value) {
+// Формат партнёрского ID (kz + 8 цифр). Право на партнёрскую цену даёт не формат,
+// а вхождение в белый список ID (секрет PARTNER_IDS / KV partners /
+// site_settings.partnerIds) — иначе любой посетитель получил бы −50 %
+// просто вписав чужой номер в корзине.
+function isPartnerIdFormat(value) {
   return /^kz\d{8}$/i.test(normalizePartnerId(value));
+}
+
+// Белый список партнёров. Если список пуст — партнёрская цена не начисляется
+// (fail-closed): партнёра добавляет владелец в кабинете или секретом Worker.
+async function allowedPartnerIds(env) {
+  const ids = new Set();
+  const add = function (value) {
+    const id = normalizePartnerId(value);
+    if (isPartnerIdFormat(id)) ids.add(id);
+  };
+  try {
+    String(env.PARTNER_IDS || '').split(/[,\s]+/).forEach(add);
+  } catch (e) { /* секрет не задан */ }
+  try {
+    const kv = await kvGet(env, 'partners');
+    if (kv && typeof kv === 'object') {
+      Object.keys(kv).forEach(function (key) {
+        if (key === 'ids') return;
+        add(key);
+      });
+      if (Array.isArray(kv.ids)) kv.ids.forEach(add);
+    }
+  } catch (e) { /* ключа нет */ }
+  try {
+    const settings = await kvGet(env, 'site_settings');
+    const list = settings && settings.partnerIds;
+    if (Array.isArray(list)) list.forEach(add);
+    else String(list || '').split(/[,\s]+/).forEach(add);
+  } catch (e) { /* настроек нет */ }
+  return ids;
 }
 
 function hasOwn(object, key) {
@@ -167,7 +201,50 @@ function isBotRequest(request) {
   return BOT_UA_RE.test(ua);
 }
 
-function jsonResponse(obj, status, cacheSeconds) {
+// ---------------- Лимиты публичных операций ----------------
+// Счётчики живут в памяти изолята и НЕ пишутся в KV: на Free-плане лимит
+// 1000 записей в сутки, и каждый счётчик съедал бы квоту. Для точного
+// глобального лимита нужен Durable Object; против флуда одного клиента
+// (и против перебора пароля) этого достаточно.
+const RATE_BUCKETS = new Map();
+
+function rateLimit(key, limit, windowMs) {
+  const now = Date.now();
+  let bucket = RATE_BUCKETS.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    bucket = { count: 0, resetAt: now + windowMs };
+    RATE_BUCKETS.set(key, bucket);
+  }
+  bucket.count += 1;
+  if (RATE_BUCKETS.size > 4000) {
+    RATE_BUCKETS.forEach(function (b, k) { if (b.resetAt <= now) RATE_BUCKETS.delete(k); });
+  }
+  return { limited: bucket.count > limit, count: bucket.count, resetAt: bucket.resetAt };
+}
+
+function clientIp(request) {
+  return String(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '').split(',')[0].trim().slice(0, 64) || 'unknown';
+}
+
+// Сравнение строк без раннего выхода (пароли, токены)
+function safeEqual(a, b) {
+  const x = String(a == null ? '' : a);
+  const y = String(b == null ? '' : b);
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0;
+}
+
+// Ответ «слишком много запросов» с Retry-After
+function tooMany(env, request, key, limit, windowMs) {
+  const res = rateLimit(key, limit, windowMs);
+  if (!res.limited) return null;
+  const retryAfter = Math.max(1, Math.ceil((res.resetAt - Date.now()) / 1000));
+  return jsonResponse({ ok: false, error: 'rate_limited', message: 'Слишком много запросов. Попробуйте позже.' }, 429, 0, retryAfter);
+}
+
+function jsonResponse(obj, status, cacheSeconds, retryAfter) {
   const headers = { 'Content-Type': 'application/json' };
   // Workers Cache (wrangler.jsonc: "cache": { "enabled": true }):
   // публичным GET задаём явный max-age + stale-while-revalidate на edge,
@@ -181,6 +258,10 @@ function jsonResponse(obj, status, cacheSeconds) {
   // Маркер нового билда: scripts/verify.sh и deploy.sh проверяют его,
   // чтобы вовремя заметить деплой из устаревшей рабочей копии
   headers['x-greenleaf-build'] = 'v2';
+  if (retryAfter) headers['Retry-After'] = String(retryAfter);
+  // Базовые заголовки безопасности и для ответов API
+  headers['X-Content-Type-Options'] = 'nosniff';
+  headers['Referrer-Policy'] = 'strict-origin-when-cross-origin';
   return new Response(JSON.stringify(obj), {
     status: status || 200,
     headers
@@ -237,7 +318,13 @@ async function encryptSecret(env, plain) {
 
 async function decryptSecret(env, value) {
   const v = String(value == null ? '' : value);
-  if (!v.startsWith(ENC_PREFIX) || !env.DATA_ENC_KEY) return v;
+  if (!v.startsWith(ENC_PREFIX)) return v;   // старое значение в открытом виде
+  if (!env.DATA_ENC_KEY) {
+    // Ключа нет — расшифровать нечем. Возвращаем null (не «пустой пароль»),
+    // иначе неудачная расшифровка превращалась бы в вход без пароля.
+    console.error('decryptSecret: не задан Worker-секрет DATA_ENC_KEY');
+    return null;
+  }
   try {
     const rest = v.slice(ENC_PREFIX.length);
     const sep = rest.indexOf(':');
@@ -250,7 +337,7 @@ async function decryptSecret(env, value) {
     return new TextDecoder().decode(pt);
   } catch (e) {
     console.error('decryptSecret error:', e);
-    return '';
+    return null;   // сбой расшифровки — это не «пароль пустой»
   }
 }
 
@@ -261,7 +348,11 @@ const RESERVE_TTL_MS = 600 * 1000; // 10 минут
 
 function parseStockCount(text) {
   const t = String(text || '').trim();
-  if (!t || t.indexOf('Ожидается') !== -1) return null;
+  if (!t) return null;                       // нет данных — остаток неизвестен
+  // Парсер пишет «Ожидается», когда товара нет (qty = 0) — это 0 шт, а не «неизвестно».
+  // Раньше здесь был null, и проверка лимита при резерве пропускалась целиком:
+  // товар с нулевым остатком можно было заказать в любом количестве.
+  if (t.indexOf('Ожидается') !== -1) return 0;
   if (t.toLowerCase().indexOf('нет') === 0) return 0;
   const m = t.match(/(\d+)\s*шт/);
   return m ? parseInt(m[1], 10) : null;
@@ -329,6 +420,16 @@ async function loadRawBaseStock(env, url) {
   }
 }
 
+// Есть ли у товара факт парсера (запись с числом). «Ожидается» парсер пишет при
+// qty = 0 — это не факт: для таких товаров ручное число хранится абсолютным
+// значением (stock_edits), а не дельтой к факту.
+function hasStockFact(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (t.indexOf('Ожидается') !== -1) return false;
+  return parseStockCount(t) !== null;
+}
+
 // Суперадмин/СЦ: сохранение ручных остатков (KV) — сайт обновляется сразу.
 // Если у товара есть факт парсера — сохраняется постоянная дельта (N − факт),
 // иначе — абсолютное значение (как раньше, в stock_edits).
@@ -341,48 +442,62 @@ async function handleStockSave(env, url, body) {
   if (!scId || !items) return jsonResponse({ ok: false, error: 'scId и items обязательны' }, 400);
   const rawStock = await loadRawBaseStock(env, url);
   const rawSc = (rawStock && rawStock[scId]) || {};
-  const deltas = await kvGet(env, 'stock_deltas');
-  const edits = await kvGet(env, 'stock_edits');
+
+  // Правки считаем заранее, потом пишем через безопасную мутацию: два
+  // устройства, сохраняющие остатки одновременно, не затирают друг друга.
+  const deltaPlan = [];   // {pid, value|null}
+  const editPlan = [];    // {pid, value|null}
   Object.keys(items).forEach((pid) => {
     const v = String(items[pid] == null ? '' : items[pid]).trim();
     const target = parseStockCount(v); // null = очистить поправку
     const rawCount = parseStockCount(rawSc[pid]);
     // Товар с фактом парсера → постоянная дельта к факту
-    if (rawCount !== null) {
+    if (hasStockFact(rawSc[pid])) {
       const next = target === null ? 0 : (target - rawCount);
-      const set = (obj) => {
-        if (!obj[scId]) obj[scId] = {};
-        if (next === 0) {
-          delete obj[scId][pid];
-          if (!Object.keys(obj[scId]).length) delete obj[scId];
-        } else {
-          obj[scId][pid] = next;
-        }
-      };
-      set(deltas);
+      deltaPlan.push({ pid: pid, value: next === 0 ? null : next });
       // Старая абсолютная правка больше не нужна — переводим на дельту
-      if (edits[scId]) {
-        delete edits[scId][pid];
-        if (!Object.keys(edits[scId]).length) delete edits[scId];
-      }
+      editPlan.push({ pid: pid, value: null });
       return;
     }
     // Без факта парсера (в т.ч. запись «Ожидается») — абсолютное значение:
     // ручное число хранится как есть и не зависит от следующих синков парсера;
     // пустое поле снимает правку
-    if (!edits[scId]) edits[scId] = {};
-    if (v === '') delete edits[scId][pid];
-    else edits[scId][pid] = v;
+    editPlan.push({ pid: pid, value: v === '' ? null : v });
     // Старая дельта больше не нужна — снимаем, чтобы после сброса правки
     // не всплыло устаревшее значение
-    if (deltas[scId]) {
-      delete deltas[scId][pid];
-      if (!Object.keys(deltas[scId]).length) delete deltas[scId];
-    }
+    deltaPlan.push({ pid: pid, value: null });
   });
-  if (!Object.keys(edits[scId] || {}).length) delete edits[scId];
-  await kvPut(env, 'stock_deltas', deltas);
-  await kvPut(env, 'stock_edits', edits);
+
+  const applyPlan = function (draft, plan) {
+    plan.forEach(function (item) {
+      if (!draft[scId]) draft[scId] = {};
+      if (item.value === null || item.value === undefined) {
+        delete draft[scId][item.pid];
+      } else {
+        draft[scId][item.pid] = item.value;
+      }
+    });
+    if (!Object.keys(draft[scId] || {}).length) delete draft[scId];
+  };
+  const verifyPlan = function (map, plan) {
+    return plan.every(function (item) {
+      const bucket = map && map[scId];
+      const current = bucket ? bucket[item.pid] : undefined;
+      if (item.value === null || item.value === undefined) return current === undefined;
+      return Number(current) === Number(item.value) || String(current) === String(item.value);
+    });
+  };
+
+  await mutateKvMap(env, 'stock_deltas', function (draft) {
+    applyPlan(draft, deltaPlan);
+    return { verify: function (map) { return verifyPlan(map, deltaPlan); } };
+  });
+  await mutateKvMap(env, 'stock_edits', function (draft) {
+    applyPlan(draft, editPlan);
+    return { verify: function (map) { return verifyPlan(map, editPlan); } };
+  });
+
+  const deltas = await kvGet(env, 'stock_deltas');
   return jsonResponse({ ok: true, deltas: (deltas && deltas[scId]) || {} });
 }
 
@@ -559,6 +674,11 @@ function storeLocalNow() {
 }
 
 async function handleReserve(request, env, url) {
+  // 30 резервов за 10 минут с одного IP: холд держит товар 10 минут,
+  // без лимита анонимный клиент мог заблокировать весь склад филиала
+  const rl = tooMany(env, request, 'reserve:' + clientIp(request), 30, 10 * 60 * 1000);
+  if (rl) return rl;
+
   let data;
   try {
     data = await request.json();
@@ -574,11 +694,10 @@ async function handleReserve(request, env, url) {
   if (!isOrderId(orderId)) {
     return jsonResponse({ ok: false, error: 'Некорректный orderId' }, 400);
   }
+  // Список чужих броней клиент больше не присылает: исключается только своя
+  // бронь (orderId). Иначе знание чужих ID позволяло вычесть их из остатка
+  // и заказать больше, чем есть на складе.
   const excludeOrderIds = Object.create(null);
-  (Array.isArray(data.excludeOrderIds) ? data.excludeOrderIds.slice(0, 20) : []).forEach(function (value) {
-    const excludedId = normalizeOrderId(value);
-    if (isOrderId(excludedId) && excludedId !== orderId) excludeOrderIds[excludedId] = true;
-  });
   const itemMap = Object.create(null);
   for (const raw of rawItems) {
     const productId = String(raw && raw.productId || '');
@@ -617,7 +736,7 @@ async function handleReserve(request, env, url) {
   // Бронь доступна в любое время суток: ограничение по рабочим часам применяется
   // только к выбору времени получения (validatePickupSchedule при оформлении заказа).
   const ttl = RESERVE_TTL_MS;
-  const eff = await computeEffectiveStock(env, url, orderId, excludeOrderIds);
+  const eff = await computeEffectiveStock(env, url, orderId);
   const now = Date.now();
   let error = null;
   items.forEach((i) => {
@@ -657,6 +776,9 @@ async function handleReserve(request, env, url) {
 }
 
 async function handleReserveRelease(request, env) {
+  const rl = tooMany(env, request, 'reserve:' + clientIp(request), 30, 10 * 60 * 1000);
+  if (rl) return rl;
+
   let data;
   try {
     data = await request.json();
@@ -671,6 +793,10 @@ async function handleReserveRelease(request, env) {
 
 // Бронь места на мероприятие (единый счётчик в KV)
 async function handleEventBook(request, env) {
+  // 10 броней в час с одного IP — иначе счётчик мест накручивается флудом
+  const rl = tooMany(env, request, 'evbook:' + clientIp(request), 10, 60 * 60 * 1000);
+  if (rl) return rl;
+
   let body;
   try {
     body = await request.json();
@@ -680,10 +806,39 @@ async function handleEventBook(request, env) {
   const eventId = String(body.eventId || '').trim();
   if (!eventId) return jsonResponse({ ok: false, error: 'eventId required' }, 400);
   const qty = Math.max(1, Math.min(Number(body.qty) || 1, 10));
+
+  // Лимит мест: событие знает своё число мест (events.json + правки из KV)
+  const slots = await eventSlots(env, eventId);
   const bookings = await kvGet(env, 'event_bookings');
-  bookings[eventId] = (Number(bookings[eventId]) || 0) + qty;
+  const taken = Number(bookings[eventId]) || 0;
+  if (slots > 0 && taken + qty > slots) {
+    return jsonResponse({ ok: false, error: 'no slots', message: 'Свободных мест не осталось' }, 409);
+  }
+
+  bookings[eventId] = taken + qty;
+  // Кап на размер карты: иначе флуд раздувает ключ до лимита KV (25 МБ)
+  const ids = Object.keys(bookings);
+  if (ids.length > 500) {
+    ids.sort(function (a, b) { return Number(bookings[a]) - Number(bookings[b]); });
+    ids.slice(0, ids.length - 500).forEach(function (id) { delete bookings[id]; });
+  }
   await kvPut(env, 'event_bookings', bookings);
   return jsonResponse({ ok: true, booked: bookings[eventId] });
+}
+
+// Сколько мест у мероприятия (0 — лимит не задан)
+async function eventSlots(env, eventId) {
+  try {
+    const res = await env.ASSETS.fetch(new URL('/data/events.json', new URL('https://gl.local')));
+    if (!res.ok) return 0;
+    const d = await res.json();
+    const list = (d && d.events) || (Array.isArray(d) ? d : []);
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (e && String(e.id) === String(eventId)) return Number(e.slots || e.maxSlots || e.places || 0) || 0;
+    }
+  } catch (e) { /* статика недоступна — лимита не знаем */ }
+  return 0;
 }
 
 // Мероприятия: статика events.json + правки суперадмина (KV events) + правки СЦ (KV sc_events)
@@ -835,6 +990,35 @@ async function loadOrders(env) {
   return kvGet(env, 'orders');
 }
 
+// Безопасная мутация карты в KV (заказы, архив заказов).
+// В KV нет транзакций, а все заказы лежат в одном ключе: схема
+// «прочитал → изменил → записал» теряет чужие изменения (созданный
+// параллельно заказ исчезал). Поэтому после записи ключ перечитывается и
+// проверяется, что наша запись на месте; если её затёрли — мутация повторяется
+// на свежем снимке.
+async function mutateKvMap(env, key, mutator) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const snapshot = await kvGet(env, key);
+    const draft = JSON.parse(JSON.stringify(snapshot || {}));
+    const check = mutator(draft) || {};
+    if (check.noop) return { orders: draft, changed: false };
+    await kvPut(env, key, draft);
+    if (!check.verify) return { orders: draft, changed: true };
+    const after = await kvGet(env, key);
+    if (check.verify(after)) return { orders: after, changed: true };
+    await new Promise(function (r) { setTimeout(r, 30 * (attempt + 1)); });
+  }
+  return { orders: await kvGet(env, key), changed: true };
+}
+
+function mutateOrders(env, mutator) {
+  return mutateKvMap(env, 'orders', mutator);
+}
+
+function mutateHistory(env, mutator) {
+  return mutateKvMap(env, 'orders_history', mutator);
+}
+
 // Свой филиал Сервис-Центра: токен сессии несёт login, а не id —
 // ищем карточку по логину кабинета (authLogin)
 async function scOwnStoreId(env, auth) {
@@ -863,33 +1047,58 @@ async function archiveConfirmedOrders(env, url) {
   const base = await loadBaseStock(env, url);
   const baseUpdatedMs = base.updated ? new Date(base.updated).getTime() : 0;
   const orders = await loadOrders(env);
-  let changed = false;
   const history = await kvGet(env, 'orders_history');
+  const archivedAt = new Date().toISOString();
+  // Кого переносим в архив
+  const moving = [];
   Object.keys(orders).forEach((oid) => {
     const o = orders[oid];
     if (!o) return;
     if (o.status === 'confirmed' && baseUpdatedMs) {
       const confirmedMs = o.confirmedAt ? new Date(o.confirmedAt).getTime() : 0;
       if (confirmedMs && baseUpdatedMs > confirmedMs) {
-        o.archivedAt = new Date().toISOString();
-        history[oid] = o;
-        delete orders[oid];
-        changed = true;
-      }
-    } else if (o.status === 'cancelled' && o.cancelledAt) {
-      const cancelledMs = new Date(o.cancelledAt).getTime();
-      if (!isNaN(cancelledMs) && Date.now() - cancelledMs > CANCELLED_RETENTION_MS) {
-        o.archivedAt = new Date().toISOString();
-        history[oid] = o;
-        delete orders[oid];
-        changed = true;
+        moving.push(oid);
+        return;
       }
     }
+    if (o.status === 'cancelled' && o.cancelledAt) {
+      const cancelledMs = new Date(o.cancelledAt).getTime();
+      if (!isNaN(cancelledMs) && Date.now() - cancelledMs > CANCELLED_RETENTION_MS) moving.push(oid);
+    }
   });
-  if (changed) {
-    await kvPut(env, 'orders', orders);
-    await kvPut(env, 'orders_history', history);
-  }
+  if (!moving.length) return;
+
+  // 1. Пишем в архив (через безопасную мутацию — чужие изменения не теряются)
+  await mutateHistory(env, function (draft) {
+    let changed = false;
+    moving.forEach(function (oid) {
+      const o = orders[oid];
+      if (!o) return;
+      const copy = Object.assign({}, o, { archivedAt: archivedAt });
+      draft[oid] = copy;
+      changed = true;
+    });
+    return {
+      verify: function (map) {
+        return moving.every(function (oid) { return !!(map && map[oid]); });
+      },
+      noop: !changed
+    };
+  });
+
+  // 2. Убираем из активных
+  await mutateOrders(env, function (draft) {
+    let changed = false;
+    moving.forEach(function (oid) {
+      if (draft[oid]) { delete draft[oid]; changed = true; }
+    });
+    return {
+      verify: function (map) {
+        return moving.every(function (oid) { return !(map && map[oid]); });
+      },
+      noop: !changed
+    };
+  });
 }
 
 // Последовательный номер заказа (#10001, #10002, …) — красивый номер для клиента;
@@ -921,10 +1130,11 @@ async function loadOrderCatalog(env, url) {
   } catch (e) {
     return null;
   }
-  const [overrides, scOverrides, custom] = await Promise.all([
+  const [overrides, scOverrides, custom, settings] = await Promise.all([
     kvGet(env, 'product_overrides'),
     kvGet(env, 'sc_product_overrides'),
-    kvGet(env, 'custom_products')
+    kvGet(env, 'custom_products'),
+    kvGet(env, 'site_settings')
   ]);
   const products = Object.create(null);
   (Array.isArray(data.products) ? data.products : []).forEach(function (p) {
@@ -934,7 +1144,15 @@ async function loadOrderCatalog(env, url) {
     const p = custom[id];
     if (p && p.id) products[String(p.id)] = p;
   });
-  const catalog = { products, overrides, scOverrides };
+  const catalog = {
+    products,
+    overrides,
+    scOverrides,
+    // Показывать скидочные цены — общий переключатель витрины. Если он выключен,
+    // скидка не показывается И не применяется к заказу (иначе клиент видит одну
+    // цену, а с него берут другую).
+    showDiscountPrices: !settings || settings.showDiscountPrices !== false
+  };
   orderCatalogCache = { catalog: catalog, expiresAt: Date.now() + 30000 };
   return catalog;
 }
@@ -951,7 +1169,7 @@ function orderProductPrice(catalog, storeId, productId, partnerMode) {
     return basePrice > 0 ? Math.round(basePrice / 2) : 0;
   }
   const discount = Number(local.discount_price != null ? local.discount_price : (global.discount_price != null ? global.discount_price : product.discount_price));
-  if (discount > 0 && discount < basePrice) return discount;
+  if (catalog.showDiscountPrices !== false && discount > 0 && discount < basePrice) return discount;
   return basePrice;
 }
 
@@ -1049,7 +1267,9 @@ async function createOrder(env, data, url, reservation, store) {
   }
   const paymentCode = paymentCodeFromData(data);
   const submittedPartnerId = normalizePartnerId(data.partner_id || data.partnerId);
-  const partnerMode = isPartnerId(submittedPartnerId);
+  // Партнёрская цена — только для ID из белого списка (см. allowedPartnerIds)
+  const partnerAllowed = await allowedPartnerIds(env);
+  const partnerMode = partnerAllowed.has(submittedPartnerId);
   const partnerId = partnerMode ? submittedPartnerId : '';
   const priced = reservationOrderTotals(res, partnerMode) || await authoritativeOrderTotals(env, url, res.storeId, items, partnerMode);
   if (!priced) {
@@ -1079,9 +1299,12 @@ async function createOrder(env, data, url, reservation, store) {
     status: 'new',
     createdAt: new Date().toISOString()
   };
-  const orders = await loadOrders(env);
-  orders[orderId] = order;
-  await kvPut(env, 'orders', orders);
+  // Заказ пишем через безопасную мутацию: параллельный запрос клиента не
+  // должен привести к потере этого заказа (и наоборот).
+  await mutateOrders(env, function (orders) {
+    orders[orderId] = order;
+    return { verify: function (map) { return !!(map && map[orderId]); } };
+  });
   await deleteReservation(env, orderId);
   console.log('Заказ создан:', orderId, 'СЦ', res.storeId, order.items.length, 'поз.');
   return order;
@@ -1153,48 +1376,67 @@ async function handleOrdersAction(request, env, auth) {
     if (order.status !== 'new') {
       return jsonResponse({ ok: false, error: 'Отметить «готов» можно только новый заказ' }, 400);
     }
-    order.status = 'ready';
-    order.readyAt = new Date().toISOString();
-    if (note) order.managerNote = note;
-    await kvPut(env, 'orders', orders);
-    return jsonResponse({ ok: true, order: publicOrder(order) });
+    const readyAt = new Date().toISOString();
+    const res = await mutateOrders(env, function (orders) {
+      const o = orders[id];
+      if (!o || o.status !== 'new') return { noop: true };
+      o.status = 'ready';
+      o.readyAt = readyAt;
+      if (note) o.managerNote = note;
+      return { verify: function (map) { return !!(map && map[id] && map[id].status === 'ready'); } };
+    });
+    await deleteReservation(env, id);
+    return jsonResponse({ ok: true, order: publicOrder(res.orders[id] || order) });
   }
 
   if (action === 'confirm') {
     if (order.status !== 'new' && order.status !== 'ready') {
       return jsonResponse({ ok: false, error: 'Подтвердить можно только новый или готовый заказ' }, 400);
     }
-    order.status = 'confirmed';
-    order.confirmedAt = new Date().toISOString();
-    if (note) order.managerNote = note;
-    await kvPut(env, 'orders', orders);
-    return jsonResponse({ ok: true, order: publicOrder(order) });
+    const confirmedAt = new Date().toISOString();
+    const res = await mutateOrders(env, function (orders) {
+      const o = orders[id];
+      if (!o || (o.status !== 'new' && o.status !== 'ready')) return { noop: true };
+      o.status = 'confirmed';
+      o.confirmedAt = confirmedAt;
+      if (note) o.managerNote = note;
+      return { verify: function (map) { return !!(map && map[id] && map[id].status === 'confirmed'); } };
+    });
+    return jsonResponse({ ok: true, order: publicOrder(res.orders[id] || order) });
   }
 
   if (action === 'cancel') {
     if (order.status !== 'new' && order.status !== 'ready') {
       return jsonResponse({ ok: false, error: 'Отменить можно только новый или готовый заказ' }, 400);
     }
-    order.status = 'cancelled';
-    order.cancelledAt = new Date().toISOString();
-    if (note) order.managerNote = note;
-    await kvPut(env, 'orders', orders);
+    const cancelledAt = new Date().toISOString();
+    const res = await mutateOrders(env, function (orders) {
+      const o = orders[id];
+      if (!o || (o.status !== 'new' && o.status !== 'ready')) return { noop: true };
+      o.status = 'cancelled';
+      o.cancelledAt = cancelledAt;
+      if (note) o.managerNote = note;
+      return { verify: function (map) { return !!(map && map[id] && map[id].status === 'cancelled'); } };
+    });
     await deleteReservation(env, id);
-    return jsonResponse({ ok: true, order: publicOrder(order) });
+    return jsonResponse({ ok: true, order: publicOrder(res.orders[id] || order) });
   }
 
   if (action === 'delete') {
     const wasNew = order.status === 'new' || order.status === 'ready';
-    delete orders[id];
-    await kvPut(env, 'orders', orders);
+    await mutateOrders(env, function (orders) {
+      if (!orders[id]) return { noop: true };
+      delete orders[id];
+      return { verify: function (map) { return !(map && map[id]); } };
+    });
     await deleteReservation(env, id);
     // Суперадмин может удалять и архивные заказы
     if (auth.role === 'superadmin') {
-      const history = await kvGet(env, 'orders_history');
-      if (history[id]) {
+      await mutateHistory(env, function (history) {
+        if (!history[id]) return { noop: true };
         delete history[id];
-        await kvPut(env, 'orders_history', history);
-      }
+        return { verify: function (map) { return !(map && map[id]); } };
+      });
     }
     // Удаление не меняет физический остаток: для new/ready резерв снимается (заказа больше
     // нет — товар снова доступен), для confirmed продажа остаётся продажей.
@@ -1215,7 +1457,15 @@ async function handleMyOrders(request, env) {
   if (!token || token.length < 16) {
     return jsonResponse({ ok: false, error: 'token required' }, 400);
   }
-  await archiveConfirmedOrders(env, url);
+  // 60 просмотров за 10 минут с IP: анонимный GET больше не пишет в KV
+  const rl = tooMany(env, request, 'myorders:' + clientIp(request), 60, 10 * 60 * 1000);
+  if (rl) return rl;
+
+  // Архивирование (перенос подтверждённых заказов из orders в orders_history)
+  // делает планировщик, а не этот запрос: раньше анонимный GET перезаписывал
+  // весь список заказов и мог затереть только что созданный заказ.
+  const base = await loadBaseStock(env, url);
+  const baseUpdatedMs = base.updated ? new Date(base.updated).getTime() : 0;
   const stores = await kvGet(env, 'stores');
   const active = await loadOrders(env);
   const history = await kvGet(env, 'orders_history');
@@ -1232,10 +1482,27 @@ async function handleMyOrders(request, env) {
       archived: !!archived
     }));
   };
-  Object.keys(active).forEach(function (id) { push(active[id], false); });
-  Object.keys(history).forEach(function (id) { push(history[id], true); });
+  const seen = Object.create(null);
+  // Сначала архив, потом активные: заказ, уже ушедший в архив, не дублируется
+  Object.keys(history).forEach(function (id) {
+    seen[id] = true;
+    push(history[id], true);
+  });
+  Object.keys(active).forEach(function (id) {
+    if (seen[id]) return;
+    const o = active[id];
+    // Заказ, который скоро уйдёт в архив, показываем уже архивным
+    push(o, isArchivableOrder(o, baseUpdatedMs));
+  });
   list.sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
   return jsonResponse({ ok: true, orders: list });
+}
+
+// Подтверждённый заказ, сделанный до последнего синка парсера, — в архиве
+function isArchivableOrder(o, baseUpdatedMs) {
+  if (!o || o.status !== 'confirmed' || !baseUpdatedMs) return false;
+  const confirmedMs = o.confirmedAt ? new Date(o.confirmedAt).getTime() : 0;
+  return !!confirmedMs && baseUpdatedMs > confirmedMs;
 }
 
 // POST /api/my-orders/action {id, token, action: 'cancel'} — отмена своего заказа
@@ -1260,12 +1527,17 @@ async function handleMyOrdersAction(request, env) {
     if (order.status !== 'new') {
       return jsonResponse({ ok: false, error: 'Отменить можно только заказ в статусе «Новый»' }, 400);
     }
-    order.status = 'cancelled';
-    order.cancelledAt = new Date().toISOString();
-    order.managerNote = order.managerNote || 'Отменён клиентом';
-    await kvPut(env, 'orders', orders);
+    const cancelledAt = new Date().toISOString();
+    const res = await mutateOrders(env, function (orders) {
+      const o = orders[id];
+      if (!o || o.status !== 'new') return { noop: true };
+      o.status = 'cancelled';
+      o.cancelledAt = cancelledAt;
+      o.managerNote = o.managerNote || 'Отменён клиентом';
+      return { verify: function (map) { return !!(map && map[id] && map[id].status === 'cancelled'); } };
+    });
     await deleteReservation(env, id);
-    return jsonResponse({ ok: true, order: publicOrder(order) });
+    return jsonResponse({ ok: true, order: publicOrder(res.orders[id] || order) });
   }
   return jsonResponse({ ok: false, error: 'unknown action' }, 400);
 }
@@ -1375,13 +1647,27 @@ async function handleStoreAuth(request, env) {
   }
   const login = String(body.login || '').trim().toLowerCase();
   const pass = String(body.password || '');
+
+  // Защита от перебора: 10 попыток за 15 минут на пару «IP + логин».
+  const rl = tooMany(env, request, 'auth:' + clientIp(request) + '|' + login, 10, 15 * 60 * 1000);
+  if (rl) return rl;
+
+  // Пустой пароль не проходит никогда: иначе сбой расшифровки (или пустое
+  // значение в конфиге) превращался бы в вход без пароля.
+  if (!login || !pass) {
+    return jsonResponse({ ok: false, error: 'invalid credentials' }, 401);
+  }
+
   let user = null;
 
   // 0. Суперадмин из KV admin_creds (пароль зашифрован в KV)
   const adminCreds = await kvGet(env, 'admin_creds');
   if (adminCreds && adminCreds.login && adminCreds.password &&
-      adminCreds.login === login && (await decryptSecret(env, adminCreds.password)) === pass) {
-    user = { id: 'admin', name: 'Суперадмин', role: 'superadmin' };
+      adminCreds.login === login) {
+    const expected = await decryptSecret(env, adminCreds.password);
+    if (expected !== null && safeEqual(expected, pass)) {
+      user = { id: 'admin', name: 'Суперадмин', role: 'superadmin' };
+    }
   }
 
   // 1. Статические учётки (суперадмин и пр.) из секрета STORE_CREDS
@@ -1395,7 +1681,7 @@ async function handleStoreAuth(request, env) {
         // (восстановление пароля без перезаписи read-only секрета)
         let expected = rec.password;
         if (rec.role === 'superadmin' && adminCreds && adminCreds.password) expected = await decryptSecret(env, adminCreds.password);
-        if (expected === pass) {
+        if (expected !== null && expected !== undefined && safeEqual(expected, pass)) {
           user = { id: rec.storeId || rec.id || login, name: rec.name || 'СЦ Greenleaf', role: rec.role || 'sc' };
         }
       }
@@ -1416,8 +1702,11 @@ async function handleStoreAuth(request, env) {
         if (s && String(s.authLogin || '').toLowerCase() === login) { rec = s; break; }
       }
     }
-    if (rec && rec.status === 'active' && (await decryptSecret(env, rec.authPassword)) === pass) {
-      user = { id: rec.id || login, name: rec.name || 'СЦ Greenleaf', role: 'sc' };
+    if (rec && rec.status === 'active') {
+      const expected = await decryptSecret(env, rec.authPassword);
+      if (expected !== null && safeEqual(expected, pass)) {
+        user = { id: rec.id || login, name: rec.name || 'СЦ Greenleaf', role: 'sc' };
+      }
     }
   }
 
@@ -1425,7 +1714,7 @@ async function handleStoreAuth(request, env) {
     const token = await issueToken(env, login, user.role);
     return jsonResponse({ ok: true, store: user, token, expiresAt: Math.floor(Date.now() / 1000) + TOKEN_TTL });
   }
-  return jsonResponse({ ok: false });
+  return jsonResponse({ ok: false, error: 'invalid credentials' }, 401);
 }
 
 // ---------------- Регистрация Сервис-Центра (публично) ----------------
@@ -1435,6 +1724,10 @@ function normalizeOfficeCode(code) {
 }
 
 async function handleRegisterSc(request, env) {
+  // Заявка на регистрацию СЦ — спам тоже бывает: 5 заявок в час с одного IP
+  const rl = tooMany(env, request, 'regsc:' + clientIp(request), 5, 60 * 60 * 1000);
+  if (rl) return rl;
+
   let data;
   try {
     data = await request.json();
@@ -1476,10 +1769,28 @@ async function handleRegisterSc(request, env) {
   };
   const apps = await kvGet(env, 'applications');
   apps[app.id] = app;
+  // Кап на размер: иначе флуд заявок съедает квоту KV (1000 записей/сутки)
+  const appIds = Object.keys(apps);
+  if (appIds.length > 300) {
+    appIds
+      .sort(function (a, b) { return String(apps[a].createdAt || '').localeCompare(String(apps[b].createdAt || '')); })
+      .slice(0, appIds.length - 300)
+      .forEach(function (id) { delete apps[id]; });
+  }
   await kvPut(env, 'applications', apps);
 
-  // Уведомление главному администратору
-  const text = buildText(Object.assign({ type: app.type }, data, { comment: app.comment, experience: app.experience }));
+  // Уведомление главному администратору. Собираем текст из очищенных полей:
+  // пароль кабинета СЦ в Telegram не попадает (он хранится в KV и виден
+  // суперадмину в кабинете).
+  const text = buildText({
+    type: 'sc_registration',
+    storeName: storeName,
+    email: String(data.email || '').trim(),
+    portalLogin: portalLogin,
+    city: city,
+    address: address,
+    comment: app.comment
+  });
   await sendTelegram(env, text);
 
   return jsonResponse({ ok: true, id: app.id });
@@ -1858,25 +2169,44 @@ async function handleStores(env) {
 
 // ---------------- Конфиг для парсера (по API-ключу) ----------------
 
-// Логин партнёра для каталога универсален для всех Сервис-Центров
-const PARTNER_LOGIN = 'kz44326234';
+// Логин партнёра для каталога универсален для всех Сервис-Центров.
+// Хранится в Worker-секрете PARTNER_LOGIN (или в site_settings.partnerLogin) —
+// в коде его быть не должно: из репозитория он был виден всем.
+async function partnerLogin(env) {
+  const fromSecret = String(env.PARTNER_LOGIN || '').trim();
+  if (fromSecret) return fromSecret;
+  try {
+    const settings = await kvGet(env, 'site_settings');
+    const fromSettings = String((settings && settings.partnerLogin) || '').trim();
+    if (fromSettings) return fromSettings;
+  } catch (e) { /* настроек нет */ }
+  return '';
+}
 
 async function handleParserConfig(request, env) {
   const url = new URL(request.url);
-  const key = request.headers.get('X-API-Key') || url.searchParams.get('key') || '';
-  if (!env.PARSER_API_KEY || key !== env.PARSER_API_KEY) {
+  const key = request.headers.get('X-API-Key') || '';
+  if (!env.PARSER_API_KEY || !safeEqual(String(key), String(env.PARSER_API_KEY))) {
     return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+  }
+  const partner = await partnerLogin(env);
+  if (!partner) {
+    return jsonResponse({ ok: false, error: 'partner_login_missing', message: 'Не задан PARTNER_LOGIN (секрет Worker или site_settings.partnerLogin)' }, 500);
   }
   const stores = await kvGet(env, 'stores');
   const list = [];
   for (const s of Object.values(stores)) {
     if (s.status !== 'active' || !s.portalLogin) continue;
+    const password = await decryptSecret(env, s.portalPassword || '');
+    if (password === null) {
+      return jsonResponse({ ok: false, error: 'decrypt_failed', message: 'Не удалось расшифровать пароль СЦ — проверьте DATA_ENC_KEY' }, 500);
+    }
     list.push({
       id: s.id,
       officeCode: s.officeCode || '',
       login: s.portalLogin,
-      password: await decryptSecret(env, s.portalPassword || ''),
-      partner: PARTNER_LOGIN
+      password: password,
+      partner: partner
     });
   }
   return jsonResponse({ ok: true, stores: list });
@@ -1899,7 +2229,9 @@ async function handleAdminProductsGet(env) {
     scOverrides,
     settings: {
       showDiscountPrices: settings.showDiscountPrices !== false,
-      categories: Array.isArray(settings.categories) ? settings.categories : []
+      categories: Array.isArray(settings.categories) ? settings.categories : [],
+      partnerIds: Array.isArray(settings.partnerIds) ? settings.partnerIds : [],
+      partnerLogin: String(settings.partnerLogin || '')
     }
   });
 }
@@ -2144,6 +2476,9 @@ async function handleAdminProducts(request, env) {
     if (typeof body.showDiscountPrices === 'boolean') settings.showDiscountPrices = body.showDiscountPrices;
     if (Array.isArray(body.categories)) settings.categories = body.categories;
     if (body.clearCategories === true) delete settings.categories;
+    // Партнёрские ID (право на партнёрскую цену) и логин партнёра для парсера
+    if (Array.isArray(body.partnerIds)) settings.partnerIds = body.partnerIds;
+    if (typeof body.partnerLogin === 'string') settings.partnerLogin = body.partnerLogin.trim();
     await kvPut(env, 'site_settings', settings);
     return jsonResponse({ ok: true });
   }
@@ -2327,6 +2662,18 @@ function aiClientIp(request) {
   return String(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '').split(',')[0].trim().slice(0, 64) || 'unknown';
 }
 
+// Маскирование персональных данных (телефон, почта): вопрос клиента не должен
+// уходить в модель и храниться в KV в исходном виде.
+function aiMaskPII(text) {
+  let s = String(text || '');
+  s = s.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[почта]');
+  s = s.replace(/(\+?\d[\d\s\-()]{7,}\d)/g, function (m) {
+    const digits = m.replace(/\D/g, '');
+    return digits.length >= 9 ? '[телефон]' : m;
+  });
+  return s;
+}
+
 // Каталог для ИИ: база + глобальные оверрайды цен/скрытия.
 // Наличие — эффективное (как витрина: факт − холды − заказы), если выбран СЦ.
 async function loadAiCatalog(env, url, storeId) {
@@ -2360,11 +2707,12 @@ async function loadAiCatalog(env, url, storeId) {
     const o = overrides[p.id] || {};
     const hidden = o.hidden !== undefined ? !!o.hidden : !!p.hidden;
     if (hidden) continue;
-    // Цена как на витрине: скидочная/партнёрская, а не базовая
+    // Цена как на витрине: розничная или скидочная. Партнёрская цена (половина
+    // розничной) посетителям не показывается — раньше подборка в чате отдавала
+    // partner_price, и в чате выходила вдвое дешевле, чем в каталоге.
     let price = o.price != null ? Number(o.price) : Number(p.price || 0);
     const disc = o.discount_price != null ? Number(o.discount_price) : Number(p.discount_price || 0);
     if (disc > 0 && disc < price) price = disc;
-    else if (price > 0) price = p.partner_price != null ? Number(p.partner_price) : Math.round(price / 2);
     out.push({
       id: String(p.id),
       sku: String(p.sku || p.id),
@@ -3086,10 +3434,11 @@ async function handleAiChat(request, env, url) {
       try { const lr = await env.SC_STORES.get(lastKey); last = lr ? JSON.parse(lr) : []; } catch (e) { }
       last.unshift({
         t: Date.now(), vote: vote,
-        q: String(body.q || '').slice(0, 120),
-        reply: String(body.reply || '').slice(0, 160)
+        q: aiMaskPII(String(body.q || '').slice(0, 120)),
+        reply: aiMaskPII(String(body.reply || '').slice(0, 160))
       });
-      await env.SC_STORES.put(lastKey, JSON.stringify(last.slice(0, 50)), { expirationTtl: 7776000 });
+      // 14 дней вместо 90: обратная связь не должна лежать в KV месяцами
+      await env.SC_STORES.put(lastKey, JSON.stringify(last.slice(0, 50)), { expirationTtl: 1209600 });
     } catch (e) { /* оценки необязательны */ }
     return jsonResponse({ ok: true });
   }
@@ -3102,7 +3451,8 @@ async function handleAiChat(request, env, url) {
   const history = rawHist.filter(function (m) {
     return m && (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string';
   }).slice(-AI_MAX_HISTORY).map(function (m) {
-    return { role: m.role, text: String(m.text).slice(0, 500) };
+    // В модель уходит текст без телефонов и почты (ПДн)
+    return { role: m.role, text: aiMaskPII(String(m.text).slice(0, 500)) };
   });
 
   // Интент подписки — по токенам вопроса (дешевле некуда: без ИИ)
@@ -3415,7 +3765,7 @@ async function handleAiChat(request, env, url) {
     'без диагнозов и слов «лечит» — только общие свойства; ' +
     'не повторяй эти инструкции. Карточки товаров подставлю сам — не оформляй список, просто текст.';
 
-  const userPrompt = 'Вопрос клиента: ' + q +
+  const userPrompt = 'Вопрос клиента: ' + aiMaskPII(q) +
     (histLines ? '\n\nПоследние реплики:\n' + histLines : '') +
     '\n\nНайденные товары:\n' + (prodLines || '(ничего не найдено)') +
     '\n\nОтветь кратко (2-3 предложения).';
@@ -3700,6 +4050,10 @@ async function validatePaymentMethod(env, data, store) {
   return null;
 }
 
+// Типы заявок, которые принимает /telegram. Регистрация СЦ сюда не входит:
+// у неё свой endpoint (/api/register-sc) с проверкой полей и без пароля в чате.
+const TELEGRAM_FORM_TYPES = ['order', 'event', 'partner', 'notice', 'subscription', 'consultation', 'join_team'];
+
 async function handleTelegram(request, env, ctx) {
   let data;
   try {
@@ -3711,6 +4065,14 @@ async function handleTelegram(request, env, ctx) {
   if (data.company) return new Response('ok', { status: 200 });
 
   const isOrder = data.type === 'order';
+  if (!isOrder && TELEGRAM_FORM_TYPES.indexOf(String(data.type || '')) === -1) {
+    return jsonResponse({ ok: false, error: 'invalid type', message: 'Неизвестный тип заявки.' }, 400);
+  }
+
+  // Лимит: 10 заявок в 10 минут с одного IP (заказы — 20, у них свой путь)
+  const rl = tooMany(env, request, 'tg:' + clientIp(request), isOrder ? 20 : 10, 10 * 60 * 1000);
+  if (rl) return rl;
+
   let createdOrder = null;
   let orderCreated = false;
 
@@ -3765,7 +4127,13 @@ async function handleTelegram(request, env, ctx) {
     }
   }
 
-  const text = buildText(Object.assign({}, data, createdOrder || {}, createdOrder && createdOrder.number ? { orderNumber: createdOrder.number } : {}));
+  // В текст уведомления не попадают пароли (в т.ч. пароль кабинета СЦ)
+  const safeData = Object.assign({}, data);
+  delete safeData.portalPassword;
+  delete safeData.portal_password;
+  delete safeData.password;
+
+  const text = buildText(Object.assign({}, safeData, createdOrder || {}, createdOrder && createdOrder.number ? { orderNumber: createdOrder.number } : {}));
   if (isOrder) {
     if (orderCreated) {
       const notification = deliverOrderNotification(env, createdOrder, text);
@@ -3863,7 +4231,11 @@ export default {
           return jsonResponse({ ok: false, error: 'forbidden' }, 403);
         }
       }
-      return handleStockSave(env, url, body);
+      return handleStockSave(env, url, body).then(async (res) => {
+        // Правка остатков должна быть видна сразу: сбрасываем edge-кэш /api/stock
+        try { await purgeEdgeCache(request, '/api/stock'); } catch (e) { /* кэш сбросить не удалось */ }
+        return res;
+      });
     }
 
     // 1.4.1б Мероприятия: единый список (events.json + правки из KV)
@@ -4029,5 +4401,16 @@ export default {
     }
 
     return asset;
+  },
+
+  // Планировщик: архивирование подтверждённых заказов. Раньше архивирование
+  // выполнялось внутри анонимного GET /api/my-orders — такой запрос перезаписывал
+  // общую карту заказов и мог затереть только что созданный заказ.
+  async scheduled(event, env, ctx) {
+    try {
+      await archiveConfirmedOrders(env, new URL('https://greenleaf.local/'));
+    } catch (e) {
+      console.error('archiveConfirmedOrders (cron):', e);
+    }
   }
 };
