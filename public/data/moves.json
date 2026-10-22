@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-21T14:28:25+03:00",
+  "updated": "2026-10-22T08:32:21+03:00",
   "moves": [
     {
       "number": "3658245",
@@ -9,8 +9,8 @@
       "sum": 983200.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "ASA210",
@@ -68,8 +68,8 @@
       "sum": 146080.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "JDA218",
@@ -87,8 +87,8 @@
       "sum": 555240.0,
       "source": "Астана поставщик",
       "recipient": "S240534",
-      "status": "Новый",
-      "statusCode": 0,
+      "status": "Отправлен",
+      "statusCode": 4,
       "items": [
         {
           "sku": "LYA134",
