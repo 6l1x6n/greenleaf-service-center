@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-27T15:15:03+03:00",
+  "updated": "2026-10-28T09:30:26+03:00",
   "moves": [
     {
       "number": "3672949",
@@ -281,19 +281,6 @@
       "itemsParsed": false
     },
     {
-      "number": "3533544",
-      "who": "s240534",
-      "time": "2026-09-24 13:16:31",
-      "date": "2026-09-24",
-      "sum": 1008000.0,
-      "source": "Астана поставщик \"новый\"",
-      "recipient": "S240534",
-      "status": "Отменен",
-      "statusCode": 9,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
       "number": "3533524",
       "who": "s240534",
       "time": "2026-09-24 13:15:57",
@@ -303,19 +290,6 @@
       "recipient": "S240534",
       "status": "Принят СЦ",
       "statusCode": 7,
-      "items": [],
-      "itemsParsed": false
-    },
-    {
-      "number": "3533519",
-      "who": "s240534",
-      "time": "2026-09-24 13:14:32",
-      "date": "2026-09-24",
-      "sum": 504000.0,
-      "source": "Астана поставщик \"новый\"",
-      "recipient": "S240534",
-      "status": "Отменен",
-      "statusCode": 9,
       "items": [],
       "itemsParsed": false
     },
