@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-07T09:50:02+03:00",
+  "updated": "2026-11-07T16:48:57+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -206,13 +206,13 @@
       "category": "Женская и детская гигиена",
       "price": 12400,
       "partner_price": 6200,
-      "quantity": 1,
+      "quantity": 0,
       "image": "assets/images/products/DAE086.jpg",
-      "status": "low",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 1
+        "s240534": 0
       },
       "description": "",
       "pv": 0.5
@@ -224,13 +224,13 @@
       "category": "Зубная гигиена",
       "price": 1800,
       "partner_price": 900,
-      "quantity": 524,
+      "quantity": 0,
       "image": "assets/images/products/KLA170.jpeg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 524
+        "s240534": 0
       },
       "description": "",
       "pv": 0.1
@@ -242,13 +242,13 @@
       "category": "Бытовая химия",
       "price": 4200,
       "partner_price": 2100,
-      "quantity": 110,
+      "quantity": 0,
       "image": "assets/images/products/CCA036.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 110
+        "s240534": 0
       },
       "description": "",
       "pv": 0.5
@@ -278,13 +278,13 @@
       "category": "Зубная гигиена",
       "price": 1600,
       "partner_price": 800,
-      "quantity": 37,
+      "quantity": 0,
       "image": "assets/images/products/EAA023.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 37
+        "s240534": 0
       },
       "description": "",
       "pv": 0.5
@@ -296,13 +296,13 @@
       "category": "Медицинские изделия",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 78,
+      "quantity": 0,
       "image": "assets/images/products/LPA043.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 78
+        "s240534": 0
       },
       "description": "",
       "pv": 1.0
@@ -314,13 +314,13 @@
       "category": "Зубная гигиена",
       "price": 1400,
       "partner_price": 700,
-      "quantity": 10,
+      "quantity": 0,
       "image": "assets/images/products/KLA260.jpeg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 10
+        "s240534": 0
       },
       "description": "",
       "pv": 0.2
@@ -332,13 +332,13 @@
       "category": "Зубная гигиена",
       "price": 1400,
       "partner_price": 700,
-      "quantity": 10,
+      "quantity": 0,
       "image": "assets/images/products/KLA261.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 10
+        "s240534": 0
       },
       "description": "",
       "pv": 0.2
@@ -350,13 +350,13 @@
       "category": "Бытовая химия",
       "price": 1200,
       "partner_price": 600,
-      "quantity": 180,
+      "quantity": 0,
       "image": "assets/images/products/ASF066.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 180
+        "s240534": 0
       },
       "description": "",
       "pv": 0.2
@@ -386,13 +386,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 50,
+      "quantity": 0,
       "image": "assets/images/products/ASF063.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 50
+        "s240534": 0
       },
       "description": "",
       "pv": 0.5
@@ -422,13 +422,13 @@
       "category": "Бытовая химия",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 34,
+      "quantity": 0,
       "image": "assets/images/products/CGA146.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 34
+        "s240534": 0
       },
       "description": "",
       "pv": 0.2
@@ -440,13 +440,13 @@
       "category": "Зубная гигиена",
       "price": 2600,
       "partner_price": 1300,
-      "quantity": 1,
+      "quantity": 0,
       "image": "assets/images/products/CCA038.jpg",
-      "status": "low",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 1
+        "s240534": 0
       },
       "description": "",
       "pv": 0.2
@@ -458,13 +458,13 @@
       "category": "Зубная гигиена",
       "price": 2400,
       "partner_price": 1200,
-      "quantity": 117,
+      "quantity": 0,
       "image": "assets/images/products/CCA033.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 117
+        "s240534": 0
       },
       "description": "",
       "pv": 0.5
@@ -476,13 +476,13 @@
       "category": "Зубная гигиена",
       "price": 3400,
       "partner_price": 1700,
-      "quantity": 1,
+      "quantity": 0,
       "image": "assets/images/products/CCB025.jpg",
-      "status": "low",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 1
+        "s240534": 0
       },
       "description": "",
       "pv": 0.2
@@ -512,13 +512,13 @@
       "category": "Зубная гигиена",
       "price": 1400,
       "partner_price": 700,
-      "quantity": 12,
+      "quantity": 0,
       "image": "assets/images/products/CCC001.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 12
+        "s240534": 0
       },
       "description": "",
       "pv": 0.2
@@ -1052,13 +1052,13 @@
       "category": "Уход за телом и косметика",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 30,
+      "quantity": 130,
       "image": "assets/images/products/CAB040.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 30
+        "s240534": 130
       },
       "description": "",
       "pv": 0.5
@@ -1070,13 +1070,13 @@
       "category": "Уход за телом и косметика",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 70,
+      "quantity": 170,
       "image": "assets/images/products/CAA038.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 70
+        "s240534": 170
       },
       "description": "",
       "pv": 0.5
@@ -1124,13 +1124,13 @@
       "category": "Уход за телом и косметика",
       "price": 6600,
       "partner_price": 3300,
-      "quantity": 49,
+      "quantity": 69,
       "image": "assets/images/products/KLA120.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 49
+        "s240534": 69
       },
       "description": "",
       "pv": 0.5
@@ -1430,13 +1430,13 @@
       "category": "Бытовая химия",
       "price": 6000,
       "partner_price": 3000,
-      "quantity": 12,
+      "quantity": 62,
       "image": "assets/images/products/KLA128.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 12
+        "s240534": 62
       },
       "description": "",
       "pv": 0.2
@@ -2456,13 +2456,13 @@
       "category": "Бытовая химия",
       "price": 4000,
       "partner_price": 2000,
-      "quantity": 231,
+      "quantity": 441,
       "image": "assets/images/products/KLA021.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 231
+        "s240534": 441
       },
       "description": "",
       "pv": 0.5
@@ -67747,14 +67747,14 @@
       "category": "Уход за телом и косметика",
       "price": 7400,
       "partner_price": 3700,
-      "quantity": 38,
+      "quantity": 0,
       "image": "assets/images/products/KLA025.jpg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "Состав: бикарбонат натрия, лимонная кислота, карбонат натрия, полиэтиленгликол пэг, крахмал, лаурилсульфат натрия, туалетная вода, тонер, эфирное масло морского аниса, эфирное масло лимона, эфирное масло мяты.\nПротивопоказание к применению:\n1. Дети до 3 лет.\n2. Людям с ранами следует использовать с осторожностью.\n3. Людям с чувствительной кожей следует использовать с осторожностью.\nПредупреждение:\nВо время принятия ванны, температура воды не должна быть слишком высокой. Поддерживать температуру воды около 42°С. Не рекомендуется принимать ванну слишком долго, достаточно 15-30 минут.\"\nКоличество 6 штук:\n- мечтательный морской синий цвет – 2 шт;\n- свежий лимонно-желтый цвет – 2 шт;\n- свежий мятно-зеленый цвет – 2 шт.\nОбъем: 50г х 6шт/коробка.",
       "stock": {
-        "s240534": 38
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/9627/2506231249kiI5lrvLUu.jpg",
@@ -67907,14 +67907,14 @@
       "category": "Зубная гигиена",
       "price": 1000,
       "partner_price": 500,
-      "quantity": 27,
+      "quantity": 0,
       "image": "assets/images/products/KLA162.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 27
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/685565/2607131141ObTVzE2AUf.png",
@@ -67927,14 +67927,14 @@
       "category": "Зубная гигиена",
       "price": 2600,
       "partner_price": 1300,
-      "quantity": 8,
+      "quantity": 0,
       "image": "assets/images/products/KLA163.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 8
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/603339/2607291210UDSUz5SWxz.png",
@@ -86979,14 +86979,14 @@
       "category": "Бытовая химия",
       "price": 0,
       "partner_price": 0,
-      "quantity": 113,
+      "quantity": 0,
       "image": "assets/images/products/ASG042.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 113
+        "s240534": 0
       },
       "hidden": false,
       "pv": 2.0,
@@ -96333,14 +96333,14 @@
       "price": 3800,
       "partner_price": 1900,
       "pv": 0.5,
-      "quantity": 143,
+      "quantity": 0,
       "image": "assets/images/products/KLA262.jpeg",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "Эффективное очищение и современный уход за полостью рта\nЗубная щётка CARICH лимитированной серии сочетает стильный минималистичный дизайн и продуманную конструкцию для комфортной ежедневной гигиены. Удлинённая мягкая щетина с добавлением древесного угля помогает тщательно очищать поверхность зубов и труднодоступные участки полости рта, обеспечивая ощущение чистоты и свежести после каждой чистки.\nЭргономичная ручка в скандинавском стиле удобно лежит в руке, обеспечивая полный контроль во время использования. Современный лаконичный дизайн делает щётку не только практичным средством гигиены, но и стильным аксессуаром для ванной комнаты.\nСвойства:\nУдлинённая щетина для более тщательного очищения\nЩетина с древесным углём\nПомогает эффективно очищать труднодоступные участки полости рта\nСпособствует поддержанию свежести дыхания\nМягкая щетина бережно очищает зубы и дёсны\nЭргономичная ручка обеспечивает удобный захват\nМинималистичный дизайн в скандинавском стиле\nПодходит для ежедневного использования\nКоличество:\n10 штук\nХарактеристики:\nЖёсткость щетины: мягкая\nТолщина щетины: 0,18 мм\nТермостойкость: до 80 °C\nСпособ применения:\nНанесите зубную пасту на щетину и чистите зубы не менее 2 минут, уделяя внимание всем поверхностям зубов и линии дёсен. После использования тщательно промойте щётку водой.",
       "stock": {
-        "s240534": 143
+        "s240534": 0
       },
       "hidden": false,
       "image_src": "/data/files/goods/685565/2609240839NM168t0A6z.jpeg"
@@ -101862,14 +101862,14 @@
       "price": 0,
       "partner_price": 0,
       "pv": 0.5,
-      "quantity": 171,
+      "quantity": 0,
       "image": "assets/images/products/KLA127.png",
-      "status": "in_stock",
+      "status": "out",
       "eta": null,
       "incoming": null,
       "description": "",
       "stock": {
-        "s240534": 171
+        "s240534": 0
       },
       "hidden": false,
       "pack": 36
