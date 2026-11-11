@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-10T18:35:42+03:00",
+  "updated": "2026-11-11T10:33:21+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -3626,13 +3626,13 @@
       "category": "Напитки и БАДы",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 27,
+      "quantity": 26,
       "image": "assets/images/products/NWA048.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 27
+        "s240534": 26
       },
       "description": "",
       "pv": 1.0
@@ -6221,13 +6221,13 @@
       "category": "Зубная гигиена",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 707,
+      "quantity": 703,
       "image": "assets/images/products/CCA016.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 707
+        "s240534": 703
       },
       "description": "",
       "pv": 1.0
