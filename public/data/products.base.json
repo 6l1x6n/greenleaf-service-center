@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-14T16:56:22+03:00",
+  "updated": "2026-11-15T10:34:11+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -2960,13 +2960,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 52,
+      "quantity": 51,
       "image": "assets/images/products/ASF053.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 52
+        "s240534": 51
       },
       "description": "",
       "pv": 0.5
@@ -4276,13 +4276,13 @@
       "category": "Уход за телом и косметика",
       "price": 5400,
       "partner_price": 2700,
-      "quantity": 92,
+      "quantity": 91,
       "image": "assets/images/products/KLA082.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 92
+        "s240534": 91
       },
       "description": "",
       "pv": 1.0
@@ -4312,13 +4312,13 @@
       "category": "Уход за телом и косметика",
       "price": 5400,
       "partner_price": 2700,
-      "quantity": 471,
+      "quantity": 470,
       "image": "assets/images/products/CAA039.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 471
+        "s240534": 470
       },
       "description": "",
       "pv": 1.0
@@ -6221,13 +6221,13 @@
       "category": "Зубная гигиена",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 634,
+      "quantity": 633,
       "image": "assets/images/products/CCA016.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 634
+        "s240534": 633
       },
       "description": "",
       "pv": 1.0
