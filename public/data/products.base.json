@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-15T17:41:51+03:00",
+  "updated": "2026-11-16T10:53:08+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -134,13 +134,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 38,
+      "quantity": 98,
       "image": "assets/images/products/LYA072.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 38
+        "s240534": 98
       },
       "description": "",
       "pv": 0.2
@@ -2150,13 +2150,13 @@
       "category": "Бытовая химия",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 15,
+      "quantity": 115,
       "image": "assets/images/products/ASA086.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 15
+        "s240534": 115
       },
       "description": "",
       "pv": 0.5
@@ -2636,13 +2636,13 @@
       "category": "Медицинские изделия",
       "price": 5200,
       "partner_price": 2600,
-      "quantity": 0,
+      "quantity": 268,
       "image": "assets/images/products/CIA060.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 268
       },
       "description": "",
       "pv": 0.5
@@ -2654,13 +2654,13 @@
       "category": "Бытовая химия",
       "price": 6000,
       "partner_price": 3000,
-      "quantity": 0,
+      "quantity": 3,
       "image": "assets/images/products/CEA080.png",
-      "status": "out",
+      "status": "low",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 3
       },
       "description": "",
       "pv": 0.2
@@ -2672,13 +2672,13 @@
       "category": "Бытовая химия",
       "price": 1800,
       "partner_price": 900,
-      "quantity": 0,
+      "quantity": 4,
       "image": "assets/images/products/LYA030.png",
-      "status": "out",
+      "status": "low",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 4
       },
       "description": "",
       "pv": 0.2
@@ -2690,13 +2690,13 @@
       "category": "Уход за телом и косметика",
       "price": 5200,
       "partner_price": 2600,
-      "quantity": 0,
+      "quantity": 109,
       "image": "assets/images/products/SBA087.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 109
       },
       "description": "",
       "pv": 0.5
@@ -2726,13 +2726,13 @@
       "category": "Уход за телом и косметика",
       "price": 4000,
       "partner_price": 2000,
-      "quantity": 0,
+      "quantity": 11,
       "image": "assets/images/products/CBE032.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 11
       },
       "description": "",
       "pv": 0.5
@@ -2744,13 +2744,13 @@
       "category": "Бытовая химия",
       "price": 5800,
       "partner_price": 2900,
-      "quantity": 0,
+      "quantity": 30,
       "image": "assets/images/products/ASF049.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 30
       },
       "description": "",
       "pv": 0.5
@@ -2762,13 +2762,13 @@
       "category": "Бытовая химия",
       "price": 2200,
       "partner_price": 1100,
-      "quantity": 0,
+      "quantity": 41,
       "image": "assets/images/products/ASF048.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 41
       },
       "description": "",
       "pv": 0.2
@@ -2780,13 +2780,13 @@
       "category": "Уход за телом и косметика",
       "price": 4200,
       "partner_price": 2100,
-      "quantity": 0,
+      "quantity": 73,
       "image": "assets/images/products/DAB087.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 73
       },
       "description": "",
       "pv": 0.7
@@ -2798,13 +2798,13 @@
       "category": "Уход за телом и косметика",
       "price": 3800,
       "partner_price": 1900,
-      "quantity": 0,
+      "quantity": 65,
       "image": "assets/images/products/DAA108.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 65
       },
       "description": "",
       "pv": 0.5
@@ -2816,13 +2816,13 @@
       "category": "Бытовая химия",
       "price": 3200,
       "partner_price": 1600,
-      "quantity": 0,
+      "quantity": 8,
       "image": "assets/images/products/DAC056.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 8
       },
       "description": "",
       "pv": 0.2
@@ -2834,13 +2834,13 @@
       "category": "Уход за телом и косметика",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 0,
+      "quantity": 63,
       "image": "assets/images/products/DAA107.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 63
       },
       "description": "",
       "pv": 0.2
@@ -2852,13 +2852,13 @@
       "category": "Зубная гигиена",
       "price": 2400,
       "partner_price": 1200,
-      "quantity": 0,
+      "quantity": 93,
       "image": "assets/images/products/DAA062.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 93
       },
       "description": "",
       "pv": 0.5
@@ -2870,13 +2870,13 @@
       "category": "Напитки и БАДы",
       "price": 2800,
       "partner_price": 1400,
-      "quantity": 0,
+      "quantity": 57,
       "image": "assets/images/products/CBE034.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 57
       },
       "description": "",
       "pv": 0.5
@@ -2888,13 +2888,13 @@
       "category": "Уход за телом и косметика",
       "price": 1600,
       "partner_price": 800,
-      "quantity": 0,
+      "quantity": 108,
       "image": "assets/images/products/CBB016.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 108
       },
       "description": "",
       "pv": 0.2
@@ -2906,13 +2906,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 0,
+      "quantity": 91,
       "image": "assets/images/products/ASF056.jpg",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 91
       },
       "description": "",
       "pv": 0.5
@@ -2924,13 +2924,13 @@
       "category": "Бытовая химия",
       "price": 3000,
       "partner_price": 1500,
-      "quantity": 0,
+      "quantity": 214,
       "image": "assets/images/products/ASF055.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 214
       },
       "description": "",
       "pv": 0.5
@@ -2942,13 +2942,13 @@
       "category": "Бытовая химия",
       "price": 7000,
       "partner_price": 3500,
-      "quantity": 0,
+      "quantity": 22,
       "image": "assets/images/products/ASF054.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 22
       },
       "description": "",
       "pv": 1.0
@@ -2960,13 +2960,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 0,
+      "quantity": 50,
       "image": "assets/images/products/ASF053.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 50
       },
       "description": "",
       "pv": 0.5
@@ -2978,13 +2978,13 @@
       "category": "Уход за телом и косметика",
       "price": 3800,
       "partner_price": 1900,
-      "quantity": 0,
+      "quantity": 74,
       "image": "assets/images/products/ASB047.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 0
+        "s240534": 74
       },
       "description": "",
       "pv": 0.5
@@ -3861,13 +3861,13 @@
       "category": "Напитки и БАДы",
       "price": 5400,
       "partner_price": 2700,
-      "quantity": 266,
+      "quantity": 506,
       "image": "assets/images/products/NWA050.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 266
+        "s240534": 506
       },
       "description": "",
       "pv": 1.5
@@ -5393,13 +5393,13 @@
       "category": "Бытовая химия",
       "price": 4600,
       "partner_price": 2300,
-      "quantity": 116,
+      "quantity": 176,
       "image": "assets/images/products/ASA112.jpeg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 116
+        "s240534": 176
       },
       "description": "",
       "pv": 1.0
@@ -102285,6 +102285,25 @@
       "description": "",
       "stock": {},
       "hidden": false
+    },
+    {
+      "id": "YBA065",
+      "sku": "YBA065",
+      "name": "YIBEILE Детская антибактериальная зубная щетка (2 шт. в упаковке)",
+      "category": "Зубная гигиена",
+      "price": 0,
+      "partner_price": 0,
+      "pv": 0,
+      "quantity": 0,
+      "image": "assets/images/products/YBA065.jpg",
+      "status": "out",
+      "eta": null,
+      "incoming": null,
+      "description": "",
+      "stock": {},
+      "hidden": false,
+      "pending": true,
+      "image_src": "/data/files/goods/8003/2611121457Ico2w1fmOV.jpg"
     }
   ]
 }
