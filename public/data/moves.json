@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-18T11:21:16+03:00",
+  "updated": "2026-11-18T21:19:58+03:00",
   "moves": [
     {
       "number": "3773321",
@@ -11,8 +11,14 @@
       "recipient": "S240534",
       "status": "Отправлен",
       "statusCode": 4,
-      "items": [],
-      "itemsParsed": false
+      "items": [
+        {
+          "sku": "SXA005",
+          "name": "SHOUXIZI Таблетированные конфеты из белой фасоли/120г",
+          "qty": 30
+        }
+      ],
+      "itemsParsed": true
     },
     {
       "number": "3773284",
