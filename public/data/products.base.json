@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-18T21:20:45+03:00",
+  "updated": "2026-11-19T11:21:43+03:00",
   "products": [
     {
       "id": "NWA110",
@@ -170,13 +170,13 @@
       "category": "Бытовая химия",
       "price": 4200,
       "partner_price": 2100,
-      "quantity": 163,
+      "quantity": 203,
       "image": "assets/images/products/ASA083.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 163
+        "s240534": 203
       },
       "description": "",
       "pv": 0.5
@@ -386,13 +386,13 @@
       "category": "Бытовая химия",
       "price": 3600,
       "partner_price": 1800,
-      "quantity": 50,
+      "quantity": 90,
       "image": "assets/images/products/ASF063.jpg",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 50
+        "s240534": 90
       },
       "description": "",
       "pv": 0.5
@@ -1430,13 +1430,13 @@
       "category": "Бытовая химия",
       "price": 6000,
       "partner_price": 3000,
-      "quantity": 48,
+      "quantity": 98,
       "image": "assets/images/products/KLA128.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 48
+        "s240534": 98
       },
       "description": "",
       "pv": 0.2
@@ -2600,13 +2600,13 @@
       "category": "Уход за телом и косметика",
       "price": 1200,
       "partner_price": 600,
-      "quantity": 137,
+      "quantity": 317,
       "image": "assets/images/products/CBF015.png",
       "status": "in_stock",
       "eta": null,
       "incoming": null,
       "stock": {
-        "s240534": 137
+        "s240534": 317
       },
       "description": "",
       "pv": 0.2
@@ -98204,14 +98204,16 @@
       "category": "Напитки и БАДы",
       "price": 0,
       "partner_price": 0,
-      "pv": 0,
-      "quantity": 0,
+      "pv": 5.0,
+      "quantity": 30,
       "image": "assets/images/products/SXA005.png",
-      "status": "out",
+      "status": "in_stock",
       "eta": null,
       "incoming": null,
       "description": "",
-      "stock": {},
+      "stock": {
+        "s240534": 30
+      },
       "hidden": false,
       "pack": 30
     },
